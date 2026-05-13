@@ -1,0 +1,543 @@
+/* --- KRT TRADERS PROFESSIONAL ERP STYLING --- */
+
+:root {
+    --primary-bg: #1a1a2e;    /* Dark Blue */
+    --sidebar-bg: #2c3e50;    /* Slate Gray */
+    --accent-green: #27ae60;  /* Success Green */
+    --accent-blue: #2980b9;   /* Info Blue */
+    --text-light: #ecf0f1;
+    --danger: #e74c3c;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    display: flex;
+    background-color: #f4f7f6;
+    color: #333;
+}
+
+/* --- SIDEBAR STYLING --- */
+#sidebar {
+    width: 250px;
+    background-color: var(--sidebar-bg);
+    color: var(--text-light);
+    height: 100vh;
+    position: fixed;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+    z-index: 100;
+}
+
+#sidebar h2 {
+    text-align: center;
+    padding: 20px 10px;
+    background-color: var(--primary-bg);
+    margin: 0;
+    font-size: 1.2rem;
+    letter-spacing: 1px;
+    border-bottom: 2px solid var(--accent-green);
+}
+
+#sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#sidebar ul li {
+    padding: 15px 25px;
+    border-bottom: 1px solid #34495e;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+}
+
+#sidebar ul li:hover {
+    background-color: var(--accent-green);
+    padding-left: 35px;
+}
+
+/* --- MAIN CONTENT AREA --- */
+#main-content {
+    margin-left: 250px;
+    padding: 30px;
+    width: calc(100% - 250px);
+}
+
+.header {
+    background: linear-gradient(135deg, var(--primary-bg), var(--sidebar-bg));
+    color: white;
+    padding: 20px;
+    text-align: center;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    text-transform: uppercase;
+}
+
+/* --- FORMS & INPUTS --- */
+.form-section {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    border-top: 4px solid var(--accent-blue);
+}
+
+.form-section h3 {
+    margin-top: 0;
+    color: var(--sidebar-bg);
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+input, select {
+    padding: 12px;
+    margin: 8px 5px;
+    border: 1px solid #dcdde1;
+    border-radius: 5px;
+    font-size: 14px;
+    width: calc(20% - 20px); /* Responsive width for inputs in a row */
+    min-width: 150px;
+    outline: none;
+}
+
+input:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 5px rgba(41, 128, 185, 0.2);
+}
+
+.btn {
+    padding: 12px 25px;
+    background-color: var(--accent-green);
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    font-weight: bold;
+    text-transform: uppercase;
+    transition: background 0.3s;
+}
+
+.btn:hover {
+    background-color: #219150;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* --- TABLE STYLING --- */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden; /* For rounded corners */
+}
+
+th, td {
+    padding: 15px;
+    text-align: left;
+    border-bottom: 1px solid #edf2f7;
+}
+
+th {
+    background-color: #f8f9fa;
+    color: var(--sidebar-bg);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+}
+
+tr:hover {
+    background-color: #f1f2f6;
+}
+
+/* --- REPORT CARDS --- */
+.daily-report-box {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.report-card {
+    flex: 1;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.report-card b {
+    display: block;
+    font-size: 1.5rem;
+    color: var(--accent-green);
+    margin-top: 10px;
+}
+
+/* --- FOOTER --- */
+.footer {
+    text-align: center;
+    padding: 20px;
+    color: #7f8c8d;
+    font-size: 0.8rem;
+    margin-top: 50px;
+}
+
+/* Print Styling */
+@media print {
+    #sidebar { display: none; }
+    #main-content { margin-left: 0; width: 100%; }
+    .btn { display: none; }
+}
+ body { font-family: Arial, sans-serif; margin: 0; display: flex; background: #f4f4f4; }
+        #sidebar { width: 250px; background: #2c3e50; color: white; height: 100vh; position: fixed; padding-top: 20px; }
+        #sidebar h2 { text-align: center; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        #sidebar ul { list-style: none; padding: 0; }
+        #sidebar ul li { padding: 15px; border-bottom: 1px solid #34495e; cursor: pointer; }
+        #sidebar ul li:hover { background: #1abc9c; }
+        
+        #main-content { margin-left: 260px; padding: 20px; width: 100%; }
+        .header { background: #1a1a2e; color: white; padding: 15px; text-align: center; border-radius: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 13px; }
+        th { background: #2c3e50; color: white; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        
+        .form-section { background: #fff; padding: 20px; border-radius: 5px; margin-bottom: 30px; border: 1px solid #ccc; }
+        input, select { padding: 8px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        .btn { padding: 10px 20px; background: #27ae60; color: white; border: none; cursor: pointer; border-radius: 4px; }
+ 
+        /* --- KRT TRADERS FINAL PROFESSIONAL DESIGN --- */
+
+:root {
+    --primary-bg: #1a1a2e;    
+    --sidebar-bg: #2c3e50;    
+    --accent-green: #27ae60;  
+    --accent-blue: #2980b9;   
+    --text-light: #ecf0f1;
+}
+
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    display: flex; /* Sidebar aur Content ko barabar laane ke liye */
+    background-color: #f4f7f6;
+    color: #333;
+}
+
+/* SIDEBAR: Left side par fix rahega */
+#sidebar {
+    width: 250px;
+    background-color: var(--sidebar-bg);
+    color: var(--text-light);
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+    z-index: 100;
+    overflow-y: auto;
+}
+
+#sidebar h2 {
+    text-align: center;
+    padding: 20px 10px;
+    background-color: var(--primary-bg);
+    margin: 0;
+    font-size: 1.2rem;
+    border-bottom: 2px solid var(--accent-green);
+}
+
+#sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#sidebar ul li {
+    padding: 15px 25px;
+    border-bottom: 1px solid #34495e;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+#sidebar ul li:hover {
+    background-color: var(--accent-green);
+    padding-left: 35px;
+}
+
+/* MAIN CONTENT: Sidebar ke agay se shuru hoga */
+#main-content {
+    margin-left: 250px; 
+    padding: 30px;
+    width: calc(100% - 250px);
+    box-sizing: border-box;
+}
+
+.header {
+    background: linear-gradient(135deg, var(--primary-bg), var(--sidebar-bg));
+    color: white;
+    padding: 20px;
+    text-align: center;
+    border-radius: 8px;
+    margin-bottom: 30px;
+}
+
+/* FORMS */
+.form-section {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    border-top: 4px solid var(--accent-blue);
+}
+
+input, select {
+    padding: 10px;
+    margin: 5px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    outline: none;
+}
+
+.btn {
+    padding: 10px 20px;
+    background-color: var(--accent-green);
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    font-weight: bold;
+}
+
+.btn:hover {
+    background-color: #219150;
+}
+
+/* TABLES */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    margin-top: 10px;
+}
+
+th, td {
+    padding: 12px;
+    text-align: left;
+    border: 1px solid #eee;
+}
+
+th {
+    background-color: #2c3e50;
+    color: white;
+}
+
+tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+/* PRINT SETTINGS */
+@media print {
+    #sidebar { display: none; }
+    #main-content { margin-left: 0; width: 100%; }
+}
+.btn-edit { background-color: #3498db; color: white; border: none; padding: 4px 8px; cursor: pointer; border-radius: 4px; margin-right: 5px; }
+.btn-delete { background-color: #e74c3c; color: white; border: none; padding: 4px 8px; cursor: pointer; border-radius: 4px; }
+.btn-edit:hover { background-color: #2980b9; }
+.btn-delete:hover { background-color: #c0392b; }
+.report-sub-heading {
+    background: #ecf0f1;
+    padding: 10px;
+    border-bottom: 2px solid #2c3e50;
+    color: #2c3e50;
+    font-weight: bold;
+}
+
+.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.styled-table th { background: #34495e; color: white; padding: 12px; }
+.styled-table td { padding: 10px; border-bottom: 1px solid #ddd; text-align: center; }
+
+.summary-footer {
+    display: flex;
+    justify-content: space-between;
+    background: #2c3e50;
+    color: white;
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 5px;
+}
+
+@media print {
+    .no-print, .sidebar { display: none !important; }
+    .main-content { margin: 0; width: 100%; }
+}
+/* --- Print Settings (Sidebar hatane ke liye) --- */
+@media print {
+    /* 1. Sidebar aur Buttons ko gayab karein */
+    #sidebar, 
+    .no-print, 
+    .btn, 
+    button,
+    #page-title {
+        display: none !important;
+    }
+
+    /* 2. Main content ko poori screen par phela dein */
+    #main-content {
+        margin-left: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    /* 3. Report Card ka border aur shadow hatayein taake saaf print aaye */
+    .report-card {
+        box-shadow: none !important;
+        border: none !important;
+        width: 100% !important;
+    }
+
+    /* 4. Table ko poora page cover karne dein */
+    table {
+        width: 100% !important;
+        border-collapse: collapse;
+    }
+}
+/* Mobile View Fix */
+@media (max-width: 768px) {
+    #sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    #main-content {
+        margin-left: 0;
+    }
+}
+/* Toggle Button ki position fix karne ke liye */
+#toggle-btn {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1100;
+    background: #1a1a2e;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    font-size: 20px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Logout ko red color dene ke liye */
+.logout-item {
+    background-color: #e74c3c !important;
+    color: white !important;
+    font-weight: bold;
+    margin-top: 30px; /* Thora gap taake alag nazar aaye */
+}
+
+.logout-item:hover {
+    background-color: #c0392b !important;
+}
+
+/* Toggle Button: Isay top-left par fix karne ke liye */
+#toggle-btn {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 10000; /* Login screen se bhi upar taake hamesha nazar aaye */
+    background: #1a1a2e;
+    color: white;
+    border: 1px solid #27ae60;
+    padding: 6px 12px;
+    font-size: 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: none; /* Shuru mein chhupa hua, login ke baad show hoga */
+}
+
+/* Sidebar Animation */
+#sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 250px;
+    transition: 0.3s ease;
+    z-index: 999;
+}
+
+/* Jab sidebar band ho to content poori screen par aa jaye */
+#main-content {
+    margin-left: 250px;
+    transition: 0.3s ease;
+}
+
+/* Logout ka red rang */
+.logout-item {
+    background-color: #e74c3c !important;
+    color: white !important;
+    font-weight: bold;
+    margin-top: 20px;
+}
+
+/* --- MOBILE RESPONSIVENESS --- */
+
+/* Jab screen 768px se choti ho (Tablets aur Mobiles) */
+@media (max-width: 768px) {
+    
+    /* 1. Sidebar ko shuru mein screen se bahar nikal dein */
+    #sidebar {
+        left: -250px;
+        width: 250px;
+        transition: 0.3s ease;
+    }
+
+    /* 2. Main content ko poori screen par le aao */
+    #main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+        padding: 10px;
+    }
+
+    /* 3. Tables ko scrollable banayein taake screen se bahar na jayen */
+    .erp-page {
+        overflow-x: auto;
+    }
+
+    table {
+        min-width: 600px; /* Table chota nahi hoga, scroll hoga */
+    }
+
+    /* 4. Form inputs ko aik line mein laane ki bajaye oopar niche karein */
+    .form-section input, 
+    .form-section select, 
+    .form-section button {
+        width: 100% !important;
+        margin-bottom: 10px;
+    }
+
+    /* 5. Header text thora chota kar dein */
+    #page-title {
+        font-size: 18px;
+        text-align: center;
+    }
+}
