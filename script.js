@@ -1,37 +1,4 @@
-// --- 1. FIREBASE CONFIGURATION ---
-const firebaseConfig = {
-  apiKey: "AIzaSyCQoe3T-fhQk6u874G9XwNNmQFAVoIG8Ps",
-  authDomain: "krt-traders-official.firebaseapp.com",
-  projectId: "krt-traders-official",
-  storageBucket: "krt-traders-official.firebasestorage.app",
-  messagingSenderId: "980290527140",
-  appId: "1:980290527140:web:2e8bd8d180a7dc9deb6b31",
-  measurementId: "G-QCYZFGE6QX"
-};
 
-// Firebase ko activate karein
-firebase.initializeApp(firebaseConfig);
-const dbRef = firebase.database().ref('krt_traders_data');
-
-// Purana localStorage wala logic ab khatam
-let db = { in: [], out: [], ledgers: {}, opening_balances: {} };
-
-// --- 2. ONLINE DATA SYNC ---
-dbRef.on('value', (snapshot) => {
-    const data = snapshot.val();
-    if (data) {
-        db = data;
-        renderAll(); 
-        console.log("Bilal Bhai, Data Online Sync Ho Gaya!");
-    }
-});
-
-// Cloud par data save karne ka function
-function saveAndRefresh() {
-    dbRef.set(db).then(() => {
-        renderAll();
-    }).catch(err => alert("Internet slow hai ya connect nahi: " + err));
-}
 
 
 // --- 1. DATABASE INITIALIZATION ---
@@ -683,50 +650,3 @@ function switchPage(pageId, title) {
     }
 }
 
-
-// --- 1. FIREBASE CONFIGURATION ---
-// Firebase Console > Project Settings > Your Apps mein se ye details yahan bharein:
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
-
-// Firebase Initialize karein
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
-
-// --- 2. DATABASE LOGIC (ONLINE SYNC) ---
-let db = { in: [], out: [] };
-
-// Firebase se data load karne ka function
-function loadDataFromCloud() {
-    database.ref('krt_erp_data').on('value', (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            db = data;
-            renderAll(); // Ye aapka purana function hai jo table update karta hai
-        }
-    });
-}
-
-// Data save karne ka naya tareeqa (Cloud par)
-function saveAndRefresh() {
-    database.ref('krt_erp_data').set(db)
-    .then(() => {
-        console.log("Data Online Save Ho Gaya!");
-        renderAll();
-    })
-    .catch((error) => {
-        alert("Error: Data save nahi ho saka. Internet check karein.");
-    });
-}
-
-// Software shuru hote hi cloud se data mangwao
-loadDataFromCloud();
-
-// --- Baki aapka Login aur Pages wala code niche waisa hi rahega ---
