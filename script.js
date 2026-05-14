@@ -12,6 +12,10 @@ function saveAndRefresh() {
     renderAll();
 }
 
+const supabaseUrl = 'https://zeadgtkzqooiswyyuozl.supabase.co';
+const supabaseKey = 'sb_publishable_b4jLu7Bx2dsGtLR72i8dMA_0eGc0...'; // Yahan apni poori key paste karein
+const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
 /// --- UPDATED LOGIN SYSTEM ---
 function login() {
     let u = document.getElementById('user').value.trim();
