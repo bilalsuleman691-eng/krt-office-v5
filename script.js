@@ -654,3 +654,20 @@ function switchPage(pageId, title) {
     }
 }
 
+async function addStockData(itemName, stockIn, stockOut) {
+  const { data, error } = await supabase
+    .from('KRT')
+    .insert([
+      { 
+        item_name: itemName, 
+        stock_in: stockIn, 
+        stock_out: stockOut 
+      }
+    ]);
+
+  if (error) {
+    console.error('Error inserting data:', error);
+  } else {
+    alert('Stock updated successfully!');
+  }
+}
