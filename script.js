@@ -87,74 +87,64 @@ async function addIn() {
     const date = document.getElementById('in-date').value;
     const vendor = document.getElementById('in-vendor').value;
     const item = document.getElementById('in-item').value.trim();
-    const barcode = document.getElementById('in-barcode').value; // Barcode variable
+    const barcode = document.getElementById('in-barcode').value; 
     const qty = Number(document.getElementById('in-qty').value);
     const price = Number(document.getElementById('in-price').value);
 
     if (!date || !item || qty <= 0) {
-        alert("Bilal Bhai, Date, Item aur Qty lazmi likhain!");
+        alert("Bilal Bhai, details lazmi likhain!");
         return;
     }
 
-    // Cloud Sync: Variable name '_supabase' aur column names sahi karein
+    // --- CLOUD SYNC START ---
     try {
-        await _supabase.from('KRT').insert([
+        // Sirf wahi 3 columns bhejein jo Supabase table (image_87a3b6.jpg) mein hain
+        const { error } = await _supabase.from('KRT').insert([
             { 
                 item_name: item, 
                 stock_in: qty, 
-                stock_out: 0,
-                
+                stock_out: 0 
             }
         ]);
+        
+        if(error) {
+            console.error("Supabase reject:", error);
+            alert("Cloud sync fail: " + error.message);
+            return; // Agar cloud pe save na ho to aage na barhein
+        }
     } catch (err) {
-        console.error("Cloud Save Error:", err);
+        console.error("Connection Error:", err);
+        return;
     }
+    // --- CLOUD SYNC END ---
 
-    // Local DB Update
+    // Local DB Update (Ye sirf isi laptop ke liye hai)
     db.in.push({ date, vendor, item, barcode, qty, price, total: qty * price });
     saveAndRefresh();
-    alert("Stock IN Save Ho Gaya!");
+    alert("Stock IN Cloud aur Local dono par save ho gaya!");
 }
 async function addOut() {
-    const date = document.getElementById('out-date').value;
-    const cust = document.getElementById('out-customer').value;
     const item = document.getElementById('out-item').value.trim();
-    const bc = document.getElementById('out-barcode').value;
     const qty = Number(document.getElementById('out-qty').value);
-    const price = Number(document.getElementById('out-price').value);
+    const date = document.getElementById('out-date').value;
 
-    if(!date || !item || qty <= 0) {
-        alert("Date, Item aur Qty sahi likhain!");
-        return;
-    }
-
-    // Stock Check Logic
+    // Stock check logic (Local check)
     const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
-    const currentStock = tin - tout;
+    if(qty > (tin - tout)) { alert("Stock kam hai!"); return; }
 
-    if(qty > currentStock) {
-        alert("Stock kam hai! Total bacha: " + currentStock);
-        return;
-    }
-
-    // Cloud Sync: Correct variable '_supabase'
     try {
-        await _supabase.from('KRT').insert([
-            { 
-                item_name: item, 
-                stock_in: 0, 
-                stock_out: qty,
-             }
+        const { error } = await _supabase.from('KRT').insert([
+            { item_name: item, stock_in: 0, stock_out: qty }
         ]);
-    } catch (err) {
-        console.error("Cloud Save Error:", err);
-    }
+        if (error) throw error;
 
-    // Local DB Update
-    db.out.push({ date, cust, item, bc, qty, price, total: qty * price });
-    saveAndRefresh();
-    alert("Sale Save Ho Gayi!");
+        db.out.push({ item, qty, date });
+        saveAndRefresh();
+        alert("Stock OUT Done!");
+    } catch (err) {
+        alert("Cloud Error: " + err.message);
+    }
 }
 // --- 5. MAIN RENDER FUNCTION (Table Display Logic) ---
 // --- 5. MAIN RENDER FUNCTION ---
@@ -678,3 +668,34 @@ async function addStockData(itemName, stockIn, stockOut) {
     alert('Stock updated successfully!');
   }
 }
+
+
+async function fetchCloudData() {
+    try {
+        const { data, error } = await _supabase.from('KRT').select('*');
+        if (error) throw error;
+
+        if (data) {
+            // Cloud data ko local format mein convert karna
+            db.in = data.filter(x => x.stock_in > 0).map(x => ({
+                item: x.item_name,
+                qty: x.stock_in,
+                date: x.created_at.split('T')[0] // Database ki date lena
+            }));
+            
+            db.out = data.filter(x => x.stock_out > 0).map(x => ({
+                item: x.item_name,
+                qty: x.stock_out,
+                date: x.created_at.split('T')[0]
+            }));
+
+            renderAll(); // Table update karein
+            console.log("Cloud data loaded!");
+        }
+    } catch (err) {
+        console.error("Fetch error:", err);
+    }
+}
+
+// Software load hotay hi data mangwao
+window.onload = fetchCloudData;
