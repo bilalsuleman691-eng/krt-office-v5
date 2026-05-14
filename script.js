@@ -1,10 +1,7 @@
 
 
-// --- SUPABASE CONFIGURATION ---
-const supabaseUrl = 'https://zeadgtkzqooisuyyuozi.supabase.co';
-const supabaseKey = 'sb_publishable_b4jLu78x2dsGtLR72i8dMA_0oGg0';
-
-// 'supabase' library ka naam hai, variable ka naam '_supabase' rakh lain
+const supabaseUrl = 'https://zeadgtkzqooiswyyuozl.supabase.co'; // Ye URL sahi hai
+const supabaseKey = 'sb_publishable_...'; // Yahan Secret key ki jagah Publishable key dalein
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
 // --- 1. DATABASE INITIALIZATION ---
