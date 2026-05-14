@@ -257,12 +257,6 @@ function deleteEntry(type, index) {
     }
 }
 
-function switchPage(pageId, titleText) {
-    document.querySelectorAll('.erp-page').forEach(p => p.style.display = 'none');
-    const target = document.getElementById(pageId);
-    if(target) target.style.display = 'block';
-    document.getElementById('page-title').innerText = "KRT TRADERS ERP - " + titleText;
-}
 
 
 // --- 6. MASTER SEARCH & EDITOR LOGIC ---
