@@ -676,26 +676,27 @@ async function fetchCloudData() {
         if (error) throw error;
 
         if (data) {
-            // Cloud data ko local format mein convert karna
+            // "Safe" Mapping: Agar date na ho to aaj ki date laga do
+            const today = new Date().toISOString().split('T')[0];
+
             db.in = data.filter(x => x.stock_in > 0).map(x => ({
                 item: x.item_name,
                 qty: x.stock_in,
-                date: x.created_at.split('T')[0] // Database ki date lena
+                date: x.created_at ? x.created_at.split('T')[0] : today
             }));
             
             db.out = data.filter(x => x.stock_out > 0).map(x => ({
                 item: x.item_name,
                 qty: x.stock_out,
-                date: x.created_at.split('T')[0]
+                date: x.created_at ? x.created_at.split('T')[0] : today
             }));
 
-            renderAll(); // Table update karein
-            console.log("Cloud data loaded!");
+            renderAll(); 
+            console.log("Cloud data synced successfully!");
         }
     } catch (err) {
         console.error("Fetch error:", err);
     }
 }
-
 // Software load hotay hi data mangwao
 window.onload = fetchCloudData;
