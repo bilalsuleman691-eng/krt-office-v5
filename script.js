@@ -1,11 +1,16 @@
 
 
+// --- SUPABASE CONFIGURATION ---
+const supabaseUrl = 'https://zeadgtkzqooisuyyuozi.supabase.co';
+const supabaseKey = 'sb_publishable_b4jLu78x2dsGtLR72i8dMA_0oGg0'; // Aapki key jo image mein dikh rahi hai
+const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
 // --- 1. DATABASE INITIALIZATION ---
 let db = JSON.parse(localStorage.getItem('krt_erp_data')) || {
     in: [],
     out: []
 };
+// ... baaki poora code
 
 function saveAndRefresh() {
     localStorage.setItem('krt_erp_data', JSON.stringify(db));
