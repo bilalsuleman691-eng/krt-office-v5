@@ -305,13 +305,38 @@ function generateCustomReport() {
     document.getElementById('sum-profit').innerText = "PKR " + (totalOut - totalIn).toLocaleString();
 }
 
-function deleteEntry(type, index) {
-    if(confirm("Waqai delete karna hai?")) {
+async function deleteEntry(type, index) {
+    if(confirm("Bilal Bhai, kya aap waqai ye record delete karna chahte hain?")) {
+        const record = db[type][index];
+
+        // 1. Agar record cloud se aaya hai (usmein ID hai), to Supabase se delete karo
+        if (record.id) {
+            try {
+                const { error } = await _supabase
+                    .from('KRT')
+                    .delete()
+                    .eq('id', record.id);
+
+                if (error) {
+                    alert("Cloud delete error: " + error.message);
+                    return;
+                }
+            } catch (err) {
+                alert("Internet ka masla hai, delete nahi ho saka.");
+                return;
+            }
+        }
+
+        // 2. Cloud se delete hone ke baad local se bhi hata dein
         db[type].splice(index, 1);
         saveAndRefresh();
+        
+        // Agar Master Search khuli hai to usay bhi update karein
+        if(typeof generateMasterSearch === "function") {
+            generateMasterSearch();
+        }
     }
 }
-
 
 
 // --- 6. MASTER SEARCH & EDITOR LOGIC ---
