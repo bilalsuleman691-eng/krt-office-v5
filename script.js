@@ -675,3 +675,52 @@ window.addEventListener('load', () => {
     fetchCloudData();
     // Agar koi aur function bhi load par chalana ho to yahan add kar sakte hain
 });
+
+async function fetchCloudData() {
+    try {
+        const { data, error } = await _supabase.from('KRT').select('*');
+        
+        if (error) {
+            console.error("Cloud data fetch error:", error);
+            return;
+        }
+
+        if (data) {
+            console.log("Cloud data synced successfully:", data);
+
+            const today = new Date().toISOString().split('T')[0];
+
+            db.in = [];
+            db.out = [];
+
+            data.forEach(row => {
+                if (row.stock_in > 0) {
+                    db.in.push({
+                        item: row.item_name,
+                        qty: row.stock_in,
+                        date: row.created_at ? row.created_at.split('T')[0] : today,
+                        price: 0, 
+                        total: 0,
+                        vendor: "Cloud Sync"
+                    });
+                }
+                if (row.stock_out > 0) {
+                    db.out.push({
+                        item: row.item_name,
+                        qty: row.stock_out,
+                        date: row.created_at ? row.created_at.split('T')[0] : today,
+                        price: 0,
+                        total: 0,
+                        cust: "Cloud Sync"
+                    });
+                }
+            });
+
+            // --- YAHAN ADD KAREIN ---
+            localStorage.setItem('krt_erp_data', JSON.stringify(db)); // Local storage update karein
+            renderAll(); // Phir screen refresh karein
+        }
+    } catch (err) {
+        console.error("Connection failed:", err);
+    }
+}
