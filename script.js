@@ -1,6 +1,6 @@
 
 
-const supabaseUrl = 'https://zeadgtkzqooiswyyuozl.supabase.co';
+const supabaseUrl = 'https://zeadgtkzqooiswyyuozl.supabase.co/rest/v1/';
 const supabaseKey = 'sb_publishable_b4jLu7Bx2dsGtLR72i8dMA_OeGcOu79'; // Yahan Secret key ki jagah Publishable key dalein
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
