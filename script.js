@@ -95,11 +95,20 @@ function addIn() {
         total: qty * price
     };
 
+  // --- SUPABASE CLOUD SAVE ---
+    const { data, error } = await supabase
+        .from('KRT')
+        .insert([{ item_name: item, stock_in: qty, stock_out: 0 }]);
+
+    if (error) {
+        console.error('Supabase Error:', error);
+    }
+
     db.in.push(entry); 
     saveAndRefresh();
     
     document.querySelectorAll('#page-stock-in input').forEach(input => input.value = '');
-    alert("Stock IN Saved!");
+    alert("Stock IN Saved to Local & Cloud!");
 }
 
 function addOut() {
@@ -133,12 +142,20 @@ function addOut() {
         price: price,
         total: qty * price
     };
+// --- SUPABASE CLOUD SAVE ---
+    const { data, error } = await supabase
+        .from('KRT')
+        .insert([{ item_name: item, stock_in: 0, stock_out: qty }]);
+
+    if (error) {
+        console.error('Supabase Error:', error);
+    }
 
     db.out.push(newSale);
     saveAndRefresh();
     
     document.querySelectorAll('#page-stock-out input').forEach(input => input.value = '');
-    alert("Sale Saved!");
+    alert("Sale Saved to Local & Cloud!");
 }
 // --- 5. MAIN RENDER FUNCTION (Table Display Logic) ---
 // --- 5. MAIN RENDER FUNCTION ---
