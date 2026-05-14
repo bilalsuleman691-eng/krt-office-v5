@@ -687,9 +687,9 @@ async function fetchCloudData() {
 
         if (data) {
             console.log("Cloud data synced successfully:", data);
-
             const today = new Date().toISOString().split('T')[0];
 
+            // Resetting local arrays before sync to avoid duplicates
             db.in = [];
             db.out = [];
 
@@ -698,10 +698,12 @@ async function fetchCloudData() {
                     db.in.push({
                         item: row.item_name,
                         qty: row.stock_in,
+                        // Agar created_at hai to wo date, warna aaj ki date
                         date: row.created_at ? row.created_at.split('T')[0] : today,
-                        price: 0, 
-                        total: 0,
-                        vendor: "Cloud Sync"
+                        price: row.price || 0, 
+                        total: (row.stock_in * (row.price || 0)),
+                        // Yahan "Cloud Sync" ki jagah dynamic naam aayega
+                        vendor: row.vendor_name || "Factory Stock"
                     });
                 }
                 if (row.stock_out > 0) {
@@ -709,16 +711,17 @@ async function fetchCloudData() {
                         item: row.item_name,
                         qty: row.stock_out,
                         date: row.created_at ? row.created_at.split('T')[0] : today,
-                        price: 0,
-                        total: 0,
-                        cust: "Cloud Sync"
+                        price: row.price || 0,
+                        total: (row.stock_out * (row.price || 0)),
+                        // Yahan "Cloud Sync" ki jagah customer ka naam aayega
+                        cust: row.customer_name || "General Sale"
                     });
                 }
             });
 
-            // --- YAHAN ADD KAREIN ---
-            localStorage.setItem('krt_erp_data', JSON.stringify(db)); // Local storage update karein
-            renderAll(); // Phir screen refresh karein
+            // Local storage ko refresh karein taake data save ho jaye
+            localStorage.setItem('krt_erp_data', JSON.stringify(db)); 
+            renderAll(); 
         }
     } catch (err) {
         console.error("Connection failed:", err);
