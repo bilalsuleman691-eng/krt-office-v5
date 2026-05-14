@@ -103,7 +103,7 @@ async function addIn() {
                 item_name: item, 
                 stock_in: qty, 
                 stock_out: 0,
-                barcode: barcode // Agar table mein column hai to
+                
             }
         ]);
     } catch (err) {
@@ -145,8 +145,7 @@ async function addOut() {
                 item_name: item, 
                 stock_in: 0, 
                 stock_out: qty,
-                barcode: bc 
-            }
+             }
         ]);
     } catch (err) {
         console.error("Cloud Save Error:", err);
