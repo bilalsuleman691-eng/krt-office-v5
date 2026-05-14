@@ -2,8 +2,10 @@
 
 // --- SUPABASE CONFIGURATION ---
 const supabaseUrl = 'https://zeadgtkzqooisuyyuozi.supabase.co';
-const supabaseKey = 'sb_publishable_b4jLu78x2dsGtLR72i8dMA_0oGg0'; // Aapki key jo image mein dikh rahi hai
-const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+const supabaseKey = 'sb_publishable_b4jLu78x2dsGtLR72i8dMA_0oGg0';
+
+// 'supabase' library ka naam hai, variable ka naam '_supabase' rakh lain
+const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
 // --- 1. DATABASE INITIALIZATION ---
 let db = JSON.parse(localStorage.getItem('krt_erp_data')) || {
@@ -27,22 +29,30 @@ function login() {
     if(u === "admin" && p === "123") {
         showSystem("admin");
         alert("Khush Amdeed, Bilal Bhai (Admin)!");
+        document.getElementById('toggle-btn').style.display = "block";
     } 
     // 2. Report Only Access (Staff)
     else if(u === "ali" && p === "123") {
         showSystem("staff");
         alert("Staff Login: Sirf Reports ka access hai.");
+        document.getElementById('toggle-btn').style.display = "block";
     } 
-    // 3. Ledger & Rent Access (Manager) - NAYA ACCOUNT
+    // 3. Ledger & Rent Access (Manager)
     else if(u === "sattar" && p === "786") {
         showSystem("manager");
         alert("Manager Login: Ledgers aur Rent Book ka access hai.");
+        document.getElementById('toggle-btn').style.display = "block";
     }
+    // 4. Extra Users Check (Jo aapne dashboard se banaye)
     else {
-        alert("Ghalat ID ya Password!");
+        let isExtra = checkExtraUsers(u, p);
+        if(!isExtra) {
+            alert("Ghalat ID ya Password!");
+        } else {
+            document.getElementById('toggle-btn').style.display = "block";
+        }
     }
 }
-
 function showSystem(role) {
     document.getElementById('login-screen').style.display = "none";
     document.getElementById('sidebar').style.display = "block";
@@ -76,12 +86,11 @@ function showSystem(role) {
 
     renderAll();
 }
-// --- 3. STOCK IN (PURCHASE) ---
 async function addIn() {
     const date = document.getElementById('in-date').value;
     const vendor = document.getElementById('in-vendor').value;
     const item = document.getElementById('in-item').value.trim();
-    const barcode = document.getElementById('in-barcode').value;
+    const barcode = document.getElementById('in-barcode').value; // Barcode variable
     const qty = Number(document.getElementById('in-qty').value);
     const price = Number(document.getElementById('in-price').value);
 
@@ -90,32 +99,25 @@ async function addIn() {
         return;
     }
 
-    const entry = {
-        date: date, // Kisi bhi date ki entry save hogi
-        vendor: vendor,
-        item: item,
-        barcode: barcode,
-        qty: qty,
-        price: price,
-        total: qty * price
-    };
-
-  // --- SUPABASE CLOUD SAVE ---
-    const { data, error } = await supabase
-        .from('KRT')
-        .insert([{ item_name: item, stock_in: qty, stock_out: 0 }]);
-
-    if (error) {
-        console.error('Supabase Error:', error);
+    // Cloud Sync: Variable name '_supabase' aur column names sahi karein
+    try {
+        await _supabase.from('KRT').insert([
+            { 
+                item_name: item, 
+                stock_in: qty, 
+                stock_out: 0,
+                barcode: barcode // Agar table mein column hai to
+            }
+        ]);
+    } catch (err) {
+        console.error("Cloud Save Error:", err);
     }
 
-    db.in.push(entry); 
+    // Local DB Update
+    db.in.push({ date, vendor, item, barcode, qty, price, total: qty * price });
     saveAndRefresh();
-    
-    document.querySelectorAll('#page-stock-in input').forEach(input => input.value = '');
-    alert("Stock IN Saved to Local & Cloud!");
+    alert("Stock IN Save Ho Gaya!");
 }
-
 async function addOut() {
     const date = document.getElementById('out-date').value;
     const cust = document.getElementById('out-customer').value;
@@ -129,6 +131,7 @@ async function addOut() {
         return;
     }
 
+    // Stock Check Logic
     const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const currentStock = tin - tout;
@@ -138,29 +141,24 @@ async function addOut() {
         return;
     }
 
-    const newSale = { 
-        date: date, 
-        cust: cust, 
-        item: item, 
-        bc: bc, 
-        qty: qty, 
-        price: price,
-        total: qty * price
-    };
-// --- SUPABASE CLOUD SAVE ---
-    const { data, error } = await supabase
-        .from('KRT')
-        .insert([{ item_name: item, stock_in: 0, stock_out: qty }]);
-
-    if (error) {
-        console.error('Supabase Error:', error);
+    // Cloud Sync: Correct variable '_supabase'
+    try {
+        await _supabase.from('KRT').insert([
+            { 
+                item_name: item, 
+                stock_in: 0, 
+                stock_out: qty,
+                barcode: bc 
+            }
+        ]);
+    } catch (err) {
+        console.error("Cloud Save Error:", err);
     }
 
-    db.out.push(newSale);
+    // Local DB Update
+    db.out.push({ date, cust, item, bc, qty, price, total: qty * price });
     saveAndRefresh();
-    
-    document.querySelectorAll('#page-stock-out input').forEach(input => input.value = '');
-    alert("Sale Saved to Local & Cloud!");
+    alert("Sale Save Ho Gayi!");
 }
 // --- 5. MAIN RENDER FUNCTION (Table Display Logic) ---
 // --- 5. MAIN RENDER FUNCTION ---
@@ -674,7 +672,7 @@ function switchPage(pageId, title) {
 }
 
 async function addStockData(itemName, stockIn, stockOut) {
-  const { data, error } = await supabase
+  const { data, error } = await _supabase
     .from('KRT')
     .insert([
       { 
