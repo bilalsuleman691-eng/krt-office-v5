@@ -72,7 +72,7 @@ function showSystem(role) {
     renderAll();
 }
 // --- 3. STOCK IN (PURCHASE) ---
-function addIn() {
+async function addIn() {
     const date = document.getElementById('in-date').value;
     const vendor = document.getElementById('in-vendor').value;
     const item = document.getElementById('in-item').value.trim();
@@ -111,7 +111,7 @@ function addIn() {
     alert("Stock IN Saved to Local & Cloud!");
 }
 
-function addOut() {
+async function addOut() {
     const date = document.getElementById('out-date').value;
     const cust = document.getElementById('out-customer').value;
     const item = document.getElementById('out-item').value.trim();
