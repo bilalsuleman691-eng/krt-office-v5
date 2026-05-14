@@ -4,6 +4,14 @@ const supabaseUrl = 'https://zeadgtkzqooiswyyuozl.supabase.co';
 const supabaseKey = 'sb_publishable_b4jLu7Bx2dsGtLR72i8dMA_OeGcOu79'; // Yahan Secret key ki jagah Publishable key dalein
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
+2. YAHAN LIKHEIN (Database Initialization)
+// Ye line functions se bahar honi chahiye taake har function isay use kar sakay
+let db = JSON.parse(localStorage.getItem('krt_erp_data')) || {
+    in: [],
+    out: []
+};
+
+
 // --- 1. DATABASE INITIALIZATION ---
 let db = JSON.parse(localStorage.getItem('krt_erp_data')) || {
     in: [],
@@ -84,6 +92,7 @@ function showSystem(role) {
     renderAll();
 }
 async function addIn() {
+    // UI se values lena
     const date = document.getElementById('in-date').value;
     const vendor = document.getElementById('in-vendor').value;
     const item = document.getElementById('in-item').value.trim();
@@ -91,60 +100,122 @@ async function addIn() {
     const qty = Number(document.getElementById('in-qty').value);
     const price = Number(document.getElementById('in-price').value);
 
+    // 1. Validation: Check karna ke zaroori maloomat bhari hain ya nahi
     if (!date || !item || qty <= 0) {
         alert("Bilal Bhai, details lazmi likhain!");
         return;
     }
 
-    // --- CLOUD SYNC START ---
+    // 2. Cloud Sync: Supabase mein data bhejnan
     try {
-        // Sirf wahi 3 columns bhejein jo Supabase table (image_87a3b6.jpg) mein hain
         const { error } = await _supabase.from('KRT').insert([
             { 
                 item_name: item, 
                 stock_in: qty, 
-                stock_out: 0 
+                stock_out: 0,
+                price: price,        // Price bhej rahe hain taake calculation sahi ho
+                vendor_name: vendor  // Dynamic Vendor Name cloud pe bhej rahe hain
             }
         ]);
         
         if(error) {
-            console.error("Supabase reject:", error);
+            console.error("Supabase error:", error);
             alert("Cloud sync fail: " + error.message);
-            return; // Agar cloud pe save na ho to aage na barhein
+            return; // Agar cloud pe save na ho to local pe bhi save nahi karein ge taake data mismatch na ho
         }
     } catch (err) {
         console.error("Connection Error:", err);
+        alert("Internet ka masla hai, dobara koshish karein.");
         return;
     }
-    // --- CLOUD SYNC END ---
 
-    // Local DB Update (Ye sirf isi laptop ke liye hai)
-    db.in.push({ date, vendor, item, barcode, qty, price, total: qty * price });
+    // 3. Local DB Update: Jab cloud confirm karde, tab laptop ke storage mein save karein
+    db.in.push({ 
+        date, 
+        vendor, 
+        item, 
+        barcode, 
+        qty, 
+        price, 
+        total: qty * price 
+    });
+
+    // Data save karna aur tables refresh karna
     saveAndRefresh();
+    
+    // Form clear karna (Behtar user experience ke liye)
+    document.getElementById('in-item').value = "";
+    document.getElementById('in-qty').value = "";
+    document.getElementById('in-price').value = "";
+    
     alert("Stock IN Cloud aur Local dono par save ho gaya!");
 }
 async function addOut() {
+    // 1. UI se values lena
     const item = document.getElementById('out-item').value.trim();
     const qty = Number(document.getElementById('out-qty').value);
     const date = document.getElementById('out-date').value;
+    const price = Number(document.getElementById('out-price')?.value || 0);
+    // Customer name field se lena, agar khali ho to "General Sale" rakhna
+    const custName = document.getElementById('out-customer')?.value || "General Sale";
 
-    // Stock check logic (Local check)
+    // 2. Validation: Basic checks
+    if (!item || qty <= 0 || !date) {
+        alert("Bilal Bhai, saari details bharein!");
+        return;
+    }
+
+    // 3. Stock Check: Local database se check karna ke maal mojud hai ya nahi
     const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
-    if(qty > (tin - tout)) { alert("Stock kam hai!"); return; }
+    const availableStock = tin - tout;
 
+    if (qty > availableStock) {
+        alert(`Stock kam hai! Sirf ${availableStock} mojud hain.`);
+        return;
+    }
+
+    // 4. Cloud Sync: Supabase mein data bhejna
     try {
         const { error } = await _supabase.from('KRT').insert([
-            { item_name: item, stock_in: 0, stock_out: qty }
+            { 
+                item_name: item, 
+                stock_in: 0, 
+                stock_out: qty,
+                price: price,           // Sale price
+                customer_name: custName // Ye cloud par customer ka naam save karega
+            }
         ]);
-        if (error) throw error;
 
-        db.out.push({ item, qty, date });
-        saveAndRefresh();
-        alert("Stock OUT Done!");
+        if (error) {
+            console.error("Supabase Error:", error);
+            alert("Cloud sync fail ho gaya!");
+            return;
+        }
     } catch (err) {
-        alert("Cloud Error: " + err.message);
+        console.error("Connection Error:", err);
+        alert("Internet ka masla hai!");
+        return;
     }
+
+    // 5. Local DB Update: Cloud confirm hone ke baad laptop mein save karein
+    db.out.push({ 
+        item, 
+        qty, 
+        date, 
+        cust: custName, // Local list mein customer ka naam
+        price: price,
+        total: qty * price 
+    });
+
+    // Data pakka save karna aur UI refresh karna
+    saveAndRefresh();
+    
+    // Form clear karein
+    document.getElementById('out-qty').value = "";
+    document.getElementById('out-customer').value = "";
+    
+    alert("Stock OUT Cloud aur Local dono jagah save ho gaya!");
 }
 // --- 5. MAIN RENDER FUNCTION (Table Display Logic) ---
 // --- 5. MAIN RENDER FUNCTION ---
