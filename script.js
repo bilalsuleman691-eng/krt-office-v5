@@ -4,7 +4,7 @@ const supabaseUrl = 'https://zeadgtkzqooiswyyuozl.supabase.co';
 const supabaseKey = 'sb_publishable_b4jLu7Bx2dsGtLR72i8dMA_OeGcOu79'; // Yahan Secret key ki jagah Publishable key dalein
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-2. YAHAN LIKHEIN (Database Initialization)
+// 2. YAHAN LIKHEIN (Database Initialization)
 // Ye line functions se bahar honi chahiye taake har function isay use kar sakay
 let db = JSON.parse(localStorage.getItem('krt_erp_data')) || {
     in: [],
