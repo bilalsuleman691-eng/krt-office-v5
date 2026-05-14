@@ -670,33 +670,8 @@ async function addStockData(itemName, stockIn, stockOut) {
 }
 
 
-async function fetchCloudData() {
-    try {
-        const { data, error } = await _supabase.from('KRT').select('*');
-        if (error) throw error;
-
-        if (data) {
-            // "Safe" Mapping: Agar date na ho to aaj ki date laga do
-            const today = new Date().toISOString().split('T')[0];
-
-            db.in = data.filter(x => x.stock_in > 0).map(x => ({
-                item: x.item_name,
-                qty: x.stock_in,
-                date: x.created_at ? x.created_at.split('T')[0] : today
-            }));
-            
-            db.out = data.filter(x => x.stock_out > 0).map(x => ({
-                item: x.item_name,
-                qty: x.stock_out,
-                date: x.created_at ? x.created_at.split('T')[0] : today
-            }));
-
-            renderAll(); 
-            console.log("Cloud data synced successfully!");
-        }
-    } catch (err) {
-        console.error("Fetch error:", err);
-    }
-}
-// Software load hotay hi data mangwao
-window.onload = fetchCloudData;
+// Software load hotay hi data mangwao (Behtar Tariqa)
+window.addEventListener('load', () => {
+    fetchCloudData();
+    // Agar koi aur function bhi load par chalana ho to yahan add kar sakte hain
+});
