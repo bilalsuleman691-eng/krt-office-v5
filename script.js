@@ -24,20 +24,20 @@ function login() {
     let u = document.getElementById('user').value.trim().toLowerCase();
     let p = document.getElementById('pass').value.trim();
 
-    // 1. Pehle Admin aur Basic Roles check karein
+    // 1. Pehle Hardcoded Roles check karein (Admin, Ali, Sattar)
     if (u === "admin" && p === "123") {
         showSystem("admin");
         alert("Khush Amdeed, Bilal Suleman");
     } 
     else if (u === "ali" && p === "123") {
-        showSystem("staff"); // Ali Bhai ko staff ki permissions milengi
+        showSystem("staff"); 
         alert("Khush Amdeed, Ali Bhai");
     } 
     else if (u === "sattar" && p === "123") {
-        showSystem("manager"); // Sattar Bhai ko manager ki permissions
+        showSystem("manager"); 
         alert("Khush Amdeed, Sattar Bhai");
     } 
-    // 2. Phir check karein agar koi Multi-User tab se banaya gaya account hai
+    // 2. Phir check karein agar Multi-User tab se banaya gaya koi account hai
     else if (typeof checkExtraUsers === "function" && checkExtraUsers(u, p)) {
         // Agar extra user mil gaya to wo function khud login karwa dega
         return; 
@@ -45,7 +45,41 @@ function login() {
     else {
         alert("Ghalat ID ya Password!");
     }
+} // <--- Yeh bracket lagana zaroori tha jo missing tha!
+
+function showSystem(role) {
+    document.getElementById('login-screen').style.display = "none";
+    document.getElementById('sidebar').style.display = "block";
+    document.getElementById('main-content').style.display = "block";
     
+    // Toggle button ko bhi dikhao
+    if(document.getElementById('toggle-btn')) {
+        document.getElementById('toggle-btn').style.display = "block";
+    }
+
+    const menuItems = document.querySelectorAll('#sidebar ul li');
+    menuItems.forEach(item => item.style.display = "block");
+
+    if(role === "staff") {
+        menuItems.forEach(item => {
+            let text = item.innerText;
+            if(!text.includes("Dashboard") && !text.includes("Daily Report") && !text.includes("Stock Balance")) { 
+                item.style.display = "none";
+            }
+        });
+        switchPage('page-Report', 'Daily Report');
+    } 
+    else if(role === "manager") {
+        menuItems.forEach(item => {
+            let text = item.innerText;
+            if(!text.includes("Dashboard") && !text.includes("Customer Ledgers") && !text.includes("Market Rent Book") && !text.includes("Stock Balance")) { 
+                item.style.display = "none";
+            }
+        });
+        switchPage('page-customer-ledgers', 'Customer Ledgers');
+    }
+    renderAll();
+}    
     
 function showSystem(role) {
     document.getElementById('login-screen').style.display = "none";
