@@ -23,37 +23,62 @@ function saveAndRefresh() {
 function login() {
     let u = document.getElementById('user').value.trim();
     let p = document.getElementById('pass').value.trim();
+    let welcomeMsg = "";
 
-    // 1. Full Access (Admin)
-if(u === "admin" && p === "123") {
-    let currentRole = "admin"; // Role define karein
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('userRole', currentRole);
-    showSystem(currentRole);
-    document.getElementById('toggle-btn').style.display = "block";
-    alert(`Khush Amdeed, ${u}!`);
-}        
-    // 2. Report Only Access (Staff)
-    else if(u === "ali" && p === "123") {
-        showSystem("staff");
-        alert("Staff Login: Sirf Reports ka access hai.");
-        document.getElementById('toggle-btn').style.display = "block";
-    } 
-    // 3. Ledger & Rent Access (Manager)
-    else if(u === "sattar" && p === "786") {
-        showSystem("manager");
-        alert("Manager Login: Ledgers aur Rent Book ka access hai.");
-        document.getElementById('toggle-btn').style.display = "block";
-    }
-    // 4. Extra Users Check (Jo aapne dashboard se banaye)
-    else {
-        let isExtra = checkExtraUsers(u, p);
-        if(!isExtra) {
-            alert("Ghalat ID ya Password!");
+    // 1. Roles aur Welcome Name set karein
+    if(u === "admin" && p === "123") {
+        welcomeMsg = "Welcome, Bilal Suleman";
+        localStorage.setItem('userRole', 'admin');
+    } else if(u === "ali" && p === "123") {
+        welcomeMsg = "Welcome, Ali Bhai";
+        localStorage.setItem('userRole', 'staff');
+    } else if(u === "sattar" && p === "786") {
+        welcomeMsg = "Welcome, Sattar Bhai";
+        localStorage.setItem('userRole', 'manager');
+    } else {
+        // Extra users check
+        let found = extraUsers.find(user => user.id === u && user.pass === p);
+        if(found) {
+            welcomeMsg = "Welcome, " + found.name;
         } else {
-            document.getElementById('toggle-btn').style.display = "block";
+            alert("Ghalat ID ya Password!");
+            return;
         }
     }
+
+    // 2. Professional Animation Start karein
+    runWelcomeAnimation(welcomeMsg);
+}
+
+function runWelcomeAnimation(msg) {
+    const overlay = document.getElementById('welcome-overlay');
+    const textElem = document.getElementById('welcome-text');
+    const subText = document.getElementById('sub-text');
+
+    // Overlay dikhao
+    overlay.style.display = "flex";
+    textElem.innerText = msg;
+    textElem.classList.add('start-typing');
+
+    // 1 second baad niche wala text dikhao
+    setTimeout(() => {
+        subText.classList.add('fade-in-text');
+    }, 1000);
+
+    // 3.5 seconds baad animation khatam karke system kholo
+    setTimeout(() => {
+        overlay.style.opacity = "0";
+        overlay.style.transition = "0.5s";
+        
+        setTimeout(() => {
+            overlay.style.display = "none";
+            // Ab purana system show karne wala function call karein
+            let role = localStorage.getItem('userRole') || "admin";
+            showSystem(role);
+            document.getElementById('toggle-btn').style.display = "block";
+        }, 500);
+
+    }, 3500);
 }
 function showSystem(role) {
     document.getElementById('login-screen').style.display = "none";
