@@ -5,7 +5,6 @@ const supabaseKey = 'sb_publishable_b4jLu7Bx2dsGtLR72i8dMA_OeGcOu79'; // Yahan S
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
 
-
 // --- 1. DATABASE INITIALIZATION ---
 let db = JSON.parse(localStorage.getItem('krt_erp_data')) || {
     in: [],
