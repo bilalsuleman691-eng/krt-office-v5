@@ -68,20 +68,20 @@ function showSystem(role) {
     // --- ALI BHAI (Staff Role) ---
     if(role === "staff") {
         menuItems.forEach(item => {
-            // Dashboard, Daily Report aur Stock Balance dikhao
             let text = item.innerText;
+            // Yahan humne "Stock Balance" ko bhi allow kar diya hai
             if(!text.includes("Dashboard") && 
                !text.includes("Daily Report") && 
                !text.includes("Stock Balance")) { 
                 item.style.display = "none";
             }
         });
+        // Default page reports wala hi rakhein
         switchPage('page-Report', 'Daily Report');
     } 
     // --- SATTAR BHAI (Manager Role) ---
     else if(role === "manager") {
         menuItems.forEach(item => {
-            // Dashboard, Ledgers, Rent Book aur Stock Balance dikhao
             let text = item.innerText;
             if(!text.includes("Dashboard") && 
                !text.includes("Customer Ledgers") && 
