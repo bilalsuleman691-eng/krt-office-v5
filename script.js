@@ -153,16 +153,15 @@ async function addOut() {
     const qty = Number(document.getElementById('out-qty').value);
     const date = document.getElementById('out-date').value;
     const price = Number(document.getElementById('out-price')?.value || 0);
-    // Customer name field se lena, agar khali ho to "General Sale" rakhna
     const custName = document.getElementById('out-customer')?.value || "General Sale";
 
-    // 2. Validation: Basic checks
+    // 2. Validation
     if (!item || qty <= 0 || !date) {
         alert("Bilal Bhai, saari details bharein!");
         return;
     }
 
-    // 3. Stock Check: Local database se check karna ke maal mojud hai ya nahi
+    // 3. Stock Check
     const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const availableStock = tin - tout;
@@ -172,52 +171,48 @@ async function addOut() {
         return;
     }
 
-    // 4. Cloud Sync: Supabase mein data bhejna
+    // 4. Cloud Sync (Supabase)
     try {
         const { error } = await _supabase.from('KRT').insert([
             { 
                 item_name: item, 
                 stock_in: 0, 
                 stock_out: qty,
-                price: price,           // Sale price
-                customer_name: custName // Ye cloud par customer ka naam save karega
+                price: price,
+                customer_name: custName 
             }
         ]);
 
         if (error) {
-            console.error("Supabase Error:", error);
             alert("Cloud sync fail ho gaya!");
             return;
         }
     } catch (err) {
-        console.error("Connection Error:", err);
         alert("Internet ka masla hai!");
         return;
     }
 
-    // 5. Local DB Update: Cloud confirm hone ke baad laptop mein save karein
+    // 5. Local DB Update
     db.out.push({ 
         item, 
         qty, 
         date, 
-        cust: custName, // Local list mein customer ka naam
+        cust: custName, 
         price: price,
         total: qty * price 
     });
 
-    // Data pakka save karna aur UI refresh karna
     saveAndRefresh();
     
-    // Form clear karein
+    // FORM CLEAR: Quantity aur Customer khali ho jayenge, Date aur Item wahi rahegi
     document.getElementById('out-qty').value = "";
     document.getElementById('out-customer').value = "";
     
     alert("Stock OUT Cloud aur Local dono jagah save ho gaya!");
 }
-// --- 5. MAIN RENDER FUNCTION (Table Display Logic) ---
+
 // --- 5. MAIN RENDER FUNCTION ---
 function renderAll() {
-    // Aaj ki date format: YYYY-MM-DD
     const now = new Date();
     const today = now.toISOString().split('T')[0];
 
@@ -265,7 +260,7 @@ function renderAll() {
         });
     }
 
-    // C. Balance Table (Hamesha poora stock dikhayega)
+    // C. Balance Table
     if(balTableBody) {
         const uniqueItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
         balTableBody.innerHTML = uniqueItems.map(name => {
@@ -308,11 +303,12 @@ function generateCustomReport() {
     document.getElementById('sum-profit').innerText = "PKR " + (totalOut - totalIn).toLocaleString();
 }
 
+// --- 1. SAHI DELETE FUNCTION (Cloud + Local) ---
 async function deleteEntry(type, index) {
     if(confirm("Bilal Bhai, kya aap waqai ye record delete karna chahte hain?")) {
         const record = db[type][index];
 
-        // 1. Agar record cloud se aaya hai (usmein ID hai), to Supabase se delete karo
+        // Agar record cloud wala hai (id mojud hai)
         if (record.id) {
             try {
                 const { error } = await _supabase
@@ -321,7 +317,7 @@ async function deleteEntry(type, index) {
                     .eq('id', record.id);
 
                 if (error) {
-                    alert("Cloud delete error: " + error.message);
+                    alert("Cloud delete fail: " + error.message);
                     return;
                 }
             } catch (err) {
@@ -330,63 +326,54 @@ async function deleteEntry(type, index) {
             }
         }
 
-        // 2. Cloud se delete hone ke baad local se bhi hata dein
+        // Local se delete karein
         db[type].splice(index, 1);
         saveAndRefresh();
         
-        // Agar Master Search khuli hai to usay bhi update karein
-        if(typeof generateMasterSearch === "function") {
-            generateMasterSearch();
+        // Agar Search table khuli hai toh usay refresh karein
+        if(document.getElementById('master-in-table')) {
+            generateMasterSearch(); 
         }
+        alert("Record har jagah se delete ho gaya!");
     }
 }
 
-
-// --- 6. MASTER SEARCH & EDITOR LOGIC ---
-
-// 1. Search Function (Master)
+// --- 2. MASTER SEARCH RENDER (Sahi Buttons ke sath) ---
 function generateMasterSearch() {
     const from = document.getElementById('master-from').value;
     const to = document.getElementById('master-to').value;
 
-    if(!from || !to) {
-        alert("Bilal Bhai, pehle From aur To date select karein!");
-        return;
-    }
+    if(!from || !to) { alert("Pehle Dates select karein!"); return; }
 
-    // Filter Data according to dates
     const filteredIn = db.in.filter(x => x.date >= from && x.date <= to);
     const filteredOut = db.out.filter(x => x.date >= from && x.date <= to);
 
-    // Render Stock IN Table
-    let inHTML = filteredIn.map((x) => {
+    // Stock IN Table
+    document.querySelector("#master-in-table tbody").innerHTML = filteredIn.map((x) => {
         const originalIndex = db.in.indexOf(x); 
         return `<tr>
             <td>${x.date}</td><td>${x.item}</td><td>${x.vendor}</td>
             <td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
             <td>
-                <button onclick="editEntry('in', ${originalIndex})" style="background:#3498db; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:3px;">Edit</button>
-                <button onclick="deleteEntryMaster('in', ${originalIndex})" style="background:#e74c3c; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:3px; margin-left:5px;">Del</button>
+                <button onclick="editEntry('in', ${originalIndex})" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:3px;">Edit</button>
+                <button onclick="deleteEntry('in', ${originalIndex})" style="background:#e74c3c; color:white; border:none; padding:5px 10px; border-radius:3px;">Del</button>
             </td>
         </tr>`;
-    }).join('');
-    document.querySelector("#master-in-table tbody").innerHTML = inHTML || "<tr><td colspan='7' style='text-align:center;'>No Purchase Record Found</td></tr>";
+    }).join('') || "<tr><td colspan='7'>No Record</td></tr>";
 
-    // Render Stock OUT Table
-    let outHTML = filteredOut.map((x) => {
+    // Stock OUT Table
+    document.querySelector("#master-out-table tbody").innerHTML = filteredOut.map((x) => {
         const originalIndex = db.out.indexOf(x);
         return `<tr>
             <td>${x.date}</td><td>${x.item}</td><td>${x.cust}</td>
             <td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
             <td>
-                <button onclick="editEntry('out', ${originalIndex})" style="background:#3498db; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:3px;">Edit</button>
-                <button onclick="deleteEntryMaster('out', ${originalIndex})" style="background:#e74c3c; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:3px; margin-left:5px;">Del</button>
+                <button onclick="editEntry('out', ${originalIndex})" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:3px;">Edit</button>
+                <button onclick="deleteEntry('out', ${originalIndex})" style="background:#e74c3c; color:white; border:none; padding:5px 10px; border-radius:3px;">Del</button>
             </td>
         </tr>`;
-    }).join('');
-    document.querySelector("#master-out-table tbody").innerHTML = outHTML || "<tr><td colspan='7' style='text-align:center;'>No Sale Record Found</td></tr>";
+    }).join('') || "<tr><td colspan='7'>No Record</td></tr>";
 }
-
 // 2. Specialized Delete for Master Search
 function deleteEntryMaster(type, index) {
     if(confirm("Kya aap waqai ye record delete karna chahte hain?")) {
