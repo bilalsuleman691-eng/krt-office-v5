@@ -30,25 +30,26 @@ function login() {
     let u = userField.value.trim().toLowerCase();
     let p = passField.value.trim();
 
-    // 1. Hardcoded Roles (Wahi purana style)
+    // 1. Bilal Bhai (Admin)
     if (u === "admin" && p === "123") {
-        showSystem("admin");
-        alert("Khush Amdeed, Bilal Suleman"); // Aapka favorite welcome message
+        startWelcomeAnimation("Welcome, Bilal Suleman", "admin");
     } 
+    // 2. Ali Bhai (Staff)
     else if (u === "ali" && p === "123") {
-        showSystem("staff"); 
-        alert("Khush Amdeed, Ali Bhai");
+        startWelcomeAnimation("Welcome, Ali Bhai", "staff");
     } 
+    // 3. Sattar Bhai (Manager)
     else if (u === "sattar" && p === "123") {
-        showSystem("manager"); 
-        alert("Khush Amdeed, Sattar Bhai");
+        startWelcomeAnimation("Welcome, Sattar Bhai", "manager");
     } 
-    // 2. Multi-User Check (Naye users ke liye)
-    else if (typeof checkExtraUsers === "function" && checkExtraUsers(u, p)) {
-        return; 
-    } 
+    // 4. Multi-User (Database se check)
     else {
-        alert("Ghalat ID ya Password!");
+        let found = extraUsers.find(user => user.id === u && user.pass === p);
+        if (found) {
+            startWelcomeAnimation("Welcome, " + found.name, found); // Poora object bhej rahe hain
+        } else {
+            alert("Ghalat ID ya Password!");
+        }
     }
 }
 function startWelcomeAnimation(msg, role) {
