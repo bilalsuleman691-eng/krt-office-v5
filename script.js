@@ -796,62 +796,63 @@ async function addStockData(itemName, stockIn, stockOut) {
 }
 
 
-// Software load hotay hi data mangwao (Behtar Tariqa)
-window.addEventListener('load', () => {
-    fetchCloudData();
-    // Agar koi aur function bhi load par chalana ho to yahan add kar sakte hain
-});
-
 async function fetchCloudData() {
     try {
         console.log("Cloud sync shuru ho raha hai...");
         
-        // 1. Supabase se sara data mangwao
-        const { data, error } = await _supabase.from('KRT').select('*');
-        
+        // 1. Supabase se sara data mangwao (KRT table se)
+        const { data, error } = await _supabase
+            .from('KRT')
+            .select('*')
+            .order('created_at', { ascending: true }); // Taake purana data pehle aaye
+
         if (error) {
             console.error("Cloud data fetch error:", error);
             return;
         }
 
         if (data) {
-            // 2. Naye temporary arrays banayein
+            // 2. Naye temporary arrays
             let cloudIn = [];
             let cloudOut = [];
 
-            // 3. Supabase ke data ko "IN" aur "OUT" mein divide karein
+            // 3. Data mapping aur sorting
             data.forEach(row => {
+                // Date formatting (Agar created_at nahi hai to aaj ki date)
+                let rowDate = row.created_at ? row.created_at.split('T')[0] : new Date().toISOString().split('T')[0];
+                
                 let formattedRow = {
-                    id: row.id, // Supabase ki ID lazmi save karein delete/edit ke liye
-                    date: row.created_at ? row.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-                    item: row.item_name,
-                    qty: row.stock_in > 0 ? row.stock_in : row.stock_out,
-                    price: row.price || 0,
-                    total: (row.stock_in > 0 ? row.stock_in : row.stock_out) * (row.price || 0),
-                    vendor: row.vendor_name || "Cloud Entry",
-                    cust: row.customer_name || "Cloud Sale"
+                    id: row.id, 
+                    date: rowDate,
+                    item: row.item_name || "Unknown Item",
+                    qty: Number(row.stock_in > 0 ? row.stock_in : row.stock_out) || 0,
+                    price: Number(row.price) || 0,
+                    total: (Number(row.stock_in > 0 ? row.stock_in : row.stock_out) || 0) * (Number(row.price) || 0),
+                    vendor: row.vendor_name || "-",
+                    cust: row.customer_name || "-"
                 };
 
-                if (row.stock_in > 0) {
+                // Stock In ya Out mein divide karein
+                if (Number(row.stock_in) > 0) {
                     cloudIn.push(formattedRow);
-                } else {
+                } else if (Number(row.stock_out) > 0) {
                     cloudOut.push(formattedRow);
                 }
             });
 
-            // 4. Local DB ko update karein (Cloud wala data hi final hai)
+            // 4. Local Database (db) ko update karein
             db.in = cloudIn;
             db.out = cloudOut;
 
-            // 5. Save karein aur Screen refresh karein
+            // 5. LocalStorage mein save karein aur table refresh karein
             saveAndRefresh();
-            console.log("Cloud Sync Mukammal!");
+            
+            console.log("Cloud Sync Mukammal! Total records: " + data.length);
         }
     } catch (err) {
         console.error("Connection error during sync:", err);
     }
 }
-
 // --- AUTO-CHECK ON LOAD ---
 // Jab bhi page refresh ho ya dobara khule, ye check karega ke user login hai ya nahi
 window.addEventListener('load', () => {
