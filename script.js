@@ -102,7 +102,7 @@ function showSystem(roleOrUser) {
     renderAll();
 }
 async function addIn() {
-    // UI se values lena
+    // 1. UI se values lena
     const date = document.getElementById('in-date').value;
     const vendor = document.getElementById('in-vendor').value;
     const item = document.getElementById('in-item').value.trim();
@@ -110,55 +110,61 @@ async function addIn() {
     const qty = Number(document.getElementById('in-qty').value);
     const price = Number(document.getElementById('in-price').value);
 
-    // 1. Validation: Check karna ke zaroori maloomat bhari hain ya nahi
+    // 2. Mukammal Validation
     if (!date || !item || qty <= 0) {
         alert("Bilal Bhai, details lazmi likhain!");
         return;
     }
 
-    // 2. Cloud Sync: Supabase mein data bhejnan
     try {
-        const { error } = await _supabase.from('KRT').insert([
+        console.log("Cloud par data bheja ja raha hai...");
+
+        // 3. Cloud Sync (Supabase) - ".select()" lazmi hai ID wapas lene ke liye
+        const { data, error } = await _supabase.from('KRT').insert([
             { 
                 item_name: item, 
                 stock_in: qty, 
                 stock_out: 0,
-                price: price,        // Price bhej rahe hain taake calculation sahi ho
-                vendor_name: vendor  // Dynamic Vendor Name cloud pe bhej rahe hain
+                price: price, 
+                vendor_name: vendor,
+                created_at: date // Jo date aapne select ki wahi cloud pe jaye
             }
-        ]);
+        ]).select(); // Yeh line Cloud se auto-generated ID wapas degi
         
-        if(error) {
+        if (error) {
             console.error("Supabase error:", error);
             alert("Cloud sync fail: " + error.message);
-            return; // Agar cloud pe save na ho to local pe bhi save nahi karein ge taake data mismatch na ho
+            return;
         }
+
+        // 4. Local DB Update (Cloud ID ke sath)
+        if (data && data.length > 0) {
+            db.in.push({ 
+                id: data[0].id, // Cloud wali ID yahan save ho gayi
+                date: date, 
+                vendor: vendor, 
+                item: item, 
+                barcode: barcode, 
+                qty: qty, 
+                price: price, 
+                total: qty * price 
+            });
+
+            // 5. Save and Refresh
+            saveAndRefresh();
+            
+            // Form Clear
+            document.getElementById('in-item').value = "";
+            document.getElementById('in-qty').value = "";
+            document.getElementById('in-price').value = "";
+            
+            alert("Stock IN Cloud aur Local dono par save ho gaya!");
+        }
+
     } catch (err) {
         console.error("Connection Error:", err);
-        alert("Internet ka masla hai, dobara koshish karein.");
-        return;
+        alert("Internet ka masla hai ya connection unstable hai.");
     }
-
-    // 3. Local DB Update: Jab cloud confirm karde, tab laptop ke storage mein save karein
-    db.in.push({ 
-        date, 
-        vendor, 
-        item, 
-        barcode, 
-        qty, 
-        price, 
-        total: qty * price 
-    });
-
-    // Data save karna aur tables refresh karna
-    saveAndRefresh();
-    
-    // Form clear karna (Behtar user experience ke liye)
-    document.getElementById('in-item').value = "";
-    document.getElementById('in-qty').value = "";
-    document.getElementById('in-price').value = "";
-    
-    alert("Stock IN Cloud aur Local dono par save ho gaya!");
 }
 // --- 1. LIVE STOCK VIEW FUNCTION ---
 function showLiveStock(itemName) {
