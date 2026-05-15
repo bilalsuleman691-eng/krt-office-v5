@@ -54,7 +54,9 @@ function login() {
 }
 
 // EK HI DAFA showSystem likhein
+// SIRF YE EK FUNCTION RAKHEIN (Dono purane delete kar dein)
 function showSystem(role) {
+    // 1. Screens hide/show karein
     document.getElementById('login-screen').style.display = "none";
     document.getElementById('sidebar').style.display = "block";
     document.getElementById('main-content').style.display = "block";
@@ -64,9 +66,11 @@ function showSystem(role) {
     }
 
     const menuItems = document.querySelectorAll('#sidebar ul li');
+    
+    // Pehle saare menu items reset (show) karein
     menuItems.forEach(item => item.style.display = "block");
 
-    // Staff Permissions
+    // 2. Role-based Permissions apply karein
     if(role === "staff") {
         menuItems.forEach(item => {
             let text = item.innerText;
@@ -76,7 +80,6 @@ function showSystem(role) {
         });
         switchPage('page-Report', 'Daily Report');
     } 
-    // Manager Permissions
     else if(role === "manager") {
         menuItems.forEach(item => {
             let text = item.innerText;
@@ -84,11 +87,14 @@ function showSystem(role) {
                 item.style.display = "none";
             }
         });
+        // Sattar Bhai ke liye default page Customer Ledgers rakha hai
         switchPage('page-customer-ledgers', 'Customer Ledgers');
     }
     
+    // Admin ke liye sab dikhta rahega (No filtering)
+    
     renderAll();
-}    
+}
 function showSystem(role) {
     document.getElementById('login-screen').style.display = "none";
     document.getElementById('sidebar').style.display = "block";
