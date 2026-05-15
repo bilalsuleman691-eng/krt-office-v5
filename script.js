@@ -21,19 +21,31 @@ function saveAndRefresh() {
 
 /// --- UPDATED LOGIN SYSTEM ---
 function login() {
-    let u = document.getElementById('user').value.trim();
+    let u = document.getElementById('user').value.trim().toLowerCase();
     let p = document.getElementById('pass').value.trim();
-    let welcomeMsg = "";
 
-    // Role check (Apne mutabiq theek kar lein)
-    if(u === "admin" && p === "123") {
-        welcomeMsg = "Welcome, Bilal Suleman";
-    } else if(u === "ali" && p === "123") {
-        welcomeMsg = "Welcome, Ali Bhai";
-    } else {
-        alert("Ghalat ID!"); return;
+    // 1. Pehle Admin aur Basic Roles check karein
+    if (u === "admin" && p === "123") {
+        showSystem("admin");
+        alert("Khush Amdeed, Bilal Suleman");
+    } 
+    else if (u === "ali" && p === "123") {
+        showSystem("staff"); // Ali Bhai ko staff ki permissions milengi
+        alert("Khush Amdeed, Ali Bhai");
+    } 
+    else if (u === "sattar" && p === "123") {
+        showSystem("manager"); // Sattar Bhai ko manager ki permissions
+        alert("Khush Amdeed, Sattar Bhai");
+    } 
+    // 2. Phir check karein agar koi Multi-User tab se banaya gaya account hai
+    else if (typeof checkExtraUsers === "function" && checkExtraUsers(u, p)) {
+        // Agar extra user mil gaya to wo function khud login karwa dega
+        return; 
+    } 
+    else {
+        alert("Ghalat ID ya Password!");
     }
-
+    
     
 function showSystem(role) {
     document.getElementById('login-screen').style.display = "none";
