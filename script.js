@@ -65,25 +65,32 @@ function showSystem(role) {
     // Pehle saare menu items dikhao (Reset)
     menuItems.forEach(item => item.style.display = "block");
 
+    // --- ALI BHAI (Staff Role) ---
     if(role === "staff") {
         menuItems.forEach(item => {
-            // Sirf Dashboard aur Daily Report dikhao
-            if(!item.innerText.includes("Dashboard") && !item.innerText.includes("Daily Report")) {
+            // Dashboard, Daily Report aur Stock Balance dikhao
+            let text = item.innerText;
+            if(!text.includes("Dashboard") && 
+               !text.includes("Daily Report") && 
+               !text.includes("Stock Balance")) { 
                 item.style.display = "none";
             }
         });
         switchPage('page-Report', 'Daily Report');
     } 
+    // --- SATTAR BHAI (Manager Role) ---
     else if(role === "manager") {
         menuItems.forEach(item => {
-            // Sirf Dashboard, Customer Ledgers aur Market Rent Book dikhao
-            if(!item.innerText.includes("Dashboard") && 
-               !item.innerText.includes("Customer Ledgers") && 
-               !item.innerText.includes("Market Rent Book")) {
+            // Dashboard, Ledgers, Rent Book aur Stock Balance dikhao
+            let text = item.innerText;
+            if(!text.includes("Dashboard") && 
+               !text.includes("Customer Ledgers") && 
+               !text.includes("Market Rent Book") &&
+               !text.includes("Stock Balance")) { 
                 item.style.display = "none";
             }
         });
-        switchPage('page-customer-ledgers', 'Customer Ledgers'); // Seedha Ledger par le jao
+        switchPage('page-customer-ledgers', 'Customer Ledgers');
     }
 
     renderAll();
