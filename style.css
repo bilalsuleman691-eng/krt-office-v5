@@ -541,3 +541,23 @@ tr:nth-child(even) {
         text-align: center;
     }
 }
+/* Typewriter Animation Effect */
+@keyframes typing {
+    from { width: 0 }
+    to { width: 100% }
+}
+
+@keyframes blink-caret {
+    from, to { border-color: transparent }
+    50% { border-color: #f1c40f }
+}
+
+.start-typing {
+    animation: typing 2s steps(30, end) forwards, blink-caret 0.75s step-end infinite;
+    max-width: fit-content;
+}
+
+.fade-in-text {
+    transition: opacity 1.5s ease-in;
+    opacity: 1 !important;
+}
