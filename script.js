@@ -32,72 +32,73 @@ function login() {
 
     // 1. Bilal Bhai (Admin)
     if (u === "admin" && p === "123") {
-        startWelcomeAnimation("Welcome, Bilal Suleman", "admin");
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userRole', 'admin');
+        showSystem("admin");
     } 
     // 2. Ali Bhai (Staff)
     else if (u === "ali" && p === "123") {
-        startWelcomeAnimation("Welcome, Ali Bhai", "staff");
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userRole', 'staff');
+        showSystem("staff");
     } 
     // 3. Sattar Bhai (Manager)
     else if (u === "sattar" && p === "123") {
-        startWelcomeAnimation("Welcome, Sattar Bhai", "manager");
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userRole', 'manager');
+        showSystem("manager");
     } 
-    // 4. Multi-User (Database se check)
+    // 4. Multi-User (Extra Users check)
     else {
         let found = extraUsers.find(user => user.id === u && user.pass === p);
         if (found) {
-            startWelcomeAnimation("Welcome, " + found.name, found); // Poora object bhej rahe hain
+            localStorage.setItem('isLoggedIn', 'true');
+            // Yahan pura object bhej rahe hain taake dynamic permissions apply hon
+            showSystem(found); 
         } else {
             alert("Ghalat ID ya Password!");
         }
     }
 }
-function showSystem(role) {
-    // 1. Screens hide/show karein
+function showSystem(roleOrUser) {
+    // UI Screens dikhao
     document.getElementById('login-screen').style.display = "none";
     document.getElementById('sidebar').style.display = "block";
     document.getElementById('main-content').style.display = "block";
     
-    // Toggle button dikhao (Mobile/Responsive ke liye)
     if(document.getElementById('toggle-btn')) {
         document.getElementById('toggle-btn').style.display = "block";
     }
 
-    const menuItems = document.querySelectorAll('#sidebar ul li');
-    
-    // Pehle saare menu items reset karein (Sab dikhao)
-    menuItems.forEach(item => item.style.display = "block");
-
-    // 2. Role-based Permissions Logic
-    if(role === "staff") {
-        // ALI BHAI (Staff): Dashboard, Daily Report, aur Stock Balance dikhega
-        menuItems.forEach(item => {
-            let text = item.innerText;
-            if(!text.includes("Dashboard") && 
-               !text.includes("Daily Report") && 
-               !text.includes("Stock Balance")) { 
-                item.style.display = "none";
-            }
-        });
-        switchPage('page-Report', 'Daily Report');
+    // Agar roleOrUser ek object hai (Matlab naya user hai)
+    if (typeof roleOrUser === "object") {
+        applyDynamicPermissions(roleOrUser);
     } 
-    else if(role === "manager") {
-        // SATTAR BHAI (Manager): Dashboard, Customer Ledgers, Market Rent Book, aur Stock Balance dikhega
-        menuItems.forEach(item => {
-            let text = item.innerText;
-            if(!text.includes("Dashboard") && 
-               !text.includes("Customer Ledgers") && 
-               !text.includes("Market Rent Book") && 
-               !text.includes("Stock Balance")) { 
-                item.style.display = "none";
-            }
-        });
-        switchPage('page-customer-ledgers', 'Customer Ledgers');
+    // Agar simple string hai (Admin, Staff, Manager)
+    else {
+        const menuItems = document.querySelectorAll('#sidebar ul li');
+        menuItems.forEach(item => item.style.display = "block"); // Reset
+
+        if(roleOrUser === "staff") {
+            menuItems.forEach(item => {
+                let text = item.innerText;
+                if(!text.includes("Dashboard") && !text.includes("Daily Report") && !text.includes("Stock Balance")) { 
+                    item.style.display = "none";
+                }
+            });
+            switchPage('page-Report', 'Daily Report');
+        } 
+        else if(roleOrUser === "manager") {
+            menuItems.forEach(item => {
+                let text = item.innerText;
+                if(!text.includes("Dashboard") && !text.includes("Customer Ledgers") && !text.includes("Market Rent Book") && !text.includes("Stock Balance")) { 
+                    item.style.display = "none";
+                }
+            });
+            switchPage('page-customer-ledgers', 'Customer Ledgers');
+        }
     }
     
-    // Admin (Bilal Bhai) ke liye saara menu items open rahen ge
-    
-    // 3. UI Refresh
     renderAll();
 }
 async function addIn() {
