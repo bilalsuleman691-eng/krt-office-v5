@@ -25,59 +25,42 @@ function login() {
     let p = document.getElementById('pass').value.trim();
     let welcomeMsg = "";
 
-    // 1. Roles aur Welcome Name set karein
+    // Role check (Apne mutabiq theek kar lein)
     if(u === "admin" && p === "123") {
         welcomeMsg = "Welcome, Bilal Suleman";
-        localStorage.setItem('userRole', 'admin');
     } else if(u === "ali" && p === "123") {
         welcomeMsg = "Welcome, Ali Bhai";
-        localStorage.setItem('userRole', 'staff');
-    } else if(u === "sattar" && p === "786") {
-        welcomeMsg = "Welcome, Sattar Bhai";
-        localStorage.setItem('userRole', 'manager');
     } else {
-        // Extra users check
-        let found = extraUsers.find(user => user.id === u && user.pass === p);
-        if(found) {
-            welcomeMsg = "Welcome, " + found.name;
-        } else {
-            alert("Ghalat ID ya Password!");
-            return;
-        }
+        alert("Ghalat ID!"); return;
     }
 
-    // 2. Professional Animation Start karein
-    runWelcomeAnimation(welcomeMsg);
-}
-
-function runWelcomeAnimation(msg) {
+    // --- Animation Start ---
+    const loginScreen = document.getElementById('login-screen');
     const overlay = document.getElementById('welcome-overlay');
     const textElem = document.getElementById('welcome-text');
     const subText = document.getElementById('sub-text');
 
-    // Overlay dikhao
-    overlay.style.display = "flex";
-    textElem.innerText = msg;
+    loginScreen.style.display = "none"; // Pehle login box khatam
+    overlay.style.display = "flex";    // Welcome parda shuru
+    
+    textElem.innerText = welcomeMsg;
     textElem.classList.add('start-typing');
 
-    // 1 second baad niche wala text dikhao
+    // 1 second baad chota text dikhao
     setTimeout(() => {
         subText.classList.add('fade-in-text');
     }, 1000);
 
-    // 3.5 seconds baad animation khatam karke system kholo
+    // 3.5 seconds baad dashboard kholo
     setTimeout(() => {
         overlay.style.opacity = "0";
-        overlay.style.transition = "0.5s";
+        overlay.style.transition = "0.8s";
         
         setTimeout(() => {
             overlay.style.display = "none";
-            // Ab purana system show karne wala function call karein
-            let role = localStorage.getItem('userRole') || "admin";
-            showSystem(role);
-            document.getElementById('toggle-btn').style.display = "block";
-        }, 500);
-
+            // Yahan wo function call karein jo dashboard dikhata hai
+            showSystem(u === "admin" ? "admin" : "staff"); 
+        }, 800);
     }, 3500);
 }
 function showSystem(role) {
