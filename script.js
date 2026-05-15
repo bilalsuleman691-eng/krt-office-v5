@@ -147,21 +147,52 @@ async function addIn() {
     
     alert("Stock IN Cloud aur Local dono par save ho gaya!");
 }
+// --- 1. LIVE STOCK VIEW FUNCTION ---
+// Jab aap typing karein ge, ye khud bataye ga kitna maal bacha hai
+function showLiveStock(itemName) {
+    const statusDiv = document.getElementById('stock-status');
+    if (!statusDiv) return;
+
+    if (!itemName || itemName.trim() === "") {
+        statusDiv.innerText = "";
+        return;
+    }
+
+    const tin = db.in.filter(x => x.item.toLowerCase() === itemName.toLowerCase().trim()).reduce((s, x) => s + x.qty, 0);
+    const tout = db.out.filter(x => x.item.toLowerCase() === itemName.toLowerCase().trim()).reduce((s, x) => s + x.qty, 0);
+    const available = tin - tout;
+
+    if (tin === 0 && tout === 0) {
+        statusDiv.innerHTML = `<span style="color:orange;">⚠ Naya Item: Pehle Stock IN karein</span>`;
+    } else {
+        statusDiv.innerHTML = `Available Stock: <b style="color:${available > 0 ? '#2ecc71' : '#e74c3c'};">${available}</b>`;
+    }
+}
+
+// --- 2. DROPDOWN LIST UPDATE ---
+function updateItemLists() {
+    const list = document.getElementById('items-list');
+    if (!list) return;
+    const allItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
+    list.innerHTML = allItems.map(name => `<option value="${name}">`).join('');
+}
+
+// --- 3. THE COMPLETE STOCK OUT FUNCTION ---
 async function addOut() {
-    // 1. UI se values lena
+    // UI se values lena
     const item = document.getElementById('out-item').value.trim();
     const qty = Number(document.getElementById('out-qty').value);
     const date = document.getElementById('out-date').value;
     const price = Number(document.getElementById('out-price')?.value || 0);
     const custName = document.getElementById('out-customer')?.value || "General Sale";
 
-    // 2. Validation
+    // A. Mukammal Validation
     if (!item || qty <= 0 || !date) {
         alert("Bilal Bhai, saari details bharein!");
         return;
     }
 
-    // 3. Stock Check
+    // B. Real-time Stock Check
     const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const availableStock = tin - tout;
@@ -171,7 +202,7 @@ async function addOut() {
         return;
     }
 
-    // 4. Cloud Sync (Supabase)
+    // C. Supabase Cloud Sync
     try {
         const { error } = await _supabase.from('KRT').insert([
             { 
@@ -184,7 +215,7 @@ async function addOut() {
         ]);
 
         if (error) {
-            alert("Cloud sync fail ho gaya!");
+            alert("Cloud sync fail ho gaya! Check connection.");
             return;
         }
     } catch (err) {
@@ -192,7 +223,7 @@ async function addOut() {
         return;
     }
 
-    // 5. Local DB Update
+    // D. Local Database Update
     db.out.push({ 
         item, 
         qty, 
@@ -202,16 +233,18 @@ async function addOut() {
         total: qty * price 
     });
 
-    saveAndRefresh();
+    // E. Save and Refresh UI
+    saveAndRefresh(); // Is mein renderAll khud call ho jata hai
     
-    // FORM CLEAR: Quantity aur Customer khali ho jayenge, Date aur Item wahi rahegi
+    // F. Form Clear
     document.getElementById('out-qty').value = "";
     document.getElementById('out-customer').value = "";
+    document.getElementById('stock-status').innerText = ""; 
     
     alert("Stock OUT Cloud aur Local dono jagah save ho gaya!");
 }
 
-// --- 5. MAIN RENDER FUNCTION ---
+// --- 4. MAIN RENDER FUNCTION (RE-WRITTEN) ---
 function renderAll() {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
@@ -220,47 +253,28 @@ function renderAll() {
     const outTableBody = document.querySelector('#table-out tbody');
     const balTableBody = document.querySelector('#table-balance tbody');
 
-    // A. Today's Stock IN
+    // A. Rendering Today's IN
     if(todayInBody) {
-        todayInBody.innerHTML = "";
-        let count = 1;
-        db.in.forEach((x, index) => {
-            if(x.date === today) {
-                todayInBody.innerHTML += `
-                    <tr>
-                        <td>${count++}</td><td>${x.item}</td><td>${x.vendor}</td>
-                        <td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
-                        <td><button onclick="deleteEntry('in', ${index})">🗑 Del</button></td>
-                    </tr>`;
-            }
-        });
+        todayInBody.innerHTML = db.in.filter(x => x.date === today).map((x, i) => `
+            <tr>
+                <td>${i+1}</td><td>${x.item}</td><td>${x.vendor}</td>
+                <td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
+                <td><button onclick="deleteEntry('in', ${i})">🗑 Del</button></td>
+            </tr>`).join('');
     }
 
-    // B. Today's Stock OUT
+    // B. Rendering Today's OUT
     if(outTableBody) {
-        outTableBody.innerHTML = "";
-        let count = 1;
-        db.out.forEach((x, index) => {
-            if(x.date === today) { 
-                outTableBody.innerHTML += `
-                    <tr>
-                        <td>${count++}</td>
-                        <td>${x.date}</td>
-                        <td>${x.cust}</td>
-                        <td>${x.item}</td>
-                        <td>${x.bc || '0'}</td>
-                        <td>${x.qty}</td>
-                        <td>${x.price}</td>
-                        <td>${x.total}</td>
-                        <td style="text-align:center;">
-                            <button onclick="deleteEntry('out', ${index})" style="background:#e74c3c; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:3px;">Del</button>
-                        </td>
-                    </tr>`;
-            }
-        });
+        outTableBody.innerHTML = db.out.filter(x => x.date === today).map((x, i) => `
+            <tr>
+                <td>${i+1}</td><td>${x.date}</td><td>${x.cust}</td>
+                <td>${x.item}</td><td>${x.bc || '0'}</td>
+                <td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
+                <td><button onclick="deleteEntry('out', ${i})" style="background:#e74c3c; color:white;">Del</button></td>
+            </tr>`).join('');
     }
 
-    // C. Balance Table
+    // C. Balance & Profit Table
     if(balTableBody) {
         const uniqueItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
         balTableBody.innerHTML = uniqueItems.map(name => {
@@ -276,8 +290,10 @@ function renderAll() {
             </tr>`;
         }).join('');
     }
-}
 
+    // Refresh Dropdowns
+    updateItemLists();
+}
 // --- 6. REPORTS & SEARCH ---
 function generateCustomReport() {
     const from = document.getElementById('rep-from-date').value;
