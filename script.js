@@ -52,34 +52,6 @@ function login() {
         }
     }
 }
-function startWelcomeAnimation(msg, role) {
-    const loginScreen = document.getElementById('login-screen');
-    const overlay = document.getElementById('welcome-overlay');
-    const textElem = document.getElementById('welcome-text');
-
-    // Login hide karo aur overlay dikhao
-    loginScreen.style.display = "none";
-    overlay.style.display = "flex";
-    overlay.style.opacity = "1";
-    
-    // Text reset aur animation
-    textElem.innerText = msg;
-    textElem.style.width = "0"; 
-    
-    // Thora sa gap de kar typing shuru karein
-    setTimeout(() => {
-        textElem.style.width = "100%"; 
-    }, 100);
-
-    // 3 second baad system show karein
-    setTimeout(() => {
-        overlay.style.opacity = "0";
-        setTimeout(() => {
-            overlay.style.display = "none";
-            showSystem(role); // Dashboard aur permissions yahan se trigger hon gi
-        }, 800);
-    }, 3000);
-}
 function showSystem(role) {
     // 1. Screens hide/show karein
     document.getElementById('login-screen').style.display = "none";
