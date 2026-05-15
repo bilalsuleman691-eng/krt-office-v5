@@ -30,10 +30,10 @@ function login() {
     let u = userField.value.trim().toLowerCase();
     let p = passField.value.trim();
 
-    // 1. Hardcoded Roles
+    // 1. Hardcoded Roles (Wahi purana style)
     if (u === "admin" && p === "123") {
         showSystem("admin");
-        alert("Khush Amdeed, Bilal Suleman");
+        alert("Khush Amdeed, Bilal Suleman"); // Aapka favorite welcome message
     } 
     else if (u === "ali" && p === "123") {
         showSystem("staff"); 
@@ -43,96 +43,60 @@ function login() {
         showSystem("manager"); 
         alert("Khush Amdeed, Sattar Bhai");
     } 
-    // 2. Multi-User Check
+    // 2. Multi-User Check (Naye users ke liye)
     else if (typeof checkExtraUsers === "function" && checkExtraUsers(u, p)) {
-        // extra user logic checkExtraUsers ke andar handle hogi
         return; 
     } 
     else {
         alert("Ghalat ID ya Password!");
     }
 }
-
-// EK HI DAFA showSystem likhein
-// SIRF YE EK FUNCTION RAKHEIN (Dono purane delete kar dein)
 function showSystem(role) {
     // 1. Screens hide/show karein
     document.getElementById('login-screen').style.display = "none";
     document.getElementById('sidebar').style.display = "block";
     document.getElementById('main-content').style.display = "block";
     
+    // Toggle button dikhao (Mobile/Responsive ke liye)
     if(document.getElementById('toggle-btn')) {
         document.getElementById('toggle-btn').style.display = "block";
     }
 
     const menuItems = document.querySelectorAll('#sidebar ul li');
     
-    // Pehle saare menu items reset (show) karein
+    // Pehle saare menu items reset karein (Sab dikhao)
     menuItems.forEach(item => item.style.display = "block");
 
-    // 2. Role-based Permissions apply karein
+    // 2. Role-based Permissions Logic
     if(role === "staff") {
+        // ALI BHAI (Staff): Dashboard, Daily Report, aur Stock Balance dikhega
         menuItems.forEach(item => {
             let text = item.innerText;
-            if(!text.includes("Dashboard") && !text.includes("Daily Report") && !text.includes("Stock Balance")) { 
-                item.style.display = "none";
-            }
-        });
-        switchPage('page-Report', 'Daily Report');
-    } 
-    else if(role === "manager") {
-        menuItems.forEach(item => {
-            let text = item.innerText;
-            if(!text.includes("Dashboard") && !text.includes("Customer Ledgers") && !text.includes("Market Rent Book") && !text.includes("Stock Balance")) { 
-                item.style.display = "none";
-            }
-        });
-        // Sattar Bhai ke liye default page Customer Ledgers rakha hai
-        switchPage('page-customer-ledgers', 'Customer Ledgers');
-    }
-    
-    // Admin ke liye sab dikhta rahega (No filtering)
-    
-    renderAll();
-}
-function showSystem(role) {
-    document.getElementById('login-screen').style.display = "none";
-    document.getElementById('sidebar').style.display = "block";
-    document.getElementById('main-content').style.display = "block";
-
-    const menuItems = document.querySelectorAll('#sidebar ul li');
-    
-    // Pehle saare menu items dikhao (Reset)
-    menuItems.forEach(item => item.style.display = "block");
-
-    // --- ALI BHAI (Staff Role) ---
-    if(role === "staff") {
-        menuItems.forEach(item => {
-            let text = item.innerText;
-            // Yahan humne "Stock Balance" ko bhi allow kar diya hai
             if(!text.includes("Dashboard") && 
                !text.includes("Daily Report") && 
                !text.includes("Stock Balance")) { 
                 item.style.display = "none";
             }
         });
-        // Default page reports wala hi rakhein
         switchPage('page-Report', 'Daily Report');
     } 
-    // --- SATTAR BHAI (Manager Role) ---
     else if(role === "manager") {
+        // SATTAR BHAI (Manager): Dashboard, Customer Ledgers, Market Rent Book, aur Stock Balance dikhega
         menuItems.forEach(item => {
             let text = item.innerText;
             if(!text.includes("Dashboard") && 
                !text.includes("Customer Ledgers") && 
-               !text.includes("Market Rent Book") &&
+               !text.includes("Market Rent Book") && 
                !text.includes("Stock Balance")) { 
                 item.style.display = "none";
             }
         });
         switchPage('page-customer-ledgers', 'Customer Ledgers');
     }
-
+    
+    // Admin (Bilal Bhai) ke liye saara menu items open rahen ge
+    
+    // 3. UI Refresh
     renderAll();
 }
 async function addIn() {
