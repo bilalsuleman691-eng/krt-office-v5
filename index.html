@@ -9,14 +9,16 @@
 </head>
 <body>
     
-    <div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a2e; display: flex; justify-content: center; align-items: center; z-index: 9999;">
+  <div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a2e; display: flex; justify-content: center; align-items: center; z-index: 9999;">
         <div style="background: white; padding: 40px; border-radius: 10px; text-align: center; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
             <h2 style="color: #1a1a2e; margin-bottom: 20px;">KRT TRADERS LOGIN</h2>
             <input type="text" id="user" placeholder="Username (admin)" style="width: 80%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px;">
             <input type="password" id="pass" placeholder="Password (123)" style="width: 80%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 5px;">
             <button onclick="login()" style="width: 88%; padding: 12px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Access System</button>
         </div>
-    </div> <div id="welcome-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#1a1a1a; z-index:10000; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-family: 'Segoe UI', sans-serif;">
+    </div> 
+
+    <div id="welcome-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#1a1a1a; z-index:10001; flex-direction:column; align-items:center; justify-content:center; color:white; font-family: 'Segoe UI', sans-serif;">
         <h1 id="welcome-text" style="font-size: 2.5rem; font-weight: 300; border-right: 3px solid #f1c40f; white-space: nowrap; overflow: hidden; width: 0;"></h1>
         <p id="sub-text" style="opacity:0; margin-top:10px; color:#bdc3c7; letter-spacing: 2px;">KRT TRADERS ERP SYSTEM</p>
     </div>
