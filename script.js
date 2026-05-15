@@ -26,7 +26,7 @@ function login() {
 
     // 1. Full Access (Admin)
     if(u === "admin" && p === "123") {
-        showSystem("admin");
+        localStorage.setItem}{
         alert("Khush Amdeed, Bilal Bhai (Admin)!");
         document.getElementById('toggle-btn').style.display = "block";
     } 
