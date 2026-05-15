@@ -158,17 +158,20 @@ function showLiveStock(itemName) {
         return;
     }
 
-    const tin = db.in.filter(x => x.item.toLowerCase() === itemName.toLowerCase().trim()).reduce((s, x) => s + x.qty, 0);
-    const tout = db.out.filter(x => x.item.toLowerCase() === itemName.toLowerCase().trim()).reduce((s, x) => s + x.qty, 0);
+    // Dono ko lowercase karke match karein taake typing mein ghalti na ho
+    const searchName = itemName.toLowerCase().trim();
+
+    const tin = db.in.filter(x => x.item.toLowerCase() === searchName).reduce((s, x) => s + x.qty, 0);
+    const tout = db.out.filter(x => x.item.toLowerCase() === searchName).reduce((s, x) => s + x.qty, 0);
     const available = tin - tout;
 
     if (tin === 0 && tout === 0) {
         statusDiv.innerHTML = `<span style="color:orange;">⚠ Naya Item: Pehle Stock IN karein</span>`;
     } else {
+        // Agar stock 0 se zyada hai to Green, warna Red
         statusDiv.innerHTML = `Available Stock: <b style="color:${available > 0 ? '#2ecc71' : '#e74c3c'};">${available}</b>`;
     }
 }
-
 // --- 2. DROPDOWN LIST UPDATE ---
 function updateItemLists() {
     const list = document.getElementById('items-list');
