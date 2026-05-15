@@ -19,11 +19,18 @@ function saveAndRefresh() {
 
 
 /// --- UPDATED LOGIN SYSTEM ---
-function login() {
-    let u = document.getElementById('user').value.trim().toLowerCase();
-    let p = document.getElementById('pass').value.trim();
+// --- MERGED LOGIN & PERMISSIONS SYSTEM ---
 
-    // 1. Pehle Hardcoded Roles check karein (Admin, Ali, Sattar)
+function login() {
+    let userField = document.getElementById('user');
+    let passField = document.getElementById('pass');
+    
+    if(!userField || !passField) return;
+
+    let u = userField.value.trim().toLowerCase();
+    let p = passField.value.trim();
+
+    // 1. Hardcoded Roles
     if (u === "admin" && p === "123") {
         showSystem("admin");
         alert("Khush Amdeed, Bilal Suleman");
@@ -36,22 +43,22 @@ function login() {
         showSystem("manager"); 
         alert("Khush Amdeed, Sattar Bhai");
     } 
-    // 2. Phir check karein agar Multi-User tab se banaya gaya koi account hai
+    // 2. Multi-User Check
     else if (typeof checkExtraUsers === "function" && checkExtraUsers(u, p)) {
-        // Agar extra user mil gaya to wo function khud login karwa dega
+        // extra user logic checkExtraUsers ke andar handle hogi
         return; 
     } 
     else {
         alert("Ghalat ID ya Password!");
     }
-} // <--- Yeh bracket lagana zaroori tha jo missing tha!
+}
 
+// EK HI DAFA showSystem likhein
 function showSystem(role) {
     document.getElementById('login-screen').style.display = "none";
     document.getElementById('sidebar').style.display = "block";
     document.getElementById('main-content').style.display = "block";
     
-    // Toggle button ko bhi dikhao
     if(document.getElementById('toggle-btn')) {
         document.getElementById('toggle-btn').style.display = "block";
     }
@@ -59,6 +66,7 @@ function showSystem(role) {
     const menuItems = document.querySelectorAll('#sidebar ul li');
     menuItems.forEach(item => item.style.display = "block");
 
+    // Staff Permissions
     if(role === "staff") {
         menuItems.forEach(item => {
             let text = item.innerText;
@@ -68,6 +76,7 @@ function showSystem(role) {
         });
         switchPage('page-Report', 'Daily Report');
     } 
+    // Manager Permissions
     else if(role === "manager") {
         menuItems.forEach(item => {
             let text = item.innerText;
@@ -77,9 +86,9 @@ function showSystem(role) {
         });
         switchPage('page-customer-ledgers', 'Customer Ledgers');
     }
+    
     renderAll();
 }    
-    
 function showSystem(role) {
     document.getElementById('login-screen').style.display = "none";
     document.getElementById('sidebar').style.display = "block";
