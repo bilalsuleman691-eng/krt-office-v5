@@ -207,8 +207,9 @@ function updateItemLists() {
 }
 
 // --- 3. THE COMPLETE STOCK OUT FUNCTION ---
+// --- UPDATED STOCK OUT FUNCTION ---
 async function addOut() {
-    // UI se values lena
+    // 1. UI se values lena
     const item = document.getElementById('out-item').value.trim();
     const qty = Number(document.getElementById('out-qty').value);
     const date = document.getElementById('out-date').value;
@@ -221,7 +222,7 @@ async function addOut() {
         return;
     }
 
-    // B. Real-time Stock Check
+    // B. Real-time Stock Check (Laptop ke local data se check ho raha hai)
     const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const availableStock = tin - tout;
@@ -233,46 +234,54 @@ async function addOut() {
 
     // C. Supabase Cloud Sync
     try {
-        const { error } = await _supabase.from('KRT').insert([
+        console.log("Cloud sync shuru...");
+        
+        // .select() lagaya hai taake Supabase se auto-generated ID mil jaye
+        const { data, error } = await _supabase.from('KRT').insert([
             { 
                 item_name: item, 
                 stock_in: 0, 
                 stock_out: qty,
                 price: price,
-                customer_name: custName 
+                customer_name: custName,
+                created_at: date // Cloud par wahi date jaye jo select ki hai
             }
-        ]);
+        ]).select();
 
         if (error) {
+            console.error("Supabase Error:", error);
             alert("Cloud sync fail ho gaya! Check connection.");
             return;
         }
+
+        // D. Local Database Update (Jab Cloud confirm karde tabhi laptop mein save karein)
+        if (data && data.length > 0) {
+            db.out.push({ 
+                id: data[0].id, // Cloud ki ID yahan local mein save ho rahi hai
+                item: item, 
+                qty: qty, 
+                date: date, 
+                cust: custName, 
+                price: price,
+                total: qty * price 
+            });
+
+            // E. Save to LocalStorage and Refresh UI
+            saveAndRefresh(); 
+            
+            // F. Form Clear
+            document.getElementById('out-qty').value = "";
+            if(document.getElementById('out-customer')) document.getElementById('out-customer').value = "";
+            document.getElementById('stock-status').innerText = ""; 
+            
+            alert("Stock OUT Cloud aur Local dono jagah save ho gaya!");
+        }
+
     } catch (err) {
-        alert("Internet ka masla hai!");
-        return;
+        console.error("Critical Error:", err);
+        alert("Internet ya Server ka masla hai!");
     }
-
-    // D. Local Database Update
-    db.out.push({ 
-        item, 
-        qty, 
-        date, 
-        cust: custName, 
-        price: price,
-        total: qty * price 
-    });
-
-    // E. Save and Refresh UI
-    saveAndRefresh(); // Is mein renderAll khud call ho jata hai
-    
-    // F. Form Clear
-    document.getElementById('out-qty').value = "";
-    document.getElementById('out-customer').value = "";
-    document.getElementById('stock-status').innerText = ""; 
-    
-    alert("Stock OUT Cloud aur Local dono jagah save ho gaya!");
 }
-
 // --- 4. MAIN RENDER FUNCTION (RE-WRITTEN) ---
 function renderAll() {
     const now = new Date();
