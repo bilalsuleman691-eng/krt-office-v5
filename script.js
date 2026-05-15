@@ -713,6 +713,10 @@ function logout() {
         // Input fields saaf kardo
         document.getElementById('user').value = "";
         document.getElementById('pass').value = "";
+
+        if(confirm("Bilal Bhai, kya aap waqai logout karna chahte hain?")) {
+        localStorage.removeItem('isLoggedIn'); // Login status khatam
+        location.reload(); // Page refresh karke wapas login par le jayega
     }
 }
 
