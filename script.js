@@ -151,25 +151,22 @@ async function addIn() {
 // Jab aap typing karein ge, ye khud bataye ga kitna maal bacha hai
 function showLiveStock(itemName) {
     const statusDiv = document.getElementById('stock-status');
-    if (!statusDiv) return;
-
-    if (!itemName || itemName.trim() === "") {
-        statusDiv.innerText = "";
+    if (!itemName) {
+        statusDiv.innerHTML = "";
         return;
     }
 
-    // Dono ko lowercase karke match karein taake typing mein ghalti na ho
-    const searchName = itemName.toLowerCase().trim();
+    // Stock Balance nikalne ki logic
+    let totalIn = db.in.filter(x => x.item === itemName).reduce((sum, x) => sum + Number(x.qty), 0);
+    let totalOut = db.out.filter(x => x.item === itemName).reduce((sum, x) => sum + Number(x.qty), 0);
+    let balance = totalIn - totalOut;
 
-    const tin = db.in.filter(x => x.item.toLowerCase() === searchName).reduce((s, x) => s + x.qty, 0);
-    const tout = db.out.filter(x => x.item.toLowerCase() === searchName).reduce((s, x) => s + x.qty, 0);
-    const available = tin - tout;
-
-    if (tin === 0 && tout === 0) {
-        statusDiv.innerHTML = `<span style="color:orange;">⚠ Naya Item: Pehle Stock IN karein</span>`;
+    if (balance > 0) {
+        statusDiv.style.color = "#27ae60"; // Green color
+        statusDiv.innerHTML = "✅ Available Stock: " + balance;
     } else {
-        // Agar stock 0 se zyada hai to Green, warna Red
-        statusDiv.innerHTML = `Available Stock: <b style="color:${available > 0 ? '#2ecc71' : '#e74c3c'};">${available}</b>`;
+        statusDiv.style.color = "#e74c3c"; // Red color
+        statusDiv.innerHTML = "⚠️ Out of Stock! (Balance: " + balance + ")";
     }
 }
 // --- 2. DROPDOWN LIST UPDATE ---
