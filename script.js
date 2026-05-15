@@ -832,6 +832,8 @@ window.addEventListener('load', () => {
 
 async function fetchCloudData() {
     try {
+        console.log("Cloud sync shuru ho raha hai...");
+        
         // 1. Supabase se sara data mangwao
         const { data, error } = await _supabase.from('KRT').select('*');
         
@@ -841,55 +843,40 @@ async function fetchCloudData() {
         }
 
         if (data) {
-            console.log("Cloud sync in progress...");
-            const today = new Date().toISOString().split('T')[0];
-
-            // 2. Local database ko filter karein taake bina upload wala data mehfooz rahe
-            // Hum sirf wo data delete karenge jo pehle se cloud se sync ho chuka tha
-            // (Jis entry mein .id nahi hai, matlab wo abhi upload honi hai)
-            const localOnlyIn = db.in.filter(x => !x.id);
-            const localOnlyOut = db.out.filter(x => !x.id);
-
-            // 3. Cloud wala data naye arrays mein bharo
+            // 2. Naye temporary arrays banayein
             let cloudIn = [];
             let cloudOut = [];
 
+            // 3. Supabase ke data ko "IN" aur "OUT" mein divide karein
             data.forEach(row => {
+                let formattedRow = {
+                    id: row.id, // Supabase ki ID lazmi save karein delete/edit ke liye
+                    date: row.created_at ? row.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+                    item: row.item_name,
+                    qty: row.stock_in > 0 ? row.stock_in : row.stock_out,
+                    price: row.price || 0,
+                    total: (row.stock_in > 0 ? row.stock_in : row.stock_out) * (row.price || 0),
+                    vendor: row.vendor_name || "Cloud Entry",
+                    cust: row.customer_name || "Cloud Sale"
+                };
+
                 if (row.stock_in > 0) {
-                    cloudIn.push({
-                        id: row.id, // Delete ke liye zaroori hai
-                        item: row.item_name,
-                        qty: row.stock_in,
-                        date: row.created_at ? row.created_at.split('T')[0] : today,
-                        price: row.price || 0,
-                        total: (row.stock_in * (row.price || 0)),
-                        vendor: row.vendor_name || "Factory Stock"
-                    });
-                }
-                if (row.stock_out > 0) {
-                    cloudOut.push({
-                        id: row.id, // Delete ke liye zaroori hai
-                        item: row.item_name,
-                        qty: row.stock_out,
-                        date: row.created_at ? row.created_at.split('T')[0] : today,
-                        price: row.price || 0,
-                        total: (row.stock_out * (row.price || 0)),
-                        cust: row.customer_name || "General Sale"
-                    });
+                    cloudIn.push(formattedRow);
+                } else {
+                    cloudOut.push(formattedRow);
                 }
             });
 
-            // 4. Cloud aur Local (Jo upload nahi hua) dono ko milado
-            db.in = [...cloudIn, ...localOnlyIn];
-            db.out = [...cloudOut, ...localOnlyOut];
+            // 4. Local DB ko update karein (Cloud wala data hi final hai)
+            db.in = cloudIn;
+            db.out = cloudOut;
 
-            // 5. Final Save aur Refresh
-            localStorage.setItem('krt_erp_data', JSON.stringify(db)); 
-            renderAll(); 
-            console.log("Cloud sync complete. No local data lost!");
+            // 5. Save karein aur Screen refresh karein
+            saveAndRefresh();
+            console.log("Cloud Sync Mukammal!");
         }
     } catch (err) {
-        console.error("Connection failed during sync:", err);
+        console.error("Connection error during sync:", err);
     }
 }
 
