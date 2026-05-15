@@ -34,35 +34,7 @@ function login() {
         alert("Ghalat ID!"); return;
     }
 
-    // --- Animation Start ---
-    const loginScreen = document.getElementById('login-screen');
-    const overlay = document.getElementById('welcome-overlay');
-    const textElem = document.getElementById('welcome-text');
-    const subText = document.getElementById('sub-text');
-
-    loginScreen.style.display = "none"; // Pehle login box khatam
-    overlay.style.display = "flex";    // Welcome parda shuru
     
-    textElem.innerText = welcomeMsg;
-    textElem.classList.add('start-typing');
-
-    // 1 second baad chota text dikhao
-    setTimeout(() => {
-        subText.classList.add('fade-in-text');
-    }, 1000);
-
-    // 3.5 seconds baad dashboard kholo
-    setTimeout(() => {
-        overlay.style.opacity = "0";
-        overlay.style.transition = "0.8s";
-        
-        setTimeout(() => {
-            overlay.style.display = "none";
-            // Yahan wo function call karein jo dashboard dikhata hai
-            showSystem(u === "admin" ? "admin" : "staff"); 
-        }, 800);
-    }, 3500);
-}
 function showSystem(role) {
     document.getElementById('login-screen').style.display = "none";
     document.getElementById('sidebar').style.display = "block";
