@@ -148,25 +148,35 @@ async function addIn() {
     alert("Stock IN Cloud aur Local dono par save ho gaya!");
 }
 // --- 1. LIVE STOCK VIEW FUNCTION ---
-// Jab aap typing karein ge, ye khud bataye ga kitna maal bacha hai
 function showLiveStock(itemName) {
     const statusDiv = document.getElementById('stock-status');
-    if (!itemName) {
+    if (!itemName || itemName.trim() === "") {
         statusDiv.innerHTML = "";
         return;
     }
 
-    // Stock Balance nikalne ki logic
-    let totalIn = db.in.filter(x => x.item === itemName).reduce((sum, x) => sum + Number(x.qty), 0);
-    let totalOut = db.out.filter(x => x.item === itemName).reduce((sum, x) => sum + Number(x.qty), 0);
+    // Aapki global database 'db' se calculation
+    // 'db.in' (Stock In) aur 'db.out' (Stock Out) ko filter kar raha hai
+    let totalIn = db.in
+        .filter(x => x.item === itemName)
+        .reduce((sum, x) => sum + Number(x.qty || 0), 0);
+
+    let totalOut = db.out
+        .filter(x => x.item === itemName)
+        .reduce((sum, x) => sum + Number(x.qty || 0), 0);
+
     let balance = totalIn - totalOut;
 
+    // Styling aur Display
     if (balance > 0) {
-        statusDiv.style.color = "#27ae60"; // Green color
+        statusDiv.style.color = "#27ae60"; // Green for Available
         statusDiv.innerHTML = "✅ Available Stock: " + balance;
-    } else {
-        statusDiv.style.color = "#e74c3c"; // Red color
+    } else if (balance <= 0 && totalIn > 0) {
+        statusDiv.style.color = "#e74c3c"; // Red for Out of Stock
         statusDiv.innerHTML = "⚠️ Out of Stock! (Balance: " + balance + ")";
+    } else {
+        statusDiv.style.color = "#7f8c8d"; // Gray for New Item
+        statusDiv.innerHTML = "ℹ️ No record found for this item.";
     }
 }
 // --- 2. DROPDOWN LIST UPDATE ---
