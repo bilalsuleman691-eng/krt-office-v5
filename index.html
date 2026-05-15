@@ -82,12 +82,15 @@
         <input type="date" id="out-date">
         <input type="text" id="out-customer" placeholder="Customer Name">
 
-        <input type="text" id="out-item" list="items-list" oninput="showLiveStock(this.value)" placeholder="Item Name Select Karein">
+        <input type="text" id="out-item" list="items-list" 
+       oninput="showLiveStock(this.value)" 
+       onchange="showLiveStock(this.value)" 
+       placeholder="Item Name Select Karein">
+
+<div id="stock-status" style="font-size: 14px; font-weight: bold; margin-top: 5px; height: 25px; color: #2c3e50;"></div>
+
+<datalist id="items-list"></datalist>
         
-        <div id="stock-status" style="font-size: 14px; font-weight: bold; margin-top: 5px; height: 25px; padding-left: 5px;"></div>
-
-        <datalist id="items-list"></datalist>
-
         <input type="text" id="out-barcode" placeholder="Manual Barcode">
         <input type="number" id="out-qty" placeholder="Qty">
         <input type="number" id="out-price" placeholder="Sale Price">
