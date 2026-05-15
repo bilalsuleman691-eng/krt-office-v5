@@ -25,11 +25,14 @@ function login() {
     let p = document.getElementById('pass').value.trim();
 
     // 1. Full Access (Admin)
-    if(u === "admin" && p === "123") {
-        localStorage.setItem}{
-        alert("Khush Amdeed, Bilal Bhai (Admin)!");
-        document.getElementById('toggle-btn').style.display = "block";
-    } 
+if(u === "admin" && p === "123") {
+    let currentRole = "admin"; // Role define karein
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('userRole', currentRole);
+    showSystem(currentRole);
+    document.getElementById('toggle-btn').style.display = "block";
+    alert(`Khush Amdeed, ${u}!`);
+}        
     // 2. Report Only Access (Staff)
     else if(u === "ali" && p === "123") {
         showSystem("staff");
@@ -701,25 +704,28 @@ function toggleSidebar() {
     }
 }
 
-// --- LOGOUT LOGIC ---
+// --- LOGOUT LOGIC (MUKAMMAL) ---
 function logout() {
-    if (confirm("Bilal Bhai, Logout karna chahte hain?")) {
-        // Login screen wapas lao aur baaki sab hide
-        document.getElementById('login-screen').style.display = "flex";
-        document.getElementById('sidebar').style.display = "none";
-        document.getElementById('main-content').style.display = "none";
-        document.getElementById('toggle-btn').style.display = "none";
+    // 1. Confirm karein ke Bilal Bhai waqai logout karna chahte hain
+    if (confirm("Bilal Bhai, kya aap waqai system band (Logout) karna chahte hain?")) {
         
-        // Input fields saaf kardo
-        document.getElementById('user').value = "";
-        document.getElementById('pass').value = "";
+        // 2. LocalStorage se login data khatam karein
+        localStorage.removeItem('isLoggedIn'); 
+        localStorage.removeItem('userRole');
+        
+        // 3. (Optional) Agar aapne koi aur session data rakha hai toh wo bhi clear kardein
+        // localStorage.clear(); // Yeh saara data urha dega, isliye soch samajh kar use karein
 
-        if(confirm("Bilal Bhai, kya aap waqai logout karna chahte hain?")) {
-        localStorage.removeItem('isLoggedIn'); // Login status khatam
-        location.reload(); // Page refresh karke wapas login par le jayega
+        // 4. Page ko reload karein taake login screen wapas aa jaye
+        // Reload karne se code ka reset hona pakka ho jata hai
+        location.reload(); 
+        
+        // 5. User ko login screen par dhakelna (Extra safety)
+        setTimeout(() => {
+            window.location.href = "#"; // Ya jo bhi aapka login page/section hai
+        }, 100);
     }
 }
-
 // --- LOGIN FUNCTION UPDATE ---
 // Apne purane login() function ke andar jahan system show hota hai, 
 // wahan ye line lazmi add karein:
@@ -832,3 +838,21 @@ async function fetchCloudData() {
         console.error("Connection failed during sync:", err);
     }
 }
+
+// --- AUTO-CHECK ON LOAD ---
+// Jab bhi page refresh ho ya dobara khule, ye check karega ke user login hai ya nahi
+window.addEventListener('load', () => {
+    const isLoggedIn = localStorage.getItem('isLoggedIn');
+    const savedRole = localStorage.getItem('userRole');
+
+    if (isLoggedIn === 'true' && savedRole) {
+        // Agar pehle se login hai toh system dikhao
+        showSystem(savedRole);
+        document.getElementById('toggle-btn').style.display = "block";
+    } else {
+        // Agar login nahi hai toh login screen dikhao
+        document.getElementById('login-screen').style.display = "flex";
+        document.getElementById('sidebar').style.display = "none";
+        document.getElementById('main-content').style.display = "none";
+    }
+});
