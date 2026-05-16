@@ -362,8 +362,8 @@ async function deleteEntry(type, index) {
     if(confirm("Bilal Bhai, kya aap waqai ye record delete karna chahte hain?")) {
         const record = db[type][index];
 
-        // Agar record cloud wala hai (id mojud hai)
-        if (record.id) {
+        // 1. Agar record ke paas cloud ki ID hai, to pehle cloud se urao
+        if (record && record.id) {
             try {
                 const { error } = await _supabase
                     .from('KRT')
@@ -371,27 +371,29 @@ async function deleteEntry(type, index) {
                     .eq('id', record.id);
 
                 if (error) {
-                    alert("Cloud delete fail: " + error.message);
-                    return;
+                    alert("Cloud se delete fail ho gaya: " + error.message);
+                    return; // Agar cloud se delete na ho, to local se bhi mat urao
                 }
             } catch (err) {
-                alert("Internet ka masla hai, delete nahi ho saka.");
+                alert("Internet ka masla hai, cloud se delete nahi ho saka.");
                 return;
             }
         }
 
-        // Local se delete karein
+        // 2. Local database se delete karein (Is se laptop ka apna data theek hoga)
         db[type].splice(index, 1);
-        saveAndRefresh();
         
-        // Agar Search table khuli hai toh usay refresh karein
+        // 3. Laptop ke local storage mein save karein aur UI refresh karein
+        saveAndRefresh(); // Is se stock balance ka table khud hi naye siray se calculate hoga
+        
+        // 4. Agar Master Search khuli hai to usay bhi refresh karo
         if(document.getElementById('master-in-table')) {
             generateMasterSearch(); 
         }
-        alert("Record har jagah se delete ho gaya!");
+        
+        alert("Record is laptop aur cloud dono se delete ho gaya! Dosre laptop par 'Fetch' dabein.");
     }
 }
-
 // --- 2. MASTER SEARCH RENDER (Sahi Buttons ke sath) ---
 function generateMasterSearch() {
     const from = document.getElementById('master-from').value;
@@ -605,49 +607,74 @@ function updateOpeningBal() {
     }
 }
 
+// --- CUSTOMER LEDGER FIXED ---
 function showLedger() {
     const name = document.getElementById('ledger-cust-name').value.trim();
     const tbody = document.getElementById('ledger-table-body');
     if (!tbody) return;
 
-    const opening = db.opening_balances[name] || 0;
+    const opening = parseFloat(db.opening_balances[name]) || 0;
     document.getElementById('opening-bal').value = opening;
     
     tbody.innerHTML = "";
     if (!name || !db.ledgers[name]) {
-        document.getElementById('total-ctn').innerText = "0";
-        document.getElementById('total-debit').innerText = "0";
-        document.getElementById('total-credit').innerText = "0";
-        document.getElementById('final-balance').innerText = "Balance: 0";
+        resetLedgerTotals();
         return;
     }
 
     let tCtn = 0, tDebit = 0, tCredit = 0;
 
     db.ledgers[name].forEach((x, index) => {
-        tCtn += x.ctn;
-        tDebit += x.debit;
-        tCredit += x.credit;
+        tCtn += Number(x.ctn || 0);
+        tDebit += Number(x.debit || 0);
+        tCredit += Number(x.credit || 0);
+
         tbody.innerHTML += `
             <tr>
                 <td>${index + 1}</td>
                 <td>${x.date}</td>
                 <td>${x.item}</td>
                 <td>${x.ctn}</td>
-                <td>${x.debit}</td>
-                <td>${x.credit}</td>
+                <td>${x.debit.toLocaleString()}</td>
+                <td>${x.credit.toLocaleString()}</td>
                 <td>${x.method}</td>
-                <td><button onclick="delLedger('${name}', ${index})" style="background:red; color:white; border:none; cursor:pointer;">Del</button></td>
+                <td>
+                    <button onclick="editLedger('${name}', ${index})" style="background:#3498db; color:white; border:none; padding:3px 7px; border-radius:3px; cursor:pointer;">Edit</button>
+                    <button onclick="delLedger('${name}', ${index})" style="background:#e74c3c; color:white; border:none; padding:3px 7px; border-radius:3px; cursor:pointer;">Del</button>
+                </td>
             </tr>`;
     });
 
     document.getElementById('total-ctn').innerText = tCtn;
-    document.getElementById('total-debit').innerText = tDebit;
-    document.getElementById('total-credit').innerText = tCredit;
+    document.getElementById('total-debit').innerText = tDebit.toLocaleString();
+    document.getElementById('total-credit').innerText = tCredit.toLocaleString();
     
+    // Asal calculation: Opening + Udhaar (Debit) - Wasuli (Credit)
     const currentBalance = (opening + tDebit) - tCredit;
     document.getElementById('final-balance').innerText = "Kul Udhaar: " + currentBalance.toLocaleString();
-    updateCustomerDropdown();
+}
+
+// Ledger Delete Function
+function delLedger(custName, index) {
+    if(confirm("Kya ye entry delete kar dein?")) {
+        db.ledgers[custName].splice(index, 1);
+        saveAndRefresh();
+        showLedger();
+    }
+}
+
+// Ledger Edit Function
+function editLedger(custName, index) {
+    let entry = db.ledgers[custName][index];
+    let nDebit = prompt("Naya Debit (Udhaar):", entry.debit);
+    let nCredit = prompt("Naya Credit (Wasuli):", entry.credit);
+    
+    if(nDebit !== null && nCredit !== null) {
+        db.ledgers[custName][index].debit = Number(nDebit);
+        db.ledgers[custName][index].credit = Number(nCredit);
+        saveAndRefresh();
+        showLedger();
+    }
 }
 // Rent Database
 let dbRent = JSON.parse(localStorage.getItem('krt_rent_data')) || [];
@@ -883,5 +910,12 @@ window.addEventListener('load', () => {
         document.getElementById('login-screen').style.display = "flex";
         document.getElementById('sidebar').style.display = "none";
         document.getElementById('main-content').style.display = "none";
+    }
+});
+// Jab page load ho, to automatic cloud se data khinche
+window.addEventListener('DOMContentLoaded', (event) => {
+    if (localStorage.getItem('isLoggedIn') === 'true') {
+        console.log("System loaded. Fetching fresh cloud data...");
+        fetchCloudData(); // Yeh function cloud se data la kar db.in aur db.out ko refresh kar dega
     }
 });
