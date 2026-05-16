@@ -119,15 +119,15 @@ async function addIn() {
     try {
         console.log("Cloud par data bheja ja raha hai...");
 
-        // 3. Cloud Sync (Supabase) - ".select()" lazmi hai ID wapas lene ke liye
+        // 3. Cloud Sync (Supabase) - 'Date' column ke sath match kiya
         const { data, error } = await _supabase.from('KRT').insert([
             { 
+                Date: date, // 'created_at' ki jagah ab aapka sahi column 'Date' chalega
                 item_name: item, 
                 stock_in: qty, 
                 stock_out: 0,
                 price: price, 
-                vendor_name: vendor,
-                created_at: date // Jo date aapne select ki wahi cloud pe jaye
+                vendor_name: vendor
             }
         ]).select(); // Yeh line Cloud se auto-generated ID wapas degi
         
@@ -208,8 +208,11 @@ function updateItemLists() {
 
 // --- 3. THE COMPLETE STOCK OUT FUNCTION ---
 // --- UPDATED STOCK OUT FUNCTION ---
+// ==========================================
+// 1. MUKAMMAL STOCK OUT ENTRY FUNCTION
+// ==========================================
 async function addOut() {
-    // 1. UI se values lena
+    // UI se values lena
     const item = document.getElementById('out-item').value.trim();
     const qty = Number(document.getElementById('out-qty').value);
     const date = document.getElementById('out-date').value;
@@ -237,14 +240,15 @@ async function addOut() {
         console.log("Cloud sync shuru...");
         
         // .select() lagaya hai taake Supabase se auto-generated ID mil jaye
+        // 'created_at' hata kar aapke database table ka asli 'Date' column lagaya hai
         const { data, error } = await _supabase.from('KRT').insert([
             { 
+                Date: date, 
                 item_name: item, 
                 stock_in: 0, 
                 stock_out: qty,
                 price: price,
-                customer_name: custName,
-                created_at: date // Cloud par wahi date jaye jo select ki hai
+                customer_name: custName
             }
         ]).select();
 
@@ -282,7 +286,10 @@ async function addOut() {
         alert("Internet ya Server ka masla hai!");
     }
 }
-// --- 4. MAIN RENDER FUNCTION (RE-WRITTEN) ---
+
+// ==========================================
+// 2. MUKAMMAL MAIN RENDER FUNCTION (FIXED)
+// ==========================================
 function renderAll() {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
@@ -291,28 +298,51 @@ function renderAll() {
     const outTableBody = document.querySelector('#table-out tbody');
     const balTableBody = document.querySelector('#table-balance tbody');
 
-    // A. Rendering Today's IN
+    // A. Rendering Today's IN (Original Database Indexing Ke Sath)
     if(todayInBody) {
-        todayInBody.innerHTML = db.in.filter(x => x.date === today).map((x, i) => `
-            <tr>
-                <td>${i+1}</td><td>${x.item}</td><td>${x.vendor}</td>
-                <td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
-                <td><button onclick="deleteEntry('in', ${i})">🗑 Del</button></td>
-            </tr>`).join('');
+        let htmlIn = "";
+        let counterIn = 1;
+        db.in.forEach((x, originalIndex) => {
+            if (x.date === today) {
+                htmlIn += `
+                    <tr>
+                        <td>${counterIn++}</td>
+                        <td>${x.item}</td>
+                        <td>${x.vendor}</td>
+                        <td>${x.qty}</td>
+                        <td>${x.price.toLocaleString()}</td>
+                        <td>${x.total.toLocaleString()}</td>
+                        <td><button onclick="deleteEntry('in', ${originalIndex})" style="background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; cursor:pointer;">🗑 Del</button></td>
+                    </tr>`;
+            }
+        });
+        todayInBody.innerHTML = htmlIn || `<tr><td colspan="7" style="text-align:center; color:gray;">Aaj ki koi entry nahi hai...</td></tr>`;
     }
 
-    // B. Rendering Today's OUT
+    // B. Rendering Today's OUT (Original Database Indexing Ke Sath taake galat item delete na ho)
     if(outTableBody) {
-        outTableBody.innerHTML = db.out.filter(x => x.date === today).map((x, i) => `
-            <tr>
-                <td>${i+1}</td><td>${x.date}</td><td>${x.cust}</td>
-                <td>${x.item}</td><td>${x.bc || '0'}</td>
-                <td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
-                <td><button onclick="deleteEntry('out', ${i})" style="background:#e74c3c; color:white;">Del</button></td>
-            </tr>`).join('');
+        let htmlOut = "";
+        let counterOut = 1;
+        db.out.forEach((x, originalIndex) => {
+            if (x.date === today) {
+                htmlOut += `
+                    <tr>
+                        <td>${counterOut++}</td>
+                        <td>${x.date}</td>
+                        <td>${x.cust}</td>
+                        <td>${x.item}</td>
+                        <td>${x.bc || '0'}</td>
+                        <td>${x.qty}</td>
+                        <td>${x.price.toLocaleString()}</td>
+                        <td>${x.total.toLocaleString()}</td>
+                        <td><button onclick="deleteEntry('out', ${originalIndex})" style="background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; cursor:pointer;">Del</button></td>
+                    </tr>`;
+            }
+        });
+        outTableBody.innerHTML = htmlOut || `<tr><td colspan="9" style="text-align:center; color:gray;">Aaj ki koi sale nahi hai...</td></tr>`;
     }
 
-    // C. Balance & Profit Table
+    // C. Balance & Profit Table (Commas formatting ke sath)
     if(balTableBody) {
         const uniqueItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
         balTableBody.innerHTML = uniqueItems.map(name => {
@@ -321,16 +351,23 @@ function renderAll() {
             const tout = db.out.filter(x => x.item === name).reduce((s, x) => s + x.qty, 0);
             const pPrice = db.in.find(x => x.item === name)?.price || 0;
             const sPrice = db.out.find(x => x.item === name)?.price || 0;
+            const remainingStock = tin - tout;
+            
             return `<tr>
                 <td>${db.in.find(x => x.item === name)?.barcode || 'N/A'}</td>
-                <td>${name}</td><td>${tin}</td><td>${tout}</td>
-                <td>${tin - tout}</td><td>${(sPrice - pPrice) * tout}</td>
+                <td style="font-weight:bold;">${name}</td>
+                <td style="color:blue;">${tin}</td>
+                <td style="color:orange;">${tout}</td>
+                <td style="font-weight:bold; color:${remainingStock < 5 ? 'red' : 'green'};">${remainingStock}</td>
+                <td style="color:green; font-weight:bold;">${((sPrice - pPrice) * tout).toLocaleString()}</td>
             </tr>`;
         }).join('');
     }
 
     // Refresh Dropdowns
-    updateItemLists();
+    if (typeof updateItemLists === "function") {
+        updateItemLists();
+    }
 }
 // --- 6. REPORTS & SEARCH ---
 function generateCustomReport() {
