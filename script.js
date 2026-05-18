@@ -27,84 +27,65 @@ _supabase
 
 // --- CLOUD SE DATA UTFAYEN KA FUNCTION ---
 // --- CLOUD DATA FETCH ---
+// --- CLOUD SE DATA UTFAYEN KA FUNCTION (FIXED) ---
 async function fetchCloudData() {
     try {
         console.log("Cloud se latest data load ho raha hai...");
-
+        
+        // FIX: 'created_at' hata kar yahan asli column name 'Date' lagaya hai
         const { data, error } = await _supabase
             .from('KRT')
             .select('*')
-            .order('created_at', { ascending: true });
+            .order('Date', { ascending: true }); 
 
         if (error) {
-            console.error("Cloud data fetch error:", error);
             alert("Cloud se data lane mein masla aya: " + error.message);
             return;
         }
 
-        // Purana data clear
+        // Apne local 'db' object ko khali kar ke naye siray se bharhein
         db.in = [];
         db.out = [];
 
-        if (data && data.length > 0) {
-
+        if (data) {
             data.forEach(row => {
-
-                let rowDate =
-                    row.Date ||
-                    (row.created_at
-                        ? row.created_at.split('T')[0]
-                        : new Date().toISOString().split('T')[0]);
-
-                // STOCK IN
-                if (Number(row.stock_in) > 0) {
-
+                // Agar stock_in bara hai zero se toh yeh IN ki entry hai
+                if (row.stock_in > 0) {
                     db.in.push({
                         id: row.id,
-                        date: rowDate,
-                        vendor: row.vendor_name || "Factory",
-                        item: row.item_name || "",
-                        qty: Number(row.stock_in) || 0,
-                        price: Number(row.price) || 0,
-                        total: (Number(row.stock_in) || 0) * (Number(row.price) || 0)
+                        date: row.Date,
+                        vendor: row.vendor_name || 'factory',
+                        item: row.item_name,
+                        qty: row.stock_in,
+                        price: row.price,
+                        total: row.stock_in * row.price
                     });
-
-                }
-
-                // STOCK OUT
-                else if (Number(row.stock_out) > 0) {
-
+                } 
+                // Agar stock_out bara hai zero se toh yeh OUT ki entry hai
+                else if (row.stock_out > 0) {
                     db.out.push({
                         id: row.id,
-                        date: rowDate,
-                        cust: row.customer_name || "General Sale",
-                        item: row.item_name || "",
-                        qty: Number(row.stock_out) || 0,
-                        price: Number(row.price) || 0,
-                        total: (Number(row.stock_out) || 0) * (Number(row.price) || 0)
+                        date: row.Date,
+                        cust: row.customer_name || 'General Sale',
+                        item: row.item_name,
+                        qty: row.stock_out,
+                        price: row.price,
+                        total: row.stock_out * row.price
                     });
-
                 }
-
             });
-
         }
 
-        // Save Local
+        // LocalStorage mein save karein aur poori screen refresh kar dein
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
-
-        // Refresh UI
         renderAll();
-
-        console.log("Cloud Sync Complete");
+        console.log("Cloud data successfully sync ho gaya.");
 
     } catch (err) {
-        console.error("Connection Error:", err);
-        alert("Internet ya server ka masla hai!");
+        console.error("Fetch Error:", err);
+        alert("Internet connection check karein!");
     }
-}
-     
-       
+}       
 // Jab bhi koi user login kare ya page reload ho, toh automatic cloud se data uthaye
 window.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('isLoggedIn') === 'true') {
