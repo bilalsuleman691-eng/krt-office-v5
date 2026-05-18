@@ -84,6 +84,8 @@ function saveAndRefresh() {
     localStorage.setItem('krt_erp_data', JSON.stringify(db));
     renderAll();
 }
+localStorage.setItem('krt_erp_data', JSON.stringify(db));
+if (typeof renderAll === "function") renderAll(); // <--- Yeh line screen par data dikhayegi
 
 /// --- UPDATED LOGIN SYSTEM ---
 // --- MERGED LOGIN & PERMISSIONS SYSTEM ---
@@ -1005,3 +1007,11 @@ function printSection() {
     // Browser ka print window open karne ke liye
     window.print();
 }
+// Jab poora page load ho jaye (DOM ready ho)
+document.addEventListener('DOMContentLoaded', async () => {
+    // Pehle local storage se render kar dein taake screen khali na dikhe
+    if (typeof renderAll === "function") renderAll(); 
+    
+    // Phir cloud se naya data mangwain
+    await fetchCloudData();
+});
