@@ -933,7 +933,11 @@ function renderRentTable() {
 }
 
 // Naam likhte hi table update ho (Live Search jaisa)
-document.getElementById('rent-name').addEventListener('input', renderRentTable);
+const rentNameField = document.getElementById('rent-name');
+
+if (rentNameField) {
+    rentNameField.addEventListener('input', renderRentTable);
+}
 
 // --- SIDEBAR TOGGLE LOGIC ---
 function toggleSidebar() {
