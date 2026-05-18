@@ -1,66 +1,49 @@
-
-
+// 1. Supabase Initialization
 const supabaseUrl = 'https://zeadgtkzqooiswyyuozl.supabase.co';
-const supabaseKey = 'sb_publishable_b4jLu7Bx2dsGtLR72i8dMA_OeGcOu79'; // Yahan Secret key ki jagah Publishable key dalein
+const supabaseKey = 'sb_publishable_b4jLu7Bx2dsGtLR72i8dMA_OeGcOu79'; 
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
-// --- INITIALIZE GLOBAL DATABASE OBJECT ---
+
+// 2. GLOBAL DATABASE OBJECT (Yeh Line Sab Se Top Par Honi Chahiye)
 let db = JSON.parse(localStorage.getItem('krt_erp_data')) || { in: [], out: [], ledgers: {}, opening_balances: {} };
 
-// ===== REALTIME LIVE SYNC =====
-
-_supabase
-.channel('krt-live')
-.on(
-    'postgres_changes',
-    {
-        event: '*',
-        schema: 'public',
-        table: 'KRT'
-    },
-    payload => {
-
-        console.log('Realtime change:', payload);
-
-        fetchCloudData();
-    }
-)
-.subscribe();
-
+// 3. SAVE AND REFRESH FUNCTION
+function saveAndRefresh() {
+    localStorage.setItem('krt_erp_data', JSON.stringify(db));
+    renderAll();
+}
 
 // --- CLOUD SE DATA UTFAYEN KA FUNCTION ---
-// --- CLOUD DATA FETCH ---
-// --- CLOUD SE DATA UTFAYEN KA FUNCTION (FIXED) ---
 async function fetchCloudData() {
     try {
         console.log("Cloud se latest data load ho raha hai...");
         
+        // Supabase se 'Date' column ke mutabik data uthayein
         const { data, error } = await _supabase
             .from('KRT')
             .select('*')
-            .order('Date', { ascending: true }); 
+            .order('Date', { ascending: true });
 
         if (error) {
             alert("Cloud se data lane mein masla aya: " + error.message);
             return;
         }
 
-        // Local data clear kar ke refresh bharhein
+        // Local arrays ko reset karein
         db.in = [];
         db.out = [];
 
         if (data) {
             data.forEach(row => {
-                // Supabase ke columns ke data types ko numbers mein convert karna
                 let stockIn = Number(row.stock_in || 0);
                 let stockOut = Number(row.stock_out || 0);
                 let itemPrice = Number(row.price || 0);
-                
+
                 if (stockIn > 0) {
                     db.in.push({
                         id: row.id,
-                        date: row.Date || new Date().toISOString().split('T')[0], // Agar Date blank ho to aaj ki date
+                        date: row.Date,
                         vendor: row.vendor_name || 'factory',
-                        item: row.item_name || 'Unknown',
+                        item: row.item_name,
                         qty: stockIn,
                         price: itemPrice,
                         total: stockIn * itemPrice
@@ -69,9 +52,9 @@ async function fetchCloudData() {
                 else if (stockOut > 0) {
                     db.out.push({
                         id: row.id,
-                        date: row.Date || new Date().toISOString().split('T')[0],
+                        date: row.Date,
                         cust: row.customer_name || 'General Sale',
-                        item: row.item_name || 'Unknown',
+                        item: row.item_name,
                         qty: stockOut,
                         price: itemPrice,
                         total: stockOut * itemPrice
@@ -80,14 +63,17 @@ async function fetchCloudData() {
             });
         }
 
+        // Save to LocalStorage and Refresh UI
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
         renderAll();
-        console.log("Cloud Sync Done! Total Rows: " + data.length);
+        alert("Zabardast! Cloud ka sara data is laptop par sync ho gaya hai.");
 
     } catch (err) {
         console.error("Fetch Error:", err);
+        alert("Internet connection check karein!");
     }
 }
+
 // Jab bhi koi user login kare ya page reload ho, toh automatic cloud se data uthaye
 window.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('isLoggedIn') === 'true') {
