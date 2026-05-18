@@ -133,8 +133,8 @@ if (u === "admin" && p === "123") {
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('userRole', 'admin');
     showSystem("admin");
-} 
-    // 2. Ali Bhai (Staff)
+} 
+    // 2. Ali Bhai (Staff)
     else if (u === "ali" && p === "123") {
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('userRole', 'staff');
