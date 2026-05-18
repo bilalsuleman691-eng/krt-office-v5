@@ -34,7 +34,6 @@ async function fetchCloudData() {
     try {
         console.log("Cloud se latest data load ho raha hai...");
         
-        // FIX: 'created_at' hata kar yahan asli column name 'Date' lagaya hai
         const { data, error } = await _supabase
             .from('KRT')
             .select('*')
@@ -45,55 +44,60 @@ async function fetchCloudData() {
             return;
         }
 
-        // Apne local 'db' object ko khali kar ke naye siray se bharhein
+        // Local data clear kar ke refresh bharhein
         db.in = [];
         db.out = [];
 
         if (data) {
             data.forEach(row => {
-                // Agar stock_in bara hai zero se toh yeh IN ki entry hai
-                if (row.stock_in > 0) {
+                // Supabase ke columns ke data types ko numbers mein convert karna
+                let stockIn = Number(row.stock_in || 0);
+                let stockOut = Number(row.stock_out || 0);
+                let itemPrice = Number(row.price || 0);
+                
+                if (stockIn > 0) {
                     db.in.push({
                         id: row.id,
-                        date: row.Date,
+                        date: row.Date || new Date().toISOString().split('T')[0], // Agar Date blank ho to aaj ki date
                         vendor: row.vendor_name || 'factory',
-                        item: row.item_name,
-                        qty: row.stock_in,
-                        price: row.price,
-                        total: row.stock_in * row.price
+                        item: row.item_name || 'Unknown',
+                        qty: stockIn,
+                        price: itemPrice,
+                        total: stockIn * itemPrice
                     });
                 } 
-                // Agar stock_out bara hai zero se toh yeh OUT ki entry hai
-                else if (row.stock_out > 0) {
+                else if (stockOut > 0) {
                     db.out.push({
                         id: row.id,
-                        date: row.Date,
+                        date: row.Date || new Date().toISOString().split('T')[0],
                         cust: row.customer_name || 'General Sale',
-                        item: row.item_name,
-                        qty: row.stock_out,
-                        price: row.price,
-                        total: row.stock_out * row.price
+                        item: row.item_name || 'Unknown',
+                        qty: stockOut,
+                        price: itemPrice,
+                        total: stockOut * itemPrice
                     });
                 }
             });
         }
 
-        // LocalStorage mein save karein aur poori screen refresh kar dein
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
         renderAll();
-        console.log("Cloud data successfully sync ho gaya.");
+        console.log("Cloud Sync Done! Total Rows: " + data.length);
 
     } catch (err) {
         console.error("Fetch Error:", err);
-        alert("Internet connection check karein!");
     }
-}       
+}
 // Jab bhi koi user login kare ya page reload ho, toh automatic cloud se data uthaye
 window.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('isLoggedIn') === 'true') {
         fetchCloudData();
     }
 });
+function saveAndRefresh() {
+    localStorage.setItem('krt_erp_data', JSON.stringify(db));
+    renderAll();
+}
 
 /// --- UPDATED LOGIN SYSTEM ---
 // --- MERGED LOGIN & PERMISSIONS SYSTEM ---
