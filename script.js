@@ -17,14 +17,13 @@ async function fetchCloudData() {
     try {
         console.log("Cloud se latest data load ho raha hai...");
         
-        // Supabase se 'Date' column ke mutabik data uthayein
         const { data, error } = await _supabase
             .from('KRT')
             .select('*')
-            .order('Date', { ascending: true });
+            .order('Date', { ascending: true }); 
 
         if (error) {
-            alert("Cloud se data lane mein masla aya: " + error.message);
+            console.error("Supabase Error:", error.message);
             return;
         }
 
@@ -37,13 +36,13 @@ async function fetchCloudData() {
                 let stockIn = Number(row.stock_in || 0);
                 let stockOut = Number(row.stock_out || 0);
                 let itemPrice = Number(row.price || 0);
-
+                
                 if (stockIn > 0) {
                     db.in.push({
                         id: row.id,
-                        date: row.Date,
+                        date: row.Date ? row.Date.split('T')[0] : new Date().toISOString().split('T')[0],
                         vendor: row.vendor_name || 'factory',
-                        item: row.item_name,
+                        item: row.item_name || 'Unknown',
                         qty: stockIn,
                         price: itemPrice,
                         total: stockIn * itemPrice
@@ -52,9 +51,9 @@ async function fetchCloudData() {
                 else if (stockOut > 0) {
                     db.out.push({
                         id: row.id,
-                        date: row.Date,
+                        date: row.Date ? row.Date.split('T')[0] : new Date().toISOString().split('T')[0],
                         cust: row.customer_name || 'General Sale',
-                        item: row.item_name,
+                        item: row.item_name || 'Unknown',
                         qty: stockOut,
                         price: itemPrice,
                         total: stockOut * itemPrice
@@ -63,17 +62,18 @@ async function fetchCloudData() {
             });
         }
 
-        // Save to LocalStorage and Refresh UI
+        // 🟢 ASAL HAL: Pehle LocalStorage mein save karein, phir UI ko batayein
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
-        renderAll();
-        alert("Zabardast! Cloud ka sara data is laptop par sync ho gaya hai.");
+        
+        // Agar aap ka main render function renderAll hai toh usay chalayein:
+        if (typeof renderAll === "function") renderAll();
+        
+        console.log("Cloud sync done and UI updated!");
 
     } catch (err) {
         console.error("Fetch Error:", err);
-        alert("Internet connection check karein!");
     }
 }
-
 // Jab bhi koi user login kare ya page reload ho, toh automatic cloud se data uthaye
 window.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('isLoggedIn') === 'true') {
