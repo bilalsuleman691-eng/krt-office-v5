@@ -4,6 +4,26 @@ const supabaseUrl = 'https://zeadgtkzqooiswyyuozl.supabase.co';
 const supabaseKey = 'sb_publishable_b4jLu7Bx2dsGtLR72i8dMA_OeGcOu79'; // Yahan Secret key ki jagah Publishable key dalein
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
+// ===== REALTIME LIVE SYNC =====
+
+_supabase
+.channel('krt-live')
+.on(
+    'postgres_changes',
+    {
+        event: '*',
+        schema: 'public',
+        table: 'KRT'
+    },
+    payload => {
+
+        console.log('Realtime change:', payload);
+
+        fetchCloudData();
+    }
+)
+.subscribe();
+
 
 // --- CLOUD SE DATA UTFAYEN KA FUNCTION ---
 // --- CLOUD DATA FETCH ---
@@ -83,50 +103,8 @@ async function fetchCloudData() {
         alert("Internet ya server ka masla hai!");
     }
 }
-        // 2. Apne local 'db' object ko khali kar ke naye siray se bharhein
-        db.in = [];
-        db.out = [];
-
-        if (data) {
-            data.forEach(row => {
-                // Agar stock_in bara hai zero se toh yeh IN ki entry hai
-                if (row.stock_in > 0) {
-                    db.in.push({
-                        id: row.id,
-                        date: row.Date,
-                        vendor: row.vendor_name || 'factory',
-                        item: row.item_name,
-                        qty: row.stock_in,
-                        price: row.price,
-                        total: row.stock_in * row.price
-                    });
-                } 
-                // Agar stock_out bara hai zero se toh yeh OUT ki entry hai
-                else if (row.stock_out > 0) {
-                    db.out.push({
-                        id: row.id,
-                        date: row.Date,
-                        cust: row.customer_name || 'General Sale',
-                        item: row.item_name,
-                        qty: row.stock_out,
-                        price: row.price,
-                        total: row.stock_out * row.price
-                    });
-                }
-            });
-        }
-
-        // 3. LocalStorage mein save karein aur poori screen refresh kar dein
-        localStorage.setItem('krt_erp_data', JSON.stringify(db));
-        renderAll();
-        alert("Zabardast! Cloud ka sara data is laptop par sync ho gaya hai.");
-
-    } catch (err) {
-        console.error("Fetch Error:", err);
-        alert("Internet connection check karein!");
-    }
-}
-
+     
+       
 // Jab bhi koi user login kare ya page reload ho, toh automatic cloud se data uthaye
 window.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('isLoggedIn') === 'true') {
@@ -147,11 +125,15 @@ function login() {
     let p = passField.value.trim();
 
     // 1. Bilal Bhai (Admin)
-    if (u === "admin" && p === "123") {
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userRole', 'admin');
-        showSystem("admin");
-    } 
+   const users = [
+ {user:"admin", pass:"123"}
+];
+
+if (u === "admin" && p === "123") {
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('userRole', 'admin');
+    showSystem("admin");
+} 
     // 2. Ali Bhai (Staff)
     else if (u === "ali" && p === "123") {
         localStorage.setItem('isLoggedIn', 'true');
@@ -165,16 +147,36 @@ function login() {
         showSystem("manager");
     } 
     // 4. Multi-User (Extra Users check)
-    else {
-        let found = extraUsers.find(user => user.id === u && user.pass === p);
-       if (isLoggedIn === 'true' && savedRole) {
-    showSystem(savedRole);
-    document.getElementById('toggle-btn').style.display = "block";
-}
-        else {
-            alert("Ghalat ID ya Password!");
-        }
-    }
+else {
+
+    let found = extraUsers.find(user =>
+        user.id === u && user.pass === p
+    );
+
+    // Agar user mil gaya
+    if (found) {
+
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userRole', 'extra');
+
+        showSystem(found);
+
+        const toggleBtn = document.getElementById('toggle-btn');
+
+        if (toggleBtn) {
+            toggleBtn.style.display = "block";
+        }
+
+    }
+
+    // Agar user nahi mila
+    else {
+
+        alert("Ghalat ID ya Password!");
+    }
+
+    }
+
 }
 function showSystem(roleOrUser) {
     // UI Screens dikhao
@@ -593,25 +595,47 @@ function deleteEntryMaster(type, index) {
 }
 
 // 3. Edit Entry Function
-function editEntry(type, index) {
-    const data = db[type][index];
-    
-    const newQty = prompt(`Nayi Quantity likhain (Purani: ${data.qty}):`, data.qty);
-    if (newQty === null) return; // Cancel press kiya
+async function editEntry(type, index) {
 
-    const newPrice = prompt(`Nayi Price likhain (Purani: ${data.price}):`, data.price);
-    if (newPrice === null) return; // Cancel press kiya
+    const data = db[type][index];
 
-    // Data Update
-    db[type][index].qty = Number(newQty);
-    db[type][index].price = Number(newPrice);
-    db[type][index].total = Number(newQty) * Number(newPrice);
-    
-    saveAndRefresh(); // Database save karein
-    generateMasterSearch(); // List refresh karein
-    alert("Record successfully update ho gaya!");
+    const newQty = prompt("New Qty:", data.qty);
+    if (newQty === null) return;
+
+    const newPrice = prompt("New Price:", data.price);
+    if (newPrice === null) return;
+
+    try {
+
+        const { error } = await _supabase
+            .from('KRT')
+            .update({
+                stock_in: type === 'in' ? Number(newQty) : 0,
+                stock_out: type === 'out' ? Number(newQty) : 0,
+                price: Number(newPrice)
+            })
+            .eq('id', data.id);
+
+        if (error) {
+            alert(error.message);
+            return;
+        }
+
+        db[type][index].qty = Number(newQty);
+        db[type][index].price = Number(newPrice);
+        db[type][index].total =
+            Number(newQty) * Number(newPrice);
+
+        saveAndRefresh();
+        generateMasterSearch();
+
+        alert("Cloud update successful!");
+
+    } catch (err) {
+
+        alert("Internet issue!");
+    }
 }
-
 
 // --- 1. EXTRA USERS DATABASE ---
 // Yeh sirf un accounts ke liye hai jo aap Multi-User tab se banayenge
@@ -991,31 +1015,5 @@ async function addStockData(itemName, stockIn, stockOut) {
 }
 
 
-async function fetchCloudData() {
-    try {
-        console.log("Cloud sync shuru ho raha hai...");
-        
-      
-// --- AUTO-CHECK ON LOAD ---
-// Jab bhi page refresh ho ya dobara khule, ye check karega ke user login hai ya nahi
-window.addEventListener('load', () => {
-    const isLoggedIn = localStorage.getItem('isLoggedIn');
-    const savedRole = localStorage.getItem('userRole');
 
-    if (isLoggedIn === 'true' && savedRole) {
-        showSystem(savedRole);
-        document.getElementById('toggle-btn').style.display = "block";
-    } else {
-        document.getElementById('login-screen').style.display = "flex";
-        document.getElementById('sidebar').style.display = "none";
-        document.getElementById('main-content').style.display = "none";
-    }
-});
-// Jab page load ho, to automatic cloud se data khinche
-window.addEventListener('DOMContentLoaded', (event) => {
-    if (localStorage.getItem('isLoggedIn') === 'true') {
-        console.log("System loaded. Fetching fresh cloud data...");
-        fetchCloudData(); // Yeh function cloud se data la kar db.in aur db.out ko refresh kar dega
-    }
-});
-wo na type kty huy code pura ni aya ya baki ka code hai ab mera data sai save hoga na 
+
