@@ -10,16 +10,72 @@ async function fetchCloudData() {
     try {
         console.log("Cloud se latest data load ho raha hai...");
         
-        // 1. Supabase se saara data uthayein
-        const { data, error } = await _supabase
-            .from('KRT')
-            .select('*')
-            .order('Date', { ascending: true });
+       async function fetchCloudData() {
+    try {
+        console.log("Cloud se latest data load ho raha hai...");
 
-        if (error) {
-            alert("Cloud se data lane mein masla aya: " + error.message);
-            return;
-        }
+        // Supabase se sara data lao
+        const { data, error } = await _supabase
+            .from('KRT')
+            .select('*')
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            console.error("Cloud data fetch error:", error);
+            alert("Cloud se data lane mein masla aya: " + error.message);
+            return;
+        }
+
+        // Temporary arrays
+        let cloudIn = [];
+        let cloudOut = [];
+
+        // Data process karo
+        data.forEach(row => {
+
+            // Date fix
+            let rowDate = row.Date || 
+                (row.created_at
+                    ? row.created_at.split('T')[0]
+                    : new Date().toISOString().split('T')[0]);
+
+            let formattedRow = {
+                id: row.id,
+                date: rowDate,
+                item: row.item_name || "Unknown Item",
+                qty: Number(row.stock_in > 0 ? row.stock_in : row.stock_out) || 0,
+                price: Number(row.price) || 0,
+                total:
+                    (Number(row.stock_in > 0 ? row.stock_in : row.stock_out) || 0)
+                    * (Number(row.price) || 0),
+
+                vendor: row.vendor_name || "-",
+                cust: row.customer_name || "-"
+            };
+
+            // IN / OUT separate
+            if (Number(row.stock_in) > 0) {
+                cloudIn.push(formattedRow);
+            }
+            else if (Number(row.stock_out) > 0) {
+                cloudOut.push(formattedRow);
+            }
+        });
+
+        // Local DB update
+        db.in = cloudIn;
+        db.out = cloudOut;
+
+        // Save + Refresh
+        saveAndRefresh();
+
+        console.log("Cloud Sync Mukammal! Total records:", data.length);
+
+    } catch (err) {
+        console.error("Connection error during sync:", err);
+        alert("Internet ya server ka masla hai!");
+    }
+}
 
         // 2. Apne local 'db' object ko khali kar ke naye siray se bharhein
         db.in = [];
@@ -105,11 +161,11 @@ function login() {
     // 4. Multi-User (Extra Users check)
     else {
         let found = extraUsers.find(user => user.id === u && user.pass === p);
-        if (found) {
-            localStorage.setItem('isLoggedIn', 'true');
-            // Yahan pura object bhej rahe hain taake dynamic permissions apply hon
-            showSystem(found); 
-        } else {
+       if (isLoggedIn === 'true' && savedRole) {
+    showSystem(savedRole);
+    document.getElementById('toggle-btn').style.display = "block";
+}
+        else {
             alert("Ghalat ID ya Password!");
         }
     }
@@ -933,77 +989,21 @@ async function fetchCloudData() {
     try {
         console.log("Cloud sync shuru ho raha hai...");
         
-        // 1. Supabase se sara data mangwao (KRT table se)
-        const { data, error } = await _supabase
-            .from('KRT')
-            .select('*')
-            .order('created_at', { ascending: true }); // Taake purana data pehle aaye
-
-        if (error) {
-            console.error("Cloud data fetch error:", error);
-            return;
-        }
-
-        if (data) {
-            // 2. Naye temporary arrays
-            let cloudIn = [];
-            let cloudOut = [];
-
-            // 3. Data mapping aur sorting
-            data.forEach(row => {
-                // Date formatting (Agar created_at nahi hai to aaj ki date)
-                let rowDate = row.created_at ? row.created_at.split('T')[0] : new Date().toISOString().split('T')[0];
-                
-                let formattedRow = {
-                    id: row.id, 
-                    date: rowDate,
-                    item: row.item_name || "Unknown Item",
-                    qty: Number(row.stock_in > 0 ? row.stock_in : row.stock_out) || 0,
-                    price: Number(row.price) || 0,
-                    total: (Number(row.stock_in > 0 ? row.stock_in : row.stock_out) || 0) * (Number(row.price) || 0),
-                    vendor: row.vendor_name || "-",
-                    cust: row.customer_name || "-"
-                };
-
-                // Stock In ya Out mein divide karein
-                if (Number(row.stock_in) > 0) {
-                    cloudIn.push(formattedRow);
-                } else if (Number(row.stock_out) > 0) {
-                    cloudOut.push(formattedRow);
-                }
-            });
-
-            // 4. Local Database (db) ko update karein
-            db.in = cloudIn;
-            db.out = cloudOut;
-
-            // 5. LocalStorage mein save karein aur table refresh karein
-            saveAndRefresh();
-            
-            console.log("Cloud Sync Mukammal! Total records: " + data.length);
-        }
-    } catch (err) {
-        console.error("Connection error during sync:", err);
-    }
-}
+      
 // --- AUTO-CHECK ON LOAD ---
 // Jab bhi page refresh ho ya dobara khule, ye check karega ke user login hai ya nahi
 window.addEventListener('load', () => {
-    const isLoggedIn = localStorage.getItem('isLoggedIn');
-    const savedRole = localStorage.getItem('userRole');
+    const isLoggedIn = localStorage.getItem('isLoggedIn');
+    const savedRole = localStorage.getItem('userRole');
 
-    if (found) {
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('userRole', found.id);
-
-    showSystem(found);
-}
-    else {
-        // Agar login nahi hai toh login screen dikhao
-        document.getElementById('login-screen').style.display = "flex";
-        document.getElementById('sidebar').style.display = "none";
-        document.getElementById('main-content').style.display = "none";
-    }
+    if (isLoggedIn === 'true' && savedRole) {
+        showSystem(savedRole);
+        document.getElementById('toggle-btn').style.display = "block";
+    } else {
+        document.getElementById('login-screen').style.display = "flex";
+        document.getElementById('sidebar').style.display = "none";
+        document.getElementById('main-content').style.display = "none";
+    }
 });
 // Jab page load ho, to automatic cloud se data khinche
 window.addEventListener('DOMContentLoaded', (event) => {
