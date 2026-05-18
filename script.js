@@ -6,7 +6,8 @@ const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 // 2. GLOBAL DATABASE OBJECT (Yeh Line Sab Se Top Par Honi Chahiye)
 let db = JSON.parse(localStorage.getItem('krt_erp_data')) || { in: [], out: [], ledgers: {}, opening_balances: {} };
 
-let dbRent = JSON.parse(localStorage.getItem('krt_rent_data')) || [];
+
+
 // 3. SAVE AND REFRESH FUNCTION
 function saveAndRefresh() {
     localStorage.setItem('krt_erp_data', JSON.stringify(db));
@@ -832,7 +833,7 @@ function editLedger(custName, index) {
     }
 }
 // --- RENT DATABASE (CLOUD INTEGRATED) ---
-let dbRent = JSON.parse(localStorage.getItem('krt_rent_data')) || [];
+ dbRent = JSON.parse(localStorage.getItem('krt_rent_data')) || [];
 
 // 1. ENTRY COUD PAR SAVE KARNE KA FUNCTION
 async function saveRentToCloud(rentEntry) {
