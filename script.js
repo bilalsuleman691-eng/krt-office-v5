@@ -1015,3 +1015,70 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Phir cloud se naya data mangwain
     await fetchCloudData();
 });
+
+function generateStatement() {
+    const fromDate = document.getElementById('from-date').value; // e.g., "2026-05-18"
+    const toDate = document.getElementById('to-date').value;
+
+    if (!fromDate || !toDate) {
+        alert("Pehle From Date aur To Date select karein!");
+        return;
+    }
+
+    // HTML ke sahi tbody IDs check kar lein (report-in-rows aur report-out-rows)
+    const tbodyIn = document.getElementById('report-in-rows'); 
+    const tbodyOut = document.getElementById('report-out-rows');
+
+    if (tbodyIn) tbodyIn.innerHTML = "";
+    if (tbodyOut) tbodyOut.innerHTML = "";
+
+    // Filter: Sirf pehle 10 characters (YYYY-MM-DD) ko match karein
+    const filteredIn = db.in.filter(x => {
+        const itemDate = x.date ? x.date.substring(0, 10) : "";
+        return itemDate >= fromDate && itemDate <= toDate;
+    });
+
+    const filteredOut = db.out.filter(x => {
+        const itemDate = x.date ? x.date.substring(0, 10) : "";
+        return itemDate >= fromDate && itemDate <= toDate;
+    });
+
+    // Table mein data show karna (Stock In)
+    if (tbodyIn) {
+        if (filteredIn.length === 0) {
+            tbodyIn.innerHTML = `<tr><td colspan="6" style="text-align:center;">Is dauran koi Stock In nahi hua</td></tr>`;
+        } else {
+            filteredIn.forEach((x, i) => {
+                tbodyIn.innerHTML += `
+                    <tr>
+                        <td>${x.date ? x.date.substring(0,10) : ''}</td>
+                        <td>${x.item}</td>
+                        <td>${x.vendor}</td>
+                        <td>${x.qty}</td>
+                        <td>${x.price}</td>
+                        <td>${x.total}</td>
+                    </tr>`;
+            });
+        }
+    }
+
+    // Table mein data show karna (Stock Out)
+    if (tbodyOut) {
+        if (filteredOut.length === 0) {
+            tbodyOut.innerHTML = `<tr><td colspan="6" style="text-align:center;">Is dauran koi Stock Out nahi hua</td></tr>`;
+        } else {
+            filteredOut.forEach((x, i) => {
+                tbodyOut.innerHTML += `
+                    <tr>
+                        <td>${x.date ? x.date.substring(0,10) : ''}</td>
+                        <td>${x.item}</td>
+                        <td>${x.cust}</td>
+                        <td>${x.qty}</td>
+                        <td>${x.price}</td>
+                        <td>${x.total}</td>
+                    </tr>`;
+            });
+        }
+    }
+}
+
