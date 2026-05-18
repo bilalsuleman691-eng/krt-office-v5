@@ -116,67 +116,69 @@ window.addEventListener('DOMContentLoaded', () => {
 // --- MERGED LOGIN & PERMISSIONS SYSTEM ---
 
 function login() {
-    let userField = document.getElementById('user');
-    let passField = document.getElementById('pass');
-    
-    if(!userField || !passField) return;
 
-    let u = userField.value.trim().toLowerCase();
-    let p = passField.value.trim();
+    let userField = document.getElementById('user');
+    let passField = document.getElementById('pass');
 
-    // 1. Bilal Bhai (Admin)
-   const users = [
- {user:"admin", pass:"123"}
-];
+    if (!userField || !passField) return;
 
-if (u === "admin" && p === "123") {
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('userRole', 'admin');
-    showSystem("admin");
-} 
-    // 2. Ali Bhai (Staff)
-    else if (u === "ali" && p === "123") {
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userRole', 'staff');
-        showSystem("staff");
-    } 
-    // 3. Sattar Bhai (Manager)
-    else if (u === "sattar" && p === "123") {
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userRole', 'manager');
-        showSystem("manager");
-    } 
-    // 4. Multi-User (Extra Users check)
-else {
+    let u = userField.value.trim().toLowerCase();
+    let p = passField.value.trim();
 
-    let found = extraUsers.find(user =>
-        user.id === u && user.pass === p
-    );
-
-    // Agar user mil gaya
-    if (found) {
+    // Admin
+    if (u === "admin" && p === "123") {
 
         localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userRole', 'extra');
+        localStorage.setItem('userRole', 'admin');
+        showSystem("admin");
 
-        showSystem(found);
+    }
 
-        const toggleBtn = document.getElementById('toggle-btn');
+    // Staff
+    else if (u === "ali" && p === "123") {
 
-        if (toggleBtn) {
-            toggleBtn.style.display = "block";
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userRole', 'staff');
+        showSystem("staff");
+
+    }
+
+    // Manager
+    else if (u === "sattar" && p === "123") {
+
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userRole', 'manager');
+        showSystem("manager");
+
+    }
+
+    // Extra Users
+    else {
+
+        let found = extraUsers.find(user =>
+            user.id === u && user.pass === p
+        );
+
+        if (found) {
+
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('userRole', 'extra');
+
+            showSystem(found);
+
+            const toggleBtn = document.getElementById('toggle-btn');
+
+            if (toggleBtn) {
+                toggleBtn.style.display = "block";
+            }
+
+        } else {
+
+            alert("Ghalat ID ya Password!");
+
         }
 
     }
-
-    // Agar user nahi mila
-    else {
-
-        alert("Ghalat ID ya Password!");
-    }
-
-    }
-
 }
 function showSystem(roleOrUser) {
     // UI Screens dikhao
