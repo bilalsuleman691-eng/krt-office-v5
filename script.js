@@ -830,90 +830,157 @@ function editLedger(custName, index) {
         showLedger();
     }
 }
-// Rent Database
+// --- RENT DATABASE (CLOUD INTEGRATED) ---
 let dbRent = JSON.parse(localStorage.getItem('krt_rent_data')) || [];
 
-function addRentEntry() {
-    const nameInput = document.getElementById('rent-name').value.trim();
-    const shopInput = document.getElementById('rent-shop-no').value;
-    const dateInput = document.getElementById('rent-date').value;
-    const monthInput = document.getElementById('rent-month').value;
-    const debitInput = parseFloat(document.getElementById('rent-debit').value) || 0;
-    const creditInput = parseFloat(document.getElementById('rent-credit').value) || 0;
-    const methodInput = document.getElementById('rent-method').value;
+// 1. ENTRY COUD PAR SAVE KARNE KA FUNCTION
+async function saveRentToCloud(rentEntry) {
+    try {
+        console.log("Rent entry cloud par sync ho rahi hai...");
+        const { data, error } = await _supabase
+            .from('krt_rent')
+            .insert([
+                {
+                    name: rentEntry.name,
+                    shop: rentEntry.shop,
+                    date: rentEntry.date,
+                    month: rentEntry.month,
+                    debit: Number(rentEntry.debit || 0),
+                    credit: Number(rentEntry.credit || 0),
+                    method: rentEntry.method
+                }
+            ]);
 
-    if(!nameInput || !dateInput) {
-        alert("Bilal Bhai, Customer ka Naam aur Date lazmi likhain!");
-        return;
-    }
-
-    // Naya Entry Object
-    const newEntry = {
-        name: nameInput,
-        shop: shopInput,
-        date: dateInput,
-        month: monthInput,
-        debit: debitInput,
-        credit: creditInput,
-        method: methodInput
-    };
-
-    // Data Save karein
-    dbRent.push(newEntry);
-    localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
-
-    alert(nameInput + " ki entry save ho gayi!");
-    
-    // Foran Ledger Update karein (Wahi logic jo aapne manga)
-    renderRentTable(); 
+        if (error) {
+            console.error("Rent Cloud Sync Failed:", error.message);
+        } else {
+            console.log("Rent entry successfully saved to Supabase!");
+        }
+    } catch (err) {
+        console.error("Rent Cloud Error:", err);
+    }
 }
 
-// Yeh function naam check karke table update karega
+// 2. NEW ENTRY ADD KARNA (LOCAL + CLOUD)
+async function addRentEntry() {
+    const nameInput = document.getElementById('rent-name').value.trim();
+    const shopInput = document.getElementById('rent-shop-no').value;
+    const dateInput = document.getElementById('rent-date').value;
+    const monthInput = document.getElementById('rent-month').value;
+    const debitInput = parseFloat(document.getElementById('rent-debit').value) || 0;
+    const creditInput = parseFloat(document.getElementById('rent-credit').value) || 0;
+    const methodInput = document.getElementById('rent-method').value;
+
+    if(!nameInput || !dateInput) {
+        alert("Bilal Bhai, Customer ka Naam aur Date lazmi likhain!");
+        return;
+    }
+
+    // Naya Entry Object
+    const newEntry = {
+        name: nameInput,
+        shop: shopInput,
+        date: dateInput,
+        month: monthInput,
+        debit: debitInput,
+        credit: creditInput,
+        method: methodInput
+    };
+
+    // A. Local save karein
+    dbRent.push(newEntry);
+    localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
+
+    // B. Cloud (Supabase) par automatically save karein
+    await saveRentToCloud(newEntry);
+
+    alert(nameInput + " ki entry Laptop aur Cloud dono par save ho gayi!");
+    
+    renderRentTable(); 
+}
+
+// 3. CLOUD SE RENT KA DATA WAPIS SKEEN PAR LANE KA FUNCTION
+async function fetchCloudRentData() {
+    try {
+        console.log("Cloud se Rent ka data load ho raha hai...");
+        const { data, error } = await _supabase
+            .from('krt_rent')
+            .select('*')
+            .order('date', { ascending: true });
+
+        if (error) {
+            console.error("Rent data fetch karne mein masla:", error.message);
+            return;
+        }
+
+        if (data) {
+            // Cloud se aaya data map kar ke local array mein dalen
+            dbRent = data.map(row => ({
+                name: row.name,
+                shop: row.shop,
+                date: row.date ? row.date.substring(0, 10) : '',
+                month: row.month,
+                debit: Number(row.debit || 0),
+                credit: Number(row.credit || 0),
+                method: row.method
+            }));
+
+            // LocalStorage update karein aur table refresh karein
+            localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
+            renderRentTable();
+            console.log("Rent Book Sync Complete!");
+        }
+    } catch (err) {
+        console.error("Fetch Rent Error:", err);
+    }
+}
+
+// 4. RENT TABLE KO SCREEN PAR DRAW KARNA
 function renderRentTable() {
-    const tbody = document.getElementById('rent-main-rows');
-    const searchName = document.getElementById('rent-name').value.trim();
-    if(!tbody) return;
+    const tbody = document.getElementById('rent-main-rows');
+    const rentNameEl = document.getElementById('rent-name');
+    if(!tbody || !rentNameEl) return;
+    
+    const searchName = rentNameEl.value.trim();
 
-    tbody.innerHTML = "";
-    let tDebit = 0;
-    let tCredit = 0;
+    tbody.innerHTML = "";
+    let tDebit = 0;
+    let tCredit = 0;
 
-    // Filter: Agar naam likha hai toh sirf uska data dikhao, warna khali rakho ya sab dikhao
-    const filtered = dbRent.filter(x => x.name.toLowerCase() === searchName.toLowerCase());
+    // Filter logic
+    const filtered = dbRent.filter(x => x.name.toLowerCase() === searchName.toLowerCase());
 
-   if(filtered.length > 0) {
-        filtered.forEach((r, index) => {
-            tDebit += r.debit;
-            tCredit += r.credit;
-            
-            tbody.innerHTML += `
-                <tr>
-                    <td>${r.shop}</td>
-                    <td>${r.date}</td>
-                    <td>${r.month}</td>
-                    <td style="color:red;">${r.debit.toLocaleString()}</td>
-                    <td style="color:green;">${r.credit.toLocaleString()}</td>
-                    <td>${r.method}</td>
-                    <td><button onclick="deleteRent(${index})" style="background:red; color:white; border:none; padding:2px 8px; border-radius:3px;">Del</button></td>
-                </tr>`;
-        });
-    } else {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:gray;">Naya Customer hai ya naam sahi nahi likha...</td></tr>`;
-    }
+    if(filtered.length > 0) {
+        filtered.forEach((r, index) => {
+            tDebit += r.debit;
+            tCredit += r.credit;
+            
+            tbody.innerHTML += `
+                <tr>
+                    <td>${r.shop}</td>
+                    <td>${r.date}</td>
+                    <td>${r.month}</td>
+                    <td style="color:red;">${r.debit.toLocaleString()}</td>
+                    <td style="color:green;">${r.credit.toLocaleString()}</td>
+                    <td>${r.method}</td>
+                    <td><button onclick="deleteRent(${index})" style="background:red; color:white; border:none; padding:2px 8px; border-radius:3px;">Del</button></td>
+                </tr>`;
+        });
+    } else {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:gray;">Naya Customer hai ya naam sahi nahi likha...</td></tr>`;
+    }
 
-    // Totals Update
-    document.getElementById('rent-total-debit').innerText = tDebit.toLocaleString();
-    document.getElementById('rent-total-credit').innerText = tCredit.toLocaleString();
-    document.getElementById('rent-final-balance').innerText = (tDebit - tCredit).toLocaleString();
+    // Totals Update
+    if(document.getElementById('rent-total-debit')) document.getElementById('rent-total-debit').innerText = tDebit.toLocaleString();
+    if(document.getElementById('rent-total-credit')) document.getElementById('rent-total-credit').innerText = tCredit.toLocaleString();
+    if(document.getElementById('rent-final-balance')) document.getElementById('rent-final-balance').innerText = (tDebit - tCredit).toLocaleString();
 }
 
-// Naam likhte hi table update ho (Live Search jaisa)
+// Live Search Listener
 const rentNameField = document.getElementById('rent-name');
-
 if (rentNameField) {
     rentNameField.addEventListener('input', renderRentTable);
 }
-
 // --- SIDEBAR TOGGLE LOGIC ---
 function toggleSidebar() {
     let sb = document.getElementById('sidebar');
@@ -1009,13 +1076,14 @@ function printSection() {
 }
 // Jab poora page load ho jaye (DOM ready ho)
 document.addEventListener('DOMContentLoaded', async () => {
-    // Pehle local storage se render kar dein taake screen khali na dikhe
-    if (typeof renderAll === "function") renderAll(); 
+    // Purana local data pehle dikha dein
+    if (typeof renderAll === "function") renderAll();
+    if (typeof renderRentTable === "function") renderRentTable();
     
-    // Phir cloud se naya data mangwain
+    // Cloud se latest Stock aur Rent dono load karein
     await fetchCloudData();
+    await fetchCloudRentData(); // <--- Yeh line lazmi add kar dena
 });
-
 function generateStatement() {
     const fromDate = document.getElementById('from-date').value; // e.g., "2026-05-18"
     const toDate = document.getElementById('to-date').value;
