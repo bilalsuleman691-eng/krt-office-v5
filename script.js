@@ -994,13 +994,14 @@ async function addStockData(itemName, stockIn, stockOut) {
 }
 
 
-// --- STOCK SHEET PRINT FUNCTION ---
-function printStockSheet() {
-    if (!db || !db.in || !db.out) {
-        alert("Pehle data load hone dein, uske baad print karein!");
+// --- STOCK SHEET PRINT FUNCTION (FIXED NAME) ---
+function printSection() {
+    // Check karein ke data mojud hai ya nahi
+    if (!db || !db.in) {
+        alert("Pehle data mukammal load hone dein!");
         return;
     }
     
+    // Browser ka print window open karne ke liye
     window.print();
 }
-
