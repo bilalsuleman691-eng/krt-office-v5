@@ -6,15 +6,11 @@ const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
 
 // --- CLOUD SE DATA UTFAYEN KA FUNCTION ---
+// --- CLOUD DATA FETCH ---
 async function fetchCloudData() {
-    try {
-        console.log("Cloud se latest data load ho raha hai...");
-        
-       async function fetchCloudData() {
     try {
         console.log("Cloud se latest data load ho raha hai...");
 
-        // Supabase se sara data lao
         const { data, error } = await _supabase
             .from('KRT')
             .select('*')
@@ -26,57 +22,67 @@ async function fetchCloudData() {
             return;
         }
 
-        // Temporary arrays
-        let cloudIn = [];
-        let cloudOut = [];
+        // Purana data clear
+        db.in = [];
+        db.out = [];
 
-        // Data process karo
-        data.forEach(row => {
+        if (data && data.length > 0) {
 
-            // Date fix
-            let rowDate = row.Date || 
-                (row.created_at
-                    ? row.created_at.split('T')[0]
-                    : new Date().toISOString().split('T')[0]);
+            data.forEach(row => {
 
-            let formattedRow = {
-                id: row.id,
-                date: rowDate,
-                item: row.item_name || "Unknown Item",
-                qty: Number(row.stock_in > 0 ? row.stock_in : row.stock_out) || 0,
-                price: Number(row.price) || 0,
-                total:
-                    (Number(row.stock_in > 0 ? row.stock_in : row.stock_out) || 0)
-                    * (Number(row.price) || 0),
+                let rowDate =
+                    row.Date ||
+                    (row.created_at
+                        ? row.created_at.split('T')[0]
+                        : new Date().toISOString().split('T')[0]);
 
-                vendor: row.vendor_name || "-",
-                cust: row.customer_name || "-"
-            };
+                // STOCK IN
+                if (Number(row.stock_in) > 0) {
 
-            // IN / OUT separate
-            if (Number(row.stock_in) > 0) {
-                cloudIn.push(formattedRow);
-            }
-            else if (Number(row.stock_out) > 0) {
-                cloudOut.push(formattedRow);
-            }
-        });
+                    db.in.push({
+                        id: row.id,
+                        date: rowDate,
+                        vendor: row.vendor_name || "Factory",
+                        item: row.item_name || "",
+                        qty: Number(row.stock_in) || 0,
+                        price: Number(row.price) || 0,
+                        total: (Number(row.stock_in) || 0) * (Number(row.price) || 0)
+                    });
 
-        // Local DB update
-        db.in = cloudIn;
-        db.out = cloudOut;
+                }
 
-        // Save + Refresh
-        saveAndRefresh();
+                // STOCK OUT
+                else if (Number(row.stock_out) > 0) {
 
-        console.log("Cloud Sync Mukammal! Total records:", data.length);
+                    db.out.push({
+                        id: row.id,
+                        date: rowDate,
+                        cust: row.customer_name || "General Sale",
+                        item: row.item_name || "",
+                        qty: Number(row.stock_out) || 0,
+                        price: Number(row.price) || 0,
+                        total: (Number(row.stock_out) || 0) * (Number(row.price) || 0)
+                    });
+
+                }
+
+            });
+
+        }
+
+        // Save Local
+        localStorage.setItem('krt_erp_data', JSON.stringify(db));
+
+        // Refresh UI
+        renderAll();
+
+        console.log("Cloud Sync Complete");
 
     } catch (err) {
-        console.error("Connection error during sync:", err);
+        console.error("Connection Error:", err);
         alert("Internet ya server ka masla hai!");
     }
 }
-
         // 2. Apne local 'db' object ko khali kar ke naye siray se bharhein
         db.in = [];
         db.out = [];
