@@ -992,11 +992,13 @@ window.addEventListener('load', () => {
     const isLoggedIn = localStorage.getItem('isLoggedIn');
     const savedRole = localStorage.getItem('userRole');
 
-    if (isLoggedIn === 'true' && savedRole) {
-        // Agar pehle se login hai toh system dikhao
-        showSystem(savedRole);
-        document.getElementById('toggle-btn').style.display = "block";
-    } else {
+    if (found) {
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('userRole', found.id);
+
+    showSystem(found);
+}
+    else {
         // Agar login nahi hai toh login screen dikhao
         document.getElementById('login-screen').style.display = "flex";
         document.getElementById('sidebar').style.display = "none";
