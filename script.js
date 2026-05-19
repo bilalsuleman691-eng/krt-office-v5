@@ -14,69 +14,88 @@ function saveAndRefresh() {
     renderAll();
 }
 
-// --- CLOUD SE DATA UTFAYEN KA FUNCTION ---
+// --- CLOUD SE DATA UTFAYEN KA FUNCTION (FIXED) ---
 async function fetchCloudData() {
     try {
         console.log("Cloud se latest data load ho raha hai...");
         
+        // SAFE APPROACH: Agar column 'date' small letters mein hai toh small likhein.
+        // Agar pehle crash ho raha tha toh hum bina order ke pehle data manga kar check karte hain.
         const { data, error } = await _supabase
             .from('KRT')
-            .select('*')
-            .order('Date', { ascending: true }); 
+            .select('*'); 
 
         if (error) {
             console.error("Supabase Error:", error.message);
+            alert("Supabase Se Data Nahi Aya: " + error.message);
             return;
         }
 
-        // Local arrays ko reset karein
+        // Agar database khali hai ya data nahi mila
+        if (!data || data.length === 0) {
+            console.log("Supabase par koi data mojud nahi hai.");
+            return;
+        }
+
+        // Global db object ko initialize karein agar wo khali ho
+        if (typeof db === 'undefined') {
+            window.db = { in: [], out: [] };
+        }
+
+        // Local arrays ko bilkul khali (reset) karein
         db.in = [];
         db.out = [];
 
-        if (data) {
-            data.forEach(row => {
-                let stockIn = Number(row.stock_in || 0);
-                let stockOut = Number(row.stock_out || 0);
-                let itemPrice = Number(row.price || 0);
-                
-                if (stockIn > 0) {
-                    db.in.push({
-                        id: row.id,
-                        date: row.Date ? row.Date.split('T')[0] : new Date().toISOString().split('T')[0],
-                        vendor: row.vendor_name || 'factory',
-                        item: row.item_name || 'Unknown',
-                        qty: stockIn,
-                        price: itemPrice,
-                        total: stockIn * itemPrice
-                    });
-                } 
-                else if (stockOut > 0) {
-                    db.out.push({
-                        id: row.id,
-                        date: row.Date ? row.Date.split('T')[0] : new Date().toISOString().split('T')[0],
-                        cust: row.customer_name || 'General Sale',
-                        item: row.item_name || 'Unknown',
-                        qty: stockOut,
-                        price: itemPrice,
-                        total: stockOut * itemPrice
-                    });
-                }
-            });
-        }
+        data.forEach(row => {
+            let stockIn = Number(row.stock_in || 0);
+            let stockOut = Number(row.stock_out || 0);
+            let itemPrice = Number(row.price || 0);
+            
+            // Date column check (chahay Date likha ho ya date, dono ko handle karega)
+            let rowDate = row.Date || row.date || row.created_at;
+            let formattedDate = rowDate ? rowDate.split('T')[0] : new Date().toISOString().split('T')[0];
+            
+            if (stockIn > 0) {
+                db.in.push({
+                    id: row.id,
+                    date: formattedDate,
+                    vendor: row.vendor_name || 'factory',
+                    item: row.item_name || 'Unknown',
+                    qty: stockIn,
+                    price: itemPrice,
+                    total: stockIn * itemPrice
+                });
+            } 
+            else if (stockOut > 0) {
+                db.out.push({
+                    id: row.id,
+                    date: formattedDate,
+                    cust: row.customer_name || 'General Sale',
+                    item: row.item_name || 'Unknown',
+                    qty: stockOut,
+                    price: itemPrice,
+                    total: stockOut * itemPrice
+                });
+            }
+        });
 
-        // 🟢 ASAL HAL: Pehle LocalStorage mein save karein, phir UI ko batayein
+        // 🟢 Dono keys par save kar dete hain taake agar baqi code mein koi bhi key use hui ho toh masla na aaye
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
+        localStorage.setItem('krt_stock_data', JSON.stringify(db));
         
-        // Agar aap ka main render function renderAll hai toh usay chalayein:
-        if (typeof renderAll === "function") renderAll();
+        // Tables ko screen par render karein
+        if (typeof renderAll === "function") {
+            renderAll();
+        } else if (typeof renderTable === "function") {
+            renderTable(); // Agar aapka function renderTable naam se hai
+        }
         
-        console.log("Cloud sync done and UI updated!");
+        console.log("Cloud sync done and UI updated successfully!");
 
     } catch (err) {
-        console.error("Fetch Error:", err);
+        console.error("Fetch Error Detail:", err);
     }
 }
-
 /// --- UPDATED LOGIN SYSTEM ---
 // --- MERGED LOGIN & PERMISSIONS SYSTEM ---
 
@@ -1190,4 +1209,28 @@ function generateStatement() {
 
     }
 
+}
+// --- CLOUD DATA AUTO-SYNC UTILITY FUNCTION ---
+async function syncAllCloudData() {
+    // Agar internet mojud hai toh dono cloud functions ko run karo
+    if (navigator.onLine) {
+        console.log("Internet active hai. Cloud data sync shuru...");
+        try {
+            // 1. Stock ka data lekar aao
+            if (typeof fetchCloudData === "function") {
+                await fetchCloudData();
+            }
+            
+            // 2. Rent ka data lekar aao
+            if (typeof fetchCloudRentData === "function") {
+                await fetchCloudRentData();
+            }
+            
+            console.log("Cloud database se saara data refresh ho gaya.");
+        } catch (syncErr) {
+            console.error("Cloud Sync Error:", syncErr);
+        }
+    } else {
+        console.warn("Internet nahi hai, isliye cloud se naya data nahi aya.");
+    }
 }
