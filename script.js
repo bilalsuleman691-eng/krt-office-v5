@@ -77,18 +77,11 @@ async function fetchCloudData() {
     }
 }
 // Jab bhi koi user login kare ya page reload ho, toh automatic cloud se data uthaye
-window.addEventListener('DOMContentLoaded', () => {
-    if (localStorage.getItem('isLoggedIn') === 'true') {
-        fetchCloudData();
-    }
-});
 
 function saveAndRefresh() {
     localStorage.setItem('krt_erp_data', JSON.stringify(db));
     renderAll();
 }
-localStorage.setItem('krt_erp_data', JSON.stringify(db));
-if (typeof renderAll === "function") renderAll(); // <--- Yeh line screen par data dikhayegi
 
 /// --- UPDATED LOGIN SYSTEM ---
 // --- MERGED LOGIN & PERMISSIONS SYSTEM ---
