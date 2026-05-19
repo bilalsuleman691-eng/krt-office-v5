@@ -76,12 +76,6 @@ async function fetchCloudData() {
         console.error("Fetch Error:", err);
     }
 }
-// Jab bhi koi user login kare ya page reload ho, toh automatic cloud se data uthaye
-
-function saveAndRefresh() {
-    localStorage.setItem('krt_erp_data', JSON.stringify(db));
-    renderAll();
-}
 
 /// --- UPDATED LOGIN SYSTEM ---
 // --- MERGED LOGIN & PERMISSIONS SYSTEM ---
@@ -1004,82 +998,196 @@ function printSection() {
     window.print();
 }
 // Jab poora page load ho jaye (DOM ready ho)
+function saveAndRefresh() {
+    localStorage.setItem('krt_erp_data', JSON.stringify(db));
+    renderAll();
+}
+
+// ================================
+// APP STARTUP SYSTEM
+// ================================
 document.addEventListener('DOMContentLoaded', async () => {
 
-    if (typeof renderAll === "function") renderAll();
+    try {
 
-    if (typeof renderRentTable === "function") {
-        renderRentTable();
-    }
+        // Default UI
+        const loginScreen = document.getElementById('login-screen');
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
 
-    if (localStorage.getItem('isLoggedIn') === 'true') {
-        await fetchCloudData();
+        if (loginScreen) loginScreen.style.display = "block";
+        if (sidebar) sidebar.style.display = "none";
+        if (mainContent) mainContent.style.display = "none";
+
+        // Initial Render
+        if (typeof renderAll === "function") {
+            renderAll();
+        }
+
+        // Rent Table Render
+        if (typeof renderRentTable === "function") {
+            renderRentTable();
+        }
+
+        // Auto Login Restore
+        const isLoggedIn = localStorage.getItem('isLoggedIn');
+        const role = localStorage.getItem('userRole');
+
+        if (isLoggedIn === 'true') {
+
+            // Restore User System
+            if (role === 'admin') {
+
+                showSystem('admin');
+
+            } else if (role === 'staff') {
+
+                showSystem('staff');
+
+            } else if (role === 'manager') {
+
+                showSystem('manager');
+
+            }
+
+            // Internet Check
+            if (navigator.onLine) {
+
+                await fetchCloudData();
+
+            } else {
+
+                alert("Internet connection nahi hai");
+
+            }
+        }
+
+    } catch (err) {
+
+        console.error("Startup Error:", err);
+
     }
 
 });
+
+// ================================
+// GENERATE STATEMENT FUNCTION
+// ================================
 function generateStatement() {
-    const fromDate = document.getElementById('from-date').value; // e.g., "2026-05-18"
+
+    const fromDate = document.getElementById('from-date').value;
     const toDate = document.getElementById('to-date').value;
 
+    // Validation
     if (!fromDate || !toDate) {
+
         alert("Pehle From Date aur To Date select karein!");
         return;
+
     }
 
-    // HTML ke sahi tbody IDs check kar lein (report-in-rows aur report-out-rows)
-    const tbodyIn = document.getElementById('report-in-rows'); 
+    // Table Bodies
+    const tbodyIn = document.getElementById('report-in-rows');
     const tbodyOut = document.getElementById('report-out-rows');
 
+    // Clear Previous Data
     if (tbodyIn) tbodyIn.innerHTML = "";
     if (tbodyOut) tbodyOut.innerHTML = "";
 
-    // Filter: Sirf pehle 10 characters (YYYY-MM-DD) ko match karein
+    // Filter Stock IN
     const filteredIn = db.in.filter(x => {
-        const itemDate = x.date ? x.date.substring(0, 10) : "";
-        return itemDate >= fromDate && itemDate <= toDate;
+
+        const itemDate = x.date
+            ? x.date.substring(0, 10)
+            : "";
+
+        return itemDate >= fromDate &&
+               itemDate <= toDate;
+
     });
 
+    // Filter Stock OUT
     const filteredOut = db.out.filter(x => {
-        const itemDate = x.date ? x.date.substring(0, 10) : "";
-        return itemDate >= fromDate && itemDate <= toDate;
+
+        const itemDate = x.date
+            ? x.date.substring(0, 10)
+            : "";
+
+        return itemDate >= fromDate &&
+               itemDate <= toDate;
+
     });
 
-    // Table mein data show karna (Stock In)
+    // =========================
+    // STOCK IN TABLE
+    // =========================
     if (tbodyIn) {
+
         if (filteredIn.length === 0) {
-            tbodyIn.innerHTML = `<tr><td colspan="6" style="text-align:center;">Is dauran koi Stock In nahi hua</td></tr>`;
+
+            tbodyIn.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align:center;">
+                        Is dauran koi Stock In nahi hua
+                    </td>
+                </tr>
+            `;
+
         } else {
-            filteredIn.forEach((x, i) => {
+
+            filteredIn.forEach((x) => {
+
                 tbodyIn.innerHTML += `
                     <tr>
                         <td>${x.date ? x.date.substring(0,10) : ''}</td>
-                        <td>${x.item}</td>
-                        <td>${x.vendor}</td>
-                        <td>${x.qty}</td>
-                        <td>${x.price}</td>
-                        <td>${x.total}</td>
-                    </tr>`;
+                        <td>${x.item || ''}</td>
+                        <td>${x.vendor || ''}</td>
+                        <td>${Number(x.qty || 0)}</td>
+                        <td>${Number(x.price || 0).toLocaleString()}</td>
+                        <td>${Number(x.total || 0).toLocaleString()}</td>
+                    </tr>
+                `;
+
             });
+
         }
+
     }
 
-    // Table mein data show karna (Stock Out)
+    // =========================
+    // STOCK OUT TABLE
+    // =========================
     if (tbodyOut) {
+
         if (filteredOut.length === 0) {
-            tbodyOut.innerHTML = `<tr><td colspan="6" style="text-align:center;">Is dauran koi Stock Out nahi hua</td></tr>`;
+
+            tbodyOut.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align:center;">
+                        Is dauran koi Stock Out nahi hua
+                    </td>
+                </tr>
+            `;
+
         } else {
-            filteredOut.forEach((x, i) => {
+
+            filteredOut.forEach((x) => {
+
                 tbodyOut.innerHTML += `
                     <tr>
                         <td>${x.date ? x.date.substring(0,10) : ''}</td>
-                        <td>${x.item}</td>
-                        <td>${x.cust}</td>
-                        <td>${x.qty}</td>
-                        <td>${x.price}</td>
-                        <td>${x.total}</td>
-                    </tr>`;
-            });
-        }
-    }
-}
+                        <td>${x.item || ''}</td>
+                        <td>${x.cust || ''}</td>
+                        <td>${Number(x.qty || 0)}</td>
+                        <td>${Number(x.price || 0).toLocaleString()}</td>
+                        <td>${Number(x.total || 0).toLocaleString()}</td>
+                    </tr>
+                `;
 
+            });
+
+        }
+
+    }
+
+}
