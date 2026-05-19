@@ -1225,3 +1225,29 @@ async function syncAllCloudData() {
     }
 }
 
+
+
+// --- CLOUD DATA AUTO-SYNC UTILITY FUNCTION ---
+async function syncAllCloudData() {
+    // Agar internet mojud hai toh dono cloud functions ko run karo
+    if (navigator.onLine) {
+        console.log("Internet active hai. Cloud data sync shuru...");
+        try {
+            // 1. Stock ka data lekar aao
+            if (typeof fetchCloudData === "function") {
+                await fetchCloudData();
+            }
+            
+            // 2. Rent ka data lekar aao
+            if (typeof fetchCloudRentData === "function") {
+                await fetchCloudRentData();
+            }
+            
+            console.log("Cloud database se saara data refresh ho gaya.");
+        } catch (syncErr) {
+            console.error("Cloud Sync Error:", syncErr);
+        }
+    } else {
+        console.warn("Internet nahi hai, isliye cloud se naya data nahi aya.");
+    }
+}
