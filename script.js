@@ -8,11 +8,7 @@ let db = JSON.parse(localStorage.getItem('krt_erp_data')) || { in: [], out: [], 
 
 
 
-// 3. SAVE AND REFRESH FUNCTION
-function saveAndRefresh() {
-    localStorage.setItem('krt_erp_data', JSON.stringify(db));
-    renderAll();
-}
+
 
 // --- CLOUD SE DATA UTFAYEN KA FUNCTION (FIXED) ---
 async function fetchCloudData() {
@@ -1041,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 🔥 HAMESHA CLOUD DATA LOAD KARO
         if (navigator.onLine) {
 
-            await fetchCloudData();
+            await syncAllCloudData();
 
         } else {
 
@@ -1200,54 +1196,102 @@ function generateStatement() {
     }
 
 }
-// --- CLOUD DATA AUTO-SYNC UTILITY FUNCTION ---
+// ================================
+// CLOUD DATA AUTO-SYNC
+// ================================
 async function syncAllCloudData() {
-    // Agar internet mojud hai toh dono cloud functions ko run karo
-    if (navigator.onLine) {
-        console.log("Internet active hai. Cloud data sync shuru...");
-        try {
-            // 1. Stock ka data lekar aao
-            if (typeof fetchCloudData === "function") {
-                await fetchCloudData();
-            }
-            
-            // 2. Rent ka data lekar aao
-            if (typeof fetchCloudRentData === "function") {
-                await fetchCloudRentData();
-            }
-            
-            console.log("Cloud database se saara data refresh ho gaya.");
-        } catch (syncErr) {
-            console.error("Cloud Sync Error:", syncErr);
-        }
-    } else {
-        console.warn("Internet nahi hai, isliye cloud se naya data nahi aya.");
+
+    if (!navigator.onLine) {
+
+        console.warn("Internet nahi hai.");
+        return;
+
     }
+
+    console.log("Cloud sync shuru...");
+
+    try {
+
+        // Stock Data
+        if (typeof fetchCloudData === "function") {
+            await fetchCloudData();
+        }
+
+        // Rent Data
+        if (typeof fetchCloudRentData === "function") {
+            await fetchCloudRentData();
+        }
+
+        // Extra Refresh
+        if (typeof updateItemLists === "function") {
+            updateItemLists();
+        }
+
+        if (typeof updateCustomerDropdown === "function") {
+            updateCustomerDropdown();
+        }
+
+        if (typeof loadUserTable === "function") {
+            loadUserTable();
+        }
+
+        console.log("Cloud sync complete ✅");
+
+    } catch (syncErr) {
+
+        console.error("Cloud Sync Error:", syncErr);
+
+    }
+
 }
 
+// ================================
+// FETCH RENT DATA FROM CLOUD
+// ================================
+async function fetchCloudRentData() {
 
+    try {
 
-// --- CLOUD DATA AUTO-SYNC UTILITY FUNCTION ---
-async function syncAllCloudData() {
-    // Agar internet mojud hai toh dono cloud functions ko run karo
-    if (navigator.onLine) {
-        console.log("Internet active hai. Cloud data sync shuru...");
-        try {
-            // 1. Stock ka data lekar aao
-            if (typeof fetchCloudData === "function") {
-                await fetchCloudData();
-            }
-            
-            // 2. Rent ka data lekar aao
-            if (typeof fetchCloudRentData === "function") {
-                await fetchCloudRentData();
-            }
-            
-            console.log("Cloud database se saara data refresh ho gaya.");
-        } catch (syncErr) {
-            console.error("Cloud Sync Error:", syncErr);
+        const { data, error } = await _supabase
+            .from('KRT_RENT')
+            .select('*')
+            .order('id', { ascending: true });
+
+        if (error) {
+
+            console.error("Rent Fetch Error:", error);
+            return;
+
         }
-    } else {
-        console.warn("Internet nahi hai, isliye cloud se naya data nahi aya.");
+
+        if (!data) return;
+
+        dbRent = data.map(row => ({
+            id: row.id,
+            name: row.name,
+            shop: row.shop,
+            date: row.date,
+            month: row.month,
+            debit: Number(row.debit || 0),
+            credit: Number(row.credit || 0),
+            method: row.method
+        }));
+
+        localStorage.setItem(
+            'krt_rent_data',
+            JSON.stringify(dbRent)
+        );
+
+        if (typeof renderRentTable === "function") {
+            renderRentTable();
+        }
+
+        console.log("Rent cloud sync done ✅");
+
+    } catch (err) {
+
+        console.error("Rent Sync Error:", err);
+
     }
+
 }
