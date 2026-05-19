@@ -78,10 +78,11 @@ async function fetchCloudData() {
 }
 // Jab bhi koi user login kare ya page reload ho, toh automatic cloud se data uthaye
 window.addEventListener('DOMContentLoaded', () => {
-    if (localStorage.getItem('isLoggedIn') === 'true') {
-        fetchCloudData();
-    }
+    if (localStorage.getItem('isLoggedIn') === 'true') {
+        fetchCloudData();
+    }
 });
+
 function saveAndRefresh() {
     localStorage.setItem('krt_erp_data', JSON.stringify(db));
     renderAll();
@@ -1011,13 +1012,17 @@ function printSection() {
 }
 // Jab poora page load ho jaye (DOM ready ho)
 document.addEventListener('DOMContentLoaded', async () => {
-    // Purana local data pehle dikha dein
+
     if (typeof renderAll === "function") renderAll();
-    if (typeof renderRentTable === "function") renderRentTable();
-    
-    // Cloud se latest Stock aur Rent dono load karein
-    await fetchCloudData();
-    await fetchCloudRentData(); // <--- Yeh line lazmi add kar dena
+
+    if (typeof renderRentTable === "function") {
+        renderRentTable();
+    }
+
+    if (localStorage.getItem('isLoggedIn') === 'true') {
+        await fetchCloudData();
+    }
+
 });
 function generateStatement() {
     const fromDate = document.getElementById('from-date').value; // e.g., "2026-05-18"
