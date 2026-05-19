@@ -915,7 +915,7 @@ const rentNameField = document.getElementById('rent-name');
 if (rentNameField) {
     rentNameField.addEventListener('input', renderRentTable);
 }
-is main add kr du
+//is main add kr du
 // --- SIDEBAR TOGGLE LOGIC ---
 function toggleSidebar() {
     let sb = document.getElementById('sidebar');
