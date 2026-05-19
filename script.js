@@ -22,9 +22,9 @@ async function fetchCloudData() {
         // SAFE APPROACH: Agar column 'date' small letters mein hai toh small likhein.
         // Agar pehle crash ho raha tha toh hum bina order ke pehle data manga kar check karte hain.
         const { data, error } = await _supabase
-            .from('KRT')
-            .select('*'); 
-
+    .from('KRT')
+    .select('*')
+    .order('id', { ascending: true });
         if (error) {
             console.error("Supabase Error:", error.message);
             alert("Supabase Se Data Nahi Aya: " + error.message);
@@ -1029,32 +1029,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
 
-        // Default UI
-        const loginScreen = document.getElementById('login-screen');
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('main-content');
-
-        if (loginScreen) loginScreen.style.display = "block";
-        if (sidebar) sidebar.style.display = "none";
-        if (mainContent) mainContent.style.display = "none";
-
-        // Initial Render
+        // Initial render
         if (typeof renderAll === "function") {
             renderAll();
         }
 
-        // Rent Table Render
         if (typeof renderRentTable === "function") {
             renderRentTable();
         }
 
-        // Auto Login Restore
+        // 🔥 HAMESHA CLOUD DATA LOAD KARO
+        if (navigator.onLine) {
+
+            await fetchCloudData();
+
+        } else {
+
+            console.warn("Internet nahi hai");
+
+        }
+
+        // Login restore
         const isLoggedIn = localStorage.getItem('isLoggedIn');
         const role = localStorage.getItem('userRole');
 
         if (isLoggedIn === 'true') {
 
-            // Restore User System
             if (role === 'admin') {
 
                 showSystem('admin');
@@ -1069,16 +1069,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             }
 
-            // Internet Check
-            if (navigator.onLine) {
-
-                await fetchCloudData();
-
-            } else {
-
-                alert("Internet connection nahi hai");
-
-            }
         }
 
     } catch (err) {
