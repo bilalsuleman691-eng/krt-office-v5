@@ -1,158 +1,31 @@
 {
   "short_name": "KRT Office",
   "name": "KRT Traders Enterprise ERP",
-  "description": "Complete Enterprise Resource Planning System for KRT Traders - Developed by Bilal Suleman",
-  
+  "description": "Complete ERP System - Developed by Bilal Suleman",
   "icons": [
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "72x72",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "96x96",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "128x128",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "144x144",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "152x152",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "256x256",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "384x384",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
-    }
+    {"src": "logo.png","type":"image/png","sizes":"72x72","purpose":"any maskable"},
+    {"src": "logo.png","type":"image/png","sizes":"96x96","purpose":"any maskable"},
+    {"src": "logo.png","type":"image/png","sizes":"128x128","purpose":"any maskable"},
+    {"src": "logo.png","type":"image/png","sizes":"144x144","purpose":"any maskable"},
+    {"src": "logo.png","type":"image/png","sizes":"152x152","purpose":"any maskable"},
+    {"src": "logo.png","type":"image/png","sizes":"192x192","purpose":"any maskable"},
+    {"src": "logo.png","type":"image/png","sizes":"256x256","purpose":"any maskable"},
+    {"src": "logo.png","type":"image/png","sizes":"384x384","purpose":"any maskable"},
+    {"src": "logo.png","type":"image/png","sizes":"512x512","purpose":"any maskable"}
   ],
-  
   "start_url": "index.html",
   "scope": "/",
   "background_color": "#1a1a2e",
   "theme_color": "#2c3e50",
   "display": "standalone",
   "orientation": "portrait",
-  
-  "categories": ["business", "finance", "productivity"],
+  "categories": ["business","finance","productivity"],
   "lang": "en",
-  "dir": "ltr",
-  
-  "screenshots": [
-    {
-      "src": "screenshot1.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "label": "KRT ERP Dashboard"
-    },
-    {
-      "src": "screenshot2.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "label": "Stock Management"
-    }
-  ],
-  
-  "related_applications": [],
-  "prefer_related_applications": false,
-  
   "shortcuts": [
-    {
-      "name": "📥 Stock In",
-      "short_name": "Stock In",
-      "description": "Add new stock entry",
-      "url": "index.html?page=stock-in",
-      "icons": [
-        {
-          "src": "logo.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "📤 Stock Out",
-      "short_name": "Stock Out",
-      "description": "Register sale",
-      "url": "index.html?page=stock-out",
-      "icons": [
-        {
-          "src": "logo.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "📊 Dashboard",
-      "short_name": "Dashboard",
-      "description": "View dashboard",
-      "url": "index.html?page=dashboard",
-      "icons": [
-        {
-          "src": "logo.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "📚 Customer Ledgers",
-      "short_name": "Ledgers",
-      "description": "Manage customer accounts",
-      "url": "index.html?page=ledgers",
-      "icons": [
-        {
-          "src": "logo.png",
-          "sizes": "192x192"
-        }
-      ]
-    }
+    {"name":"📥 Stock In","short_name":"Stock In","url":"index.html?page=stock-in","icons":[{"src":"logo.png","sizes":"192x192"}]},
+    {"name":"📤 Stock Out","short_name":"Stock Out","url":"index.html?page=stock-out","icons":[{"src":"logo.png","sizes":"192x192"}]},
+    {"name":"📊 Dashboard","short_name":"Dashboard","url":"index.html?page=dashboard","icons":[{"src":"logo.png","sizes":"192x192"}]},
+    {"name":"📚 Ledgers","short_name":"Ledgers","url":"index.html?page=ledgers","icons":[{"src":"logo.png","sizes":"192x192"}]}
   ],
-  
-  "display_override": ["standalone", "window-controls-overlay"],
-  "handle_links": "preferred",
-  "launch_handler": {
-    "client_mode": ["focus-existing", "auto"]
-  },
-  
-  "share_target": {
-    "action": "/",
-    "method": "GET",
-    "params": {
-      "title": "KRT ERP",
-      "text": "KRT Traders Enterprise System",
-      "url": "/"
-    }
-  }
+  "share_target": {"action":"/","method":"GET","params":{"title":"KRT ERP","text":"KRT Traders Enterprise System","url":"/"}}
 }
