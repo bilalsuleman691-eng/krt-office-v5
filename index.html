@@ -23,16 +23,14 @@
             <input type="password" id="pass" placeholder="Password" value="123">
             <button class="btn-login" onclick="login()">🔐 Access System</button>
             <div class="error-msg" id="login-error">Invalid credentials. Please try again.</div>
-            <div style="text-align:center; margin-top:15px; color:#8892b0; font-size:12px;">
-                <span>Default: admin / 123</span>
-            </div>
+            <div class="login-footer">Default: admin / 123</div>
         </div>
     </div>
 
     <!-- ========================================
     TOAST NOTIFICATION
     ======================================== -->
-    <div id="toast" class="toast"></div>
+    <div id="toast"></div>
 
     <!-- ========================================
     TOGGLE BUTTON (Mobile)
@@ -53,7 +51,7 @@
             <li onclick="switchPage('page-stock-out', 'STOCK OUT')"><span class="icon">📤</span> Stock OUT Entry</li>
             <li onclick="switchPage('page-balance', 'STOCK BALANCE')"><span class="icon">📦</span> Stock Balance</li>
             <li onclick="switchPage('page-billing', 'BILLING')"><span class="icon">🧾</span> Billing System <span class="badge">NEW</span></li>
-            <li onclick="switchPage('page-Report', 'REPORTS')"><span class="icon">📊</span> Reports</li>
+            <li onclick="switchPage('page-report', 'REPORTS')"><span class="icon">📊</span> Reports</li>
             <li onclick="switchPage('page-search', 'SEARCH')"><span class="icon">🔍</span> Master Search</li>
             <li onclick="switchPage('page-customer-ledgers', 'LEDGERS')"><span class="icon">📚</span> Customer Ledgers</li>
             <li onclick="switchPage('page-rent-book', 'RENT BOOK')"><span class="icon">🏢</span> Market Rent Book</li>
@@ -203,7 +201,7 @@
                         <datalist id="items-list"></datalist>
                     </div>
                     <div class="field" style="width:100%;">
-                        <div id="stock-status" style="font-size:14px; font-weight:600; padding:8px 12px; background:#f8f9fa; border-radius:6px;"></div>
+                        <div id="stock-status"></div>
                     </div>
                     <div class="field">
                         <label>Barcode</label>
@@ -243,7 +241,7 @@
             <div class="card">
                 <div class="card-title flex-between">
                     <span>📦 Current Stock Sheet (Balance)</span>
-                    <button class="btn btn-dark btn-sm" onclick="printSection()">🖨️ Print / PDF</button>
+                    <button class="btn btn-dark btn-sm" onclick="window.print()">🖨️ Print / PDF</button>
                 </div>
                 <div class="table-container">
                     <table>
@@ -257,7 +255,7 @@
         </div>
 
         <!-- ========================================
-        PAGE: BILLING SYSTEM (NEW)
+        PAGE: BILLING SYSTEM
         ======================================== -->
         <div id="page-billing" class="erp-page">
             <div class="bill-container">
@@ -305,27 +303,27 @@
                             <tr>
                                 <td>1</td>
                                 <td style="text-align:left;">
-                                    <input type="text" id="bill-item-0" placeholder="Item" style="border:none; background:transparent; padding:0; width:100%;">
+                                    <input type="text" id="bill-item-0" placeholder="Item">
                                 </td>
                                 <td>
-                                    <input type="number" id="bill-qty-0" placeholder="0" oninput="calculateBill()" style="border:none; background:transparent; padding:0; width:60px; text-align:center;">
+                                    <input type="number" id="bill-qty-0" placeholder="0" oninput="calculateBill()">
                                 </td>
                                 <td>
-                                    <input type="number" id="bill-price-0" placeholder="0" oninput="calculateBill()" style="border:none; background:transparent; padding:0; width:80px; text-align:center;">
+                                    <input type="number" id="bill-price-0" placeholder="0" oninput="calculateBill()">
                                 </td>
                                 <td id="bill-total-0" style="font-weight:600;">0</td>
                                 <td>
-                                    <button onclick="removeBillRow(this)" class="btn btn-red btn-sm" style="padding:2px 10px;">✕</button>
+                                    <button onclick="removeBillRow(this)" class="btn btn-red btn-sm">✕</button>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <div style="display:flex; gap:10px; margin:10px 0; flex-wrap:wrap;">
+                <div class="bill-actions">
                     <button class="btn btn-primary btn-sm" onclick="addBillRow()">➕ Add Row</button>
                     <button class="btn btn-gold btn-sm" onclick="saveBill()">💾 Save Bill</button>
-                    <button class="btn btn-blue btn-sm" onclick="printBill()">🖨️ Print Bill</button>
+                    <button class="btn btn-blue btn-sm" onclick="window.print()">🖨️ Print Bill</button>
                     <button class="btn btn-dark btn-sm" onclick="clearBill()">🗑️ Clear Bill</button>
                 </div>
 
@@ -343,7 +341,7 @@
         <!-- ========================================
         PAGE: REPORTS
         ======================================== -->
-        <div id="page-Report" class="erp-page">
+        <div id="page-report" class="erp-page">
             <div class="card no-print">
                 <div class="card-title">📊 Generate Statement</div>
                 <div class="form-group">
@@ -368,30 +366,30 @@
                 <h2 style="text-align:center; margin-bottom:5px;">KRT TRADERS - STATEMENT</h2>
                 <p id="report-period" style="text-align:center; color:#7f8c8d; margin-bottom:20px;"></p>
 
-                <h4 style="background:#2c3e50; color:white; padding:10px; border-radius:6px;">📥 STOCK IN (PURCHASES)</h4>
+                <h4 class="report-sub-heading">📥 STOCK IN (PURCHASES)</h4>
                 <div class="table-container">
                     <table id="rep-in-table">
                         <thead>
                             <tr><th>Date</th><th>Item</th><th>Vendor</th><th>Qty</th><th>Price</th><th>Total</th></tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody id="rep-in-table-body"></tbody>
                     </table>
                 </div>
 
-                <h4 style="background:#2c3e50; color:white; padding:10px; border-radius:6px; margin-top:20px;">📤 STOCK OUT (SALES)</h4>
+                <h4 class="report-sub-heading" style="margin-top:20px;">📤 STOCK OUT (SALES)</h4>
                 <div class="table-container">
                     <table id="rep-out-table">
                         <thead>
                             <tr><th>Date</th><th>Item</th><th>Customer</th><th>Qty</th><th>Price</th><th>Total</th></tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody id="rep-out-table-body"></tbody>
                     </table>
                 </div>
 
-                <div style="display:flex; justify-content:space-between; background:#2c3e50; color:white; padding:15px; border-radius:8px; margin-top:20px;">
+                <div class="summary-footer">
                     <span>Total In: <strong id="sum-in">PKR 0</strong></span>
                     <span>Total Out: <strong id="sum-out">PKR 0</strong></span>
-                    <span>Profit: <strong id="sum-profit" style="color:#00d4aa;">PKR 0</strong></span>
+                    <span>Profit: <strong id="sum-profit">PKR 0</strong></span>
                 </div>
             </div>
         </div>
@@ -424,7 +422,7 @@
                         <thead>
                             <tr><th>Date</th><th>Item</th><th>Vendor</th><th>Qty</th><th>Price</th><th>Total</th><th>Actions</th></tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody id="master-in-body"></tbody>
                     </table>
                 </div>
             </div>
@@ -436,7 +434,7 @@
                         <thead>
                             <tr><th>Date</th><th>Item</th><th>Customer</th><th>Qty</th><th>Price</th><th>Total</th><th>Actions</th></tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody id="master-out-body"></tbody>
                     </table>
                 </div>
             </div>
@@ -448,48 +446,48 @@
         <div id="page-customer-ledgers" class="erp-page">
             <div class="card">
                 <div class="card-title">📚 Customer Ledger System</div>
-                <div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:20px; background:#f8f9fa; padding:15px; border-radius:8px;">
-                    <div style="flex:1; min-width:200px;">
-                        <label style="font-weight:600; font-size:13px;">Select/Type Customer</label>
+                <div class="ledger-top-bar">
+                    <div class="field">
+                        <label>Select/Type Customer</label>
                         <input type="text" id="ledger-cust-name" list="customer-list" placeholder="Naam likhain" oninput="showLedger()">
                         <datalist id="customer-list"></datalist>
                     </div>
-                    <div style="flex:0 0 180px;">
-                        <label style="font-weight:600; font-size:13px;">Opening Balance</label>
+                    <div class="field">
+                        <label>Opening Balance</label>
                         <input type="number" id="opening-bal" value="0" onchange="updateOpeningBal()">
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:10px; background:#eef; padding:15px; border-radius:8px; margin-bottom:15px;">
-                    <div>
-                        <label style="font-size:12px; font-weight:600;">Date</label>
+                <div class="ledger-entry-form">
+                    <div class="field">
+                        <label>Date</label>
                         <input type="date" id="led-date">
                     </div>
-                    <div>
-                        <label style="font-size:12px; font-weight:600;">Item Detail</label>
+                    <div class="field">
+                        <label>Item Detail</label>
                         <input type="text" id="led-item" placeholder="Item">
                     </div>
-                    <div>
-                        <label style="font-size:12px; font-weight:600;">Qty (CTN)</label>
+                    <div class="field">
+                        <label>Qty (CTN)</label>
                         <input type="number" id="led-ctn" value="0">
                     </div>
-                    <div>
-                        <label style="font-size:12px; font-weight:600;">Debit (Udhaar)</label>
+                    <div class="field">
+                        <label>Debit (Udhaar)</label>
                         <input type="number" id="led-debit" value="0">
                     </div>
-                    <div>
-                        <label style="font-size:12px; font-weight:600;">Credit (Wapsi)</label>
+                    <div class="field">
+                        <label>Credit (Wapsi)</label>
                         <input type="number" id="led-credit" value="0">
                     </div>
-                    <div>
-                        <label style="font-size:12px; font-weight:600;">Method</label>
+                    <div class="field">
+                        <label>Method</label>
                         <select id="led-method">
                             <option value="Cash">Cash</option>
                             <option value="Bank">Bank</option>
                             <option value="Cheque">Cheque</option>
                         </select>
                     </div>
-                    <div style="display:flex; align-items:flex-end;">
+                    <div class="field" style="flex:0 0 auto;">
                         <button class="btn btn-blue" onclick="saveLedgerEntry()">Save Entry</button>
                     </div>
                 </div>
@@ -501,12 +499,12 @@
                         </thead>
                         <tbody id="ledger-table-body"></tbody>
                         <tfoot>
-                            <tr style="background:#f8f9fa; font-weight:700;">
+                            <tr>
                                 <td colspan="3" style="text-align:right;">Grand Total:</td>
                                 <td id="total-ctn">0</td>
                                 <td id="total-debit">0</td>
                                 <td id="total-credit">0</td>
-                                <td colspan="2" id="final-balance" style="color:#e74c3c; font-size:16px;">Balance: 0</td>
+                                <td colspan="2" id="final-balance">Balance: 0</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -520,47 +518,47 @@
         <div id="page-rent-book" class="erp-page">
             <div class="card">
                 <div class="card-title">🏢 Market Rent Book System</div>
-                <div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:15px; background:#f8f9fa; padding:15px; border-radius:8px;">
-                    <div style="flex:1; min-width:200px;">
-                        <label style="font-weight:600; font-size:13px;">Shopkeeper Name</label>
+                <div class="rent-top-bar">
+                    <div class="field">
+                        <label>Shopkeeper Name</label>
                         <input type="text" id="rent-name" placeholder="Naam likhain" oninput="renderRentTable()">
                     </div>
-                    <div style="flex:0 0 120px;">
-                        <label style="font-weight:600; font-size:13px;">Shop No</label>
+                    <div class="field">
+                        <label>Shop No</label>
                         <input type="text" id="rent-shop-no" placeholder="0">
                     </div>
-                    <div style="flex:0 0 150px;">
-                        <label style="font-weight:600; font-size:13px;">Opening Balance</label>
+                    <div class="field">
+                        <label>Opening Balance</label>
                         <input type="number" id="rent-opening" value="0">
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:10px; background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:15px;">
-                    <div>
-                        <label style="font-size:12px; font-weight:600;">Date</label>
+                <div class="rent-entry-form">
+                    <div class="field">
+                        <label>Date</label>
                         <input type="date" id="rent-date">
                     </div>
-                    <div>
-                        <label style="font-size:12px; font-weight:600;">Month Detail</label>
+                    <div class="field">
+                        <label>Month Detail</label>
                         <input type="text" id="rent-month" placeholder="e.g. April 2026">
                     </div>
-                    <div>
-                        <label style="font-size:12px; font-weight:600;">Rent (Debit)</label>
+                    <div class="field">
+                        <label>Rent (Debit)</label>
                         <input type="number" id="rent-debit" value="0">
                     </div>
-                    <div>
-                        <label style="font-size:12px; font-weight:600;">Cash Wapsi (Credit)</label>
+                    <div class="field">
+                        <label>Cash Wapsi (Credit)</label>
                         <input type="number" id="rent-credit" value="0">
                     </div>
-                    <div>
-                        <label style="font-size:12px; font-weight:600;">Method</label>
+                    <div class="field">
+                        <label>Method</label>
                         <select id="rent-method">
                             <option value="Cash">Cash</option>
                             <option value="Bank">Bank Transfer</option>
                             <option value="Cheque">Cheque</option>
                         </select>
                     </div>
-                    <div style="display:flex; align-items:flex-end;">
+                    <div class="field" style="flex:0 0 auto;">
                         <button class="btn btn-red" onclick="addRentEntry()">Save Entry</button>
                     </div>
                 </div>
@@ -572,12 +570,12 @@
                         </thead>
                         <tbody id="rent-main-rows"></tbody>
                         <tfoot>
-                            <tr style="background:#f8f9fa; font-weight:700;">
+                            <tr>
                                 <td colspan="3" style="text-align:right;">Grand Total:</td>
-                                <td id="rent-total-debit" style="color:#e74c3c;">0</td>
-                                <td id="rent-total-credit" style="color:#27ae60;">0</td>
+                                <td id="rent-total-debit">0</td>
+                                <td id="rent-total-credit">0</td>
                                 <td>Balance:</td>
-                                <td id="rent-final-balance" style="background:#e74c3c; color:white; padding:5px 10px; border-radius:4px;">0</td>
+                                <td id="rent-final-balance">0</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -591,7 +589,7 @@
         <div id="page-settings" class="erp-page">
             <div class="card">
                 <div class="card-title">👥 Multi-User Management</div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                <div class="settings-grid">
                     <div>
                         <h4 style="margin-bottom:10px;">Create New User</h4>
                         <div class="form-group">
@@ -609,12 +607,12 @@
                             </div>
                             <div class="field" style="width:100%;">
                                 <label>Permissions</label>
-                                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:5px;">
+                                <div class="perms-grid">
                                     <label><input type="checkbox" class="perm" value="page-stock-in"> Stock In</label>
                                     <label><input type="checkbox" class="perm" value="page-stock-out"> Stock Out</label>
                                     <label><input type="checkbox" class="perm" value="page-balance"> Balance</label>
                                     <label><input type="checkbox" class="perm" value="page-billing"> Billing</label>
-                                    <label><input type="checkbox" class="perm" value="page-Report"> Reports</label>
+                                    <label><input type="checkbox" class="perm" value="page-report"> Reports</label>
                                     <label><input type="checkbox" class="perm" value="page-search"> Search</label>
                                     <label><input type="checkbox" class="perm" value="page-customer-ledgers"> Ledgers</label>
                                     <label><input type="checkbox" class="perm" value="page-rent-book"> Rent Book</label>
@@ -640,11 +638,12 @@
             </div>
 
             <div class="card">
-                <div class="card-title">🔄 Data Sync</div>
-                <div style="display:flex; gap:15px; flex-wrap:wrap;">
+                <div class="card-title">🔄 Data Sync & Backup</div>
+                <div class="sync-buttons">
                     <button class="btn btn-blue" onclick="syncAllCloudData()">☁️ Sync from Cloud</button>
                     <button class="btn btn-gold" onclick="exportBackup()">💾 Export Backup</button>
                     <button class="btn btn-red" onclick="importBackup()">📂 Import Backup</button>
+                    <button class="btn btn-primary" onclick="addSampleData()">📝 Add Sample Data</button>
                     <button class="btn btn-dark" onclick="clearAllData()">🗑️ Clear All Data</button>
                 </div>
             </div>
@@ -655,7 +654,7 @@
     <!-- ========================================
     FOOTER
     ======================================== -->
-    <div style="position:fixed; bottom:0; width:100%; background:#1a1a2e; color:#8892b0; text-align:center; padding:8px; font-size:11px; border-top:1px solid rgba(255,255,255,0.05); z-index:900;">
+    <div class="footer">
         KRT TRADERS ERP v6.0 HEAVY | Developed by Bilal Suleman | All Rights Reserved
     </div>
 
