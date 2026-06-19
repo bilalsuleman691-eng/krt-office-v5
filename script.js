@@ -1,5 +1,5 @@
 // ========================================
-// KRT TRADERS ERP - COMPLETE JAVASCRIPT
+// KRT TRADERS ERP - COMPLETE JAVASCRIPT (FULLY FIXED)
 // ========================================
 
 // ========================================
@@ -12,213 +12,449 @@ const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 // ========================================
 // 2. GLOBAL DATABASE OBJECTS
 // ========================================
-let db = JSON.parse(localStorage.getItem('krt_erp_data')) || { in: [], out: [], ledgers: {}, opening_balances: {} };
-let dbRent = JSON.parse(localStorage.getItem('krt_rent_data')) || [];
-let extraUsers = JSON.parse(localStorage.getItem('krt_extra_users')) || [];
-let billCounter = parseInt(localStorage.getItem('krt_bill_counter')) || 1;
+let db = { in: [], out: [], ledgers: {}, opening_balances: {} };
+let dbRent = [];
+let extraUsers = [];
+let billCounter = 1;
 
 // ========================================
-// 3. TOAST NOTIFICATION
+// 3. LOAD DATA FROM LOCAL STORAGE
 // ========================================
-function showToast(message, type = 'success') {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = `toast ${type}`;
-    toast.style.display = 'block';
-    setTimeout(() => { toast.style.display = 'none'; }, 3000);
-}
-
-// ========================================
-// 4. CLOCK UPDATE
-// ========================================
-function updateClock() {
-    const now = new Date();
-    document.getElementById('clock-display').textContent = now.toLocaleString('en-PK', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-    });
-}
-setInterval(updateClock, 1000);
-updateClock();
-
-// ========================================
-// 5. LOGIN SYSTEM
-// ========================================
-function login() {
-    const userField = document.getElementById('user');
-    const passField = document.getElementById('pass');
-    const errorMsg = document.getElementById('login-error');
-
-    if (!userField || !passField) return;
-
-    const u = userField.value.trim().toLowerCase();
-    const p = passField.value.trim();
-
-    errorMsg.style.display = 'none';
-
-    // Admin
-    if (u === 'admin' && p === '123') {
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userRole', 'admin');
-        showSystem('admin');
-        showToast('Welcome Admin!', 'success');
-        return;
-    }
-
-    // Staff
-    if (u === 'ali' && p === '123') {
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userRole', 'staff');
-        showSystem('staff');
-        showToast('Welcome Staff!', 'success');
-        return;
-    }
-
-    // Manager
-    if (u === 'sattar' && p === '123') {
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userRole', 'manager');
-        showSystem('manager');
-        showToast('Welcome Manager!', 'success');
-        return;
-    }
-
-    // Extra Users
-    const found = extraUsers.find(user => user.id === u && user.pass === p);
-    if (found) {
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userRole', 'extra');
-        localStorage.setItem('extraUser', JSON.stringify(found));
-        showSystem(found);
-        showToast(`Welcome ${found.name}!`, 'success');
-        return;
-    }
-
-    errorMsg.style.display = 'block';
-}
-
-function showSystem(roleOrUser) {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('sidebar').style.display = 'block';
-    document.getElementById('main-content').style.display = 'block';
-    document.getElementById('toggle-btn').style.display = 'block';
-
-    // Apply permissions
-    if (typeof roleOrUser === 'object') {
-        applyDynamicPermissions(roleOrUser);
-    } else {
-        const menuItems = document.querySelectorAll('#sidebar ul li');
-        menuItems.forEach(item => item.style.display = 'flex');
-
-        if (roleOrUser === 'staff') {
-            menuItems.forEach(item => {
-                const text = item.innerText;
-                if (!text.includes('Dashboard') && !text.includes('Stock IN') && 
-                    !text.includes('Stock OUT') && !text.includes('Stock Balance')) {
-                    item.style.display = 'none';
-                }
-            });
-            switchPage('page-dashboard', 'DASHBOARD');
-        } else if (roleOrUser === 'manager') {
-            menuItems.forEach(item => {
-                const text = item.innerText;
-                if (!text.includes('Dashboard') && !text.includes('Customer Ledgers') && 
-                    !text.includes('RENT BOOK') && !text.includes('Stock Balance')) {
-                    item.style.display = 'none';
-                }
-            });
-            switchPage('page-customer-ledgers', 'LEDGERS');
+function loadAllData() {
+    console.log('Loading data from localStorage...');
+    
+    // Load main data
+    try {
+        const stored = localStorage.getItem('krt_erp_data');
+        if (stored) {
+            db = JSON.parse(stored);
+            console.log('Main data loaded:', db);
+        } else {
+            console.log('No main data found, creating sample...');
+            createSampleData();
         }
+    } catch (e) {
+        console.error('Main data load error:', e);
+        createSampleData();
     }
 
+    // Ensure all properties exist
+    if (!db.in) db.in = [];
+    if (!db.out) db.out = [];
+    if (!db.ledgers) db.ledgers = {};
+    if (!db.opening_balances) db.opening_balances = {};
+
+    // Load rent data
+    try {
+        const rentStored = localStorage.getItem('krt_rent_data');
+        if (rentStored) {
+            dbRent = JSON.parse(rentStored);
+            console.log('Rent data loaded:', dbRent);
+        }
+    } catch (e) {
+        dbRent = [];
+    }
+
+    // Load users
+    try {
+        const userStored = localStorage.getItem('krt_extra_users');
+        if (userStored) {
+            extraUsers = JSON.parse(userStored);
+        }
+    } catch (e) {
+        extraUsers = [];
+    }
+
+    // Load bill counter
+    try {
+        const counter = localStorage.getItem('krt_bill_counter');
+        if (counter) {
+            billCounter = parseInt(counter);
+        }
+    } catch (e) {
+        billCounter = 1;
+    }
+
+    console.log('All data loaded successfully!');
+    console.log('Total IN entries:', db.in.length);
+    console.log('Total OUT entries:', db.out.length);
+}
+
+// ========================================
+// 4. CREATE SAMPLE DATA
+// ========================================
+function createSampleData() {
+    console.log('Creating sample data...');
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    db = {
+        in: [
+            {
+                id: 1,
+                date: today,
+                vendor: 'Al-Noor Traders',
+                item: 'Cement',
+                barcode: 'CEM001',
+                qty: 100,
+                price: 1200,
+                total: 120000
+            },
+            {
+                id: 2,
+                date: today,
+                vendor: 'Al-Hassan Builders',
+                item: 'Steel Bar 12mm',
+                barcode: 'STL012',
+                qty: 50,
+                price: 8500,
+                total: 425000
+            },
+            {
+                id: 3,
+                date: today,
+                vendor: 'Lahore Traders',
+                item: 'Paint White',
+                barcode: 'PNT001',
+                qty: 30,
+                price: 2500,
+                total: 75000
+            },
+            {
+                id: 4,
+                date: '2026-06-15',
+                vendor: 'Karachi Steel',
+                item: 'Steel Bar 10mm',
+                barcode: 'STL010',
+                qty: 80,
+                price: 7500,
+                total: 600000
+            },
+            {
+                id: 5,
+                date: '2026-06-10',
+                vendor: 'Islamabad Traders',
+                item: 'Cement',
+                barcode: 'CEM002',
+                qty: 200,
+                price: 1100,
+                total: 220000
+            }
+        ],
+        out: [
+            {
+                id: 1,
+                date: today,
+                cust: 'Bilal Suleman',
+                phone: '0300-1234567',
+                item: 'Cement',
+                barcode: 'CEM001',
+                qty: 20,
+                price: 1500,
+                total: 30000
+            },
+            {
+                id: 2,
+                date: today,
+                cust: 'Ahmed Traders',
+                phone: '0300-7654321',
+                item: 'Steel Bar 12mm',
+                barcode: 'STL012',
+                qty: 10,
+                price: 9500,
+                total: 95000
+            },
+            {
+                id: 3,
+                date: '2026-06-16',
+                cust: 'Sattar Bhai',
+                phone: '0300-9876543',
+                item: 'Paint White',
+                barcode: 'PNT001',
+                qty: 15,
+                price: 3200,
+                total: 48000
+            },
+            {
+                id: 4,
+                date: '2026-06-14',
+                cust: 'Zain Builders',
+                phone: '0300-5555555',
+                item: 'Steel Bar 10mm',
+                barcode: 'STL010',
+                qty: 30,
+                price: 8500,
+                total: 255000
+            }
+        ],
+        ledgers: {},
+        opening_balances: {}
+    };
+
+    // Save sample data
+    localStorage.setItem('krt_erp_data', JSON.stringify(db));
+    console.log('Sample data created and saved!');
+}
+
+// ========================================
+// 5. SAVE AND REFRESH
+// ========================================
+function saveAndRefresh() {
+    localStorage.setItem('krt_erp_data', JSON.stringify(db));
     renderAll();
-    loadUserTable();
+    renderBalanceTable();
     renderRentTable();
+    updateDashboard();
+    updateItemLists();
+    updateCustomerDropdown();
+    console.log('Data saved and all views refreshed!');
 }
 
-function applyDynamicPermissions(user) {
-    const menuItems = document.querySelectorAll('#sidebar ul li');
-    menuItems.forEach(item => {
-        const onclickAttr = item.getAttribute('onclick') || '';
+// ========================================
+// 6. RENDER ALL - COMPLETE FIXED
+// ========================================
+function renderAll() {
+    console.log('Rendering all data...');
+    const today = new Date().toISOString().split('T')[0];
+
+    // ===== TODAY'S STOCK IN =====
+    const inBody = document.getElementById('today-list-in');
+    if (inBody) {
+        let html = '';
+        let counter = 1;
+        const todayIn = db.in.filter(x => x.date === today);
+        console.log('Today IN entries:', todayIn.length);
         
-        // Dashboard always visible
-        if (onclickAttr.includes('page-dashboard')) {
-            item.style.display = 'flex';
-            return;
+        if (todayIn.length === 0) {
+            html = `<tr><td colspan="7" style="text-align:center; color:#7f8c8d; padding:20px;">📭 Aaj ki koi entry nahi hai...</td></tr>`;
+        } else {
+            todayIn.forEach((x, index) => {
+                const originalIndex = db.in.indexOf(x);
+                html += `
+                    <tr>
+                        <td>${counter++}</td>
+                        <td><strong>${x.item}</strong></td>
+                        <td>${x.vendor || ''}</td>
+                        <td>${x.qty}</td>
+                        <td>${x.price ? x.price.toLocaleString() : '0'}</td>
+                        <td>${x.total ? x.total.toLocaleString() : '0'}</td>
+                        <td>
+                            <button onclick="deleteEntry('in', ${originalIndex})" class="btn btn-red btn-sm">Del</button>
+                        </td>
+                    </tr>
+                `;
+            });
         }
+        inBody.innerHTML = html;
+    }
 
-        const isAllowed = user.perms.some(p => onclickAttr.includes(p));
-        item.style.display = isAllowed ? 'flex' : 'none';
+    // ===== TODAY'S STOCK OUT =====
+    const outBody = document.getElementById('today-list-out');
+    if (outBody) {
+        let html = '';
+        let counter = 1;
+        const todayOut = db.out.filter(x => x.date === today);
+        console.log('Today OUT entries:', todayOut.length);
+        
+        if (todayOut.length === 0) {
+            html = `<tr><td colspan="9" style="text-align:center; color:#7f8c8d; padding:20px;">📭 Aaj ki koi sale nahi hai...</td></tr>`;
+        } else {
+            todayOut.forEach((x, index) => {
+                const originalIndex = db.out.indexOf(x);
+                html += `
+                    <tr>
+                        <td>${counter++}</td>
+                        <td>${x.date}</td>
+                        <td>${x.cust || ''}</td>
+                        <td>${x.phone || ''}</td>
+                        <td>${x.item}</td>
+                        <td>${x.qty}</td>
+                        <td>${x.price ? x.price.toLocaleString() : '0'}</td>
+                        <td>${x.total ? x.total.toLocaleString() : '0'}</td>
+                        <td>
+                            <button onclick="deleteEntry('out', ${originalIndex})" class="btn btn-red btn-sm">Del</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+        outBody.innerHTML = html;
+    }
+
+    // Update other components
+    renderBalanceTable();
+    updateDashboard();
+    updateItemLists();
+    updateCustomerDropdown();
+    
+    console.log('Render complete!');
+}
+
+// ========================================
+// 7. BALANCE TABLE - COMPLETE FIXED
+// ========================================
+function renderBalanceTable() {
+    console.log('Rendering balance table...');
+    const tbody = document.getElementById('table-balance-body');
+    if (!tbody) {
+        console.log('Balance table body not found!');
+        return;
+    }
+
+    // Get all unique items from both IN and OUT
+    const allItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
+    console.log('Unique items found:', allItems);
+
+    if (allItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#7f8c8d; padding:20px;">📭 Koi item nahi mila. Pehle entries add karein!</td></tr>`;
+        return;
+    }
+
+    let html = '';
+    allItems.forEach(name => {
+        if (!name) return;
+
+        // Calculate totals
+        const tin = db.in.filter(x => x.item === name).reduce((s, x) => s + (x.qty || 0), 0);
+        const tout = db.out.filter(x => x.item === name).reduce((s, x) => s + (x.qty || 0), 0);
+        const remaining = tin - tout;
+
+        // Get prices
+        const inItem = db.in.find(x => x.item === name);
+        const outItem = db.out.find(x => x.item === name);
+        const pPrice = inItem?.price || 0;
+        const sPrice = outItem?.price || 0;
+        const profit = (sPrice - pPrice) * tout;
+
+        // Status
+        let status = '';
+        if (remaining > 10) status = '<span class="stock-indicator high">✅ High</span>';
+        else if (remaining > 0) status = '<span class="stock-indicator medium">⚠️ Medium</span>';
+        else if (remaining <= 0 && tin > 0) status = '<span class="stock-indicator low">❌ Low</span>';
+        else status = '<span class="stock-indicator">🆕 New</span>';
+
+        const barcode = inItem?.barcode || outItem?.barcode || 'N/A';
+
+        html += `
+            <tr>
+                <td><code>${barcode}</code></td>
+                <td><strong>${name}</strong></td>
+                <td style="color:#27ae60; font-weight:bold;">${tin}</td>
+                <td style="color:#e74c3c; font-weight:bold;">${tout}</td>
+                <td style="font-weight:bold; font-size:16px; color:${remaining > 0 ? '#27ae60' : '#e74c3c'};">${remaining}</td>
+                <td>${status}</td>
+                <td style="color:${profit > 0 ? '#27ae60' : '#e74c3c'}; font-weight:bold;">PKR ${profit.toLocaleString()}</td>
+            </tr>
+        `;
     });
-    renderAll();
+
+    tbody.innerHTML = html;
+    console.log('Balance table rendered with', allItems.length, 'items');
 }
 
 // ========================================
-// 6. LOGOUT
+// 8. UPDATE DASHBOARD
 // ========================================
-function logout() {
-    if (confirm('Bilal Bhai, kya aap waqai logout karna chahte hain?')) {
-        localStorage.removeItem('isLoggedIn');
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('extraUser');
-        location.reload();
+function updateDashboard() {
+    console.log('Updating dashboard...');
+    
+    const totalItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])].length;
+    const totalIn = db.in.reduce((s, x) => s + (x.qty || 0), 0);
+    const totalOut = db.out.reduce((s, x) => s + (x.qty || 0), 0);
+
+    // Calculate profit
+    let totalProfit = 0;
+    const items = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
+    items.forEach(name => {
+        const pPrice = db.in.find(x => x.item === name)?.price || 0;
+        const outData = db.out.filter(x => x.item === name);
+        outData.forEach(x => {
+            totalProfit += ((x.price || 0) - pPrice) * (x.qty || 0);
+        });
+    });
+
+    document.getElementById('total-items').textContent = totalItems;
+    document.getElementById('total-in').textContent = totalIn;
+    document.getElementById('total-out').textContent = totalOut;
+    document.getElementById('total-profit').textContent = `PKR ${totalProfit.toLocaleString()}`;
+
+    // Recent entries in dashboard
+    const inBody = document.getElementById('dashboard-in');
+    if (inBody) {
+        const recentIn = db.in.slice(-5).reverse();
+        if (recentIn.length === 0) {
+            inBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#7f8c8d;">No entries</td></tr>`;
+        } else {
+            inBody.innerHTML = recentIn.map(x => `
+                <tr><td>${x.item}</td><td>${x.qty}</td><td>${x.vendor || ''}</td><td>${x.date}</td></tr>
+            `).join('');
+        }
+    }
+
+    const outBody = document.getElementById('dashboard-out');
+    if (outBody) {
+        const recentOut = db.out.slice(-5).reverse();
+        if (recentOut.length === 0) {
+            outBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#7f8c8d;">No entries</td></tr>`;
+        } else {
+            outBody.innerHTML = recentOut.map(x => `
+                <tr><td>${x.item}</td><td>${x.qty}</td><td>${x.cust || ''}</td><td>${x.date}</td></tr>
+            `).join('');
+        }
     }
 }
 
 // ========================================
-// 7. SIDEBAR TOGGLE
+// 9. UPDATE ITEM LISTS
 // ========================================
-function toggleSidebar() {
-    const sb = document.getElementById('sidebar');
-    const mc = document.getElementById('main-content');
+function updateItemLists() {
+    const list = document.getElementById('items-list');
+    if (!list) return;
+    
+    const allItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
+    list.innerHTML = allItems.map(name => `<option value="${name}">`).join('');
+    console.log('Item list updated with', allItems.length, 'items');
+}
 
-    if (sb.style.left === '0px' || sb.style.left === '') {
-        sb.style.left = '-300px';
-        mc.style.marginLeft = '0';
-        sb.classList.remove('open');
+// ========================================
+// 10. UPDATE CUSTOMER DROPDOWN
+// ========================================
+function updateCustomerDropdown() {
+    const list = document.getElementById('customer-list');
+    if (!list) return;
+    
+    if (!db.ledgers) db.ledgers = {};
+    const names = Object.keys(db.ledgers);
+    list.innerHTML = names.map(name => `<option value="${name}">`).join('');
+}
+
+// ========================================
+// 11. LIVE STOCK VIEW
+// ========================================
+function showLiveStock(itemName) {
+    const statusDiv = document.getElementById('stock-status');
+    if (!itemName || itemName.trim() === '') {
+        statusDiv.innerHTML = '';
+        return;
+    }
+
+    const tin = db.in.filter(x => x.item === itemName).reduce((s, x) => s + (x.qty || 0), 0);
+    const tout = db.out.filter(x => x.item === itemName).reduce((s, x) => s + (x.qty || 0), 0);
+    const balance = tin - tout;
+
+    if (balance > 10) {
+        statusDiv.innerHTML = `<span style="color:#27ae60; font-weight:700;">✅ Available: ${balance} (In Stock)</span>`;
+    } else if (balance > 0) {
+        statusDiv.innerHTML = `<span style="color:#f39c12; font-weight:700;">⚠️ Available: ${balance} (Low Stock)</span>`;
+    } else if (balance <= 0 && tin > 0) {
+        statusDiv.innerHTML = `<span style="color:#e74c3c; font-weight:700;">❌ Out of Stock! (Balance: ${balance})</span>`;
     } else {
-        sb.style.left = '0px';
-        mc.style.marginLeft = '280px';
-        sb.classList.add('open');
+        statusDiv.innerHTML = `<span style="color:#7f8c8d;">ℹ️ No record found for this item.</span>`;
     }
 }
 
 // ========================================
-// 8. PAGE SWITCHING
-// ========================================
-function switchPage(pageId, title) {
-    document.querySelectorAll('.erp-page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.erp-page').forEach(p => p.style.display = 'none');
-    
-    const page = document.getElementById(pageId);
-    if (page) {
-        page.style.display = 'block';
-        page.classList.add('active');
-    }
-    
-    document.getElementById('page-title').textContent = `KRT TRADERS ERP - ${title}`;
-
-    // Auto close sidebar on mobile
-    if (window.innerWidth <= 992) {
-        const sb = document.getElementById('sidebar');
-        const mc = document.getElementById('main-content');
-        sb.style.left = '-300px';
-        mc.style.marginLeft = '0';
-        sb.classList.remove('open');
-    }
-
-    // Refresh specific pages
-    if (pageId === 'page-balance') renderBalanceTable();
-    if (pageId === 'page-dashboard') updateDashboard();
-}
-
-// ========================================
-// 9. STOCK IN FUNCTION
+// 12. STOCK IN FUNCTION
 // ========================================
 async function addIn() {
     const date = document.getElementById('in-date').value;
@@ -279,7 +515,7 @@ async function addIn() {
 }
 
 // ========================================
-// 10. STOCK OUT FUNCTION
+// 13. STOCK OUT FUNCTION
 // ========================================
 async function addOut() {
     const date = document.getElementById('out-date').value;
@@ -296,8 +532,8 @@ async function addOut() {
     }
 
     // Stock check
-    const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
-    const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
+    const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + (x.qty || 0), 0);
+    const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + (x.qty || 0), 0);
     const available = tin - tout;
 
     if (qty > available) {
@@ -354,185 +590,7 @@ async function addOut() {
 }
 
 // ========================================
-// 11. LIVE STOCK VIEW
-// ========================================
-function showLiveStock(itemName) {
-    const statusDiv = document.getElementById('stock-status');
-    if (!itemName || itemName.trim() === '') {
-        statusDiv.innerHTML = '';
-        return;
-    }
-
-    const tin = db.in.filter(x => x.item === itemName).reduce((s, x) => s + x.qty, 0);
-    const tout = db.out.filter(x => x.item === itemName).reduce((s, x) => s + x.qty, 0);
-    const balance = tin - tout;
-
-    if (balance > 10) {
-        statusDiv.innerHTML = `<span style="color:#27ae60; font-weight:700;">✅ Available: ${balance} (In Stock)</span>`;
-    } else if (balance > 0) {
-        statusDiv.innerHTML = `<span style="color:#f39c12; font-weight:700;">⚠️ Available: ${balance} (Low Stock)</span>`;
-    } else if (balance <= 0 && tin > 0) {
-        statusDiv.innerHTML = `<span style="color:#e74c3c; font-weight:700;">❌ Out of Stock! (Balance: ${balance})</span>`;
-    } else {
-        statusDiv.innerHTML = `<span style="color:#7f8c8d;">ℹ️ No record found for this item.</span>`;
-    }
-}
-
-// ========================================
-// 12. UPDATE ITEM LISTS
-// ========================================
-function updateItemLists() {
-    const list = document.getElementById('items-list');
-    if (!list) return;
-    const allItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
-    list.innerHTML = allItems.map(name => `<option value="${name}">`).join('');
-}
-
-// ========================================
-// 13. RENDER ALL FUNCTION
-// ========================================
-function renderAll() {
-    const today = new Date().toISOString().split('T')[0];
-
-    // Today's Stock IN
-    const inBody = document.getElementById('today-list-in');
-    if (inBody) {
-        let html = '';
-        let counter = 1;
-        db.in.filter(x => x.date === today).forEach((x, index) => {
-            html += `
-                <tr>
-                    <td>${counter++}</td>
-                    <td>${x.item}</td>
-                    <td>${x.vendor || ''}</td>
-                    <td>${x.qty}</td>
-                    <td>${x.price.toLocaleString()}</td>
-                    <td>${(x.qty * x.price).toLocaleString()}</td>
-                    <td>
-                        <button onclick="deleteEntry('in', ${index})" class="btn btn-red btn-sm">Del</button>
-                    </td>
-                </tr>
-            `;
-        });
-        inBody.innerHTML = html || `<tr><td colspan="7" style="text-align:center; color:#7f8c8d;">Aaj ki koi entry nahi hai...</td></tr>`;
-    }
-
-    // Today's Stock OUT
-    const outBody = document.getElementById('today-list-out');
-    if (outBody) {
-        let html = '';
-        let counter = 1;
-        db.out.filter(x => x.date === today).forEach((x, index) => {
-            html += `
-                <tr>
-                    <td>${counter++}</td>
-                    <td>${x.date}</td>
-                    <td>${x.cust || ''}</td>
-                    <td>${x.phone || ''}</td>
-                    <td>${x.item}</td>
-                    <td>${x.qty}</td>
-                    <td>${x.price.toLocaleString()}</td>
-                    <td>${(x.qty * x.price).toLocaleString()}</td>
-                    <td>
-                        <button onclick="deleteEntry('out', ${index})" class="btn btn-red btn-sm">Del</button>
-                    </td>
-                </tr>
-            `;
-        });
-        outBody.innerHTML = html || `<tr><td colspan="9" style="text-align:center; color:#7f8c8d;">Aaj ki koi sale nahi hai...</td></tr>`;
-    }
-
-    // Update dropdowns
-    updateItemLists();
-    updateCustomerDropdown();
-
-    // Update dashboard
-    updateDashboard();
-
-    // Update balance table if visible
-    if (document.getElementById('page-balance').classList.contains('active')) {
-        renderBalanceTable();
-    }
-}
-
-// ========================================
-// 14. BALANCE TABLE
-// ========================================
-function renderBalanceTable() {
-    const tbody = document.getElementById('table-balance-body');
-    if (!tbody) return;
-
-    const uniqueItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
-    
-    tbody.innerHTML = uniqueItems.map(name => {
-        if (!name) return '';
-        const tin = db.in.filter(x => x.item === name).reduce((s, x) => s + x.qty, 0);
-        const tout = db.out.filter(x => x.item === name).reduce((s, x) => s + x.qty, 0);
-        const pPrice = db.in.find(x => x.item === name)?.price || 0;
-        const sPrice = db.out.find(x => x.item === name)?.price || 0;
-        const remaining = tin - tout;
-
-        let status = '';
-        if (remaining > 10) status = '<span class="stock-indicator high">High</span>';
-        else if (remaining > 0) status = '<span class="stock-indicator medium">Medium</span>';
-        else if (remaining <= 0 && tin > 0) status = '<span class="stock-indicator low">Low</span>';
-        else status = '<span class="stock-indicator">New</span>';
-
-        return `
-            <tr>
-                <td>${db.in.find(x => x.item === name)?.barcode || 'N/A'}</td>
-                <td><strong>${name}</strong></td>
-                <td>${tin}</td>
-                <td>${tout}</td>
-                <td><strong>${remaining}</strong></td>
-                <td>${status}</td>
-                <td style="color:${(sPrice - pPrice) * tout > 0 ? '#27ae60' : '#e74c3c'};">${((sPrice - pPrice) * tout).toLocaleString()}</td>
-            </tr>
-        `;
-    }).join('') || `<tr><td colspan="7" style="text-align:center; color:#7f8c8d;">No items found.</td></tr>`;
-}
-
-// ========================================
-// 15. DASHBOARD UPDATE
-// ========================================
-function updateDashboard() {
-    const totalItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])].length;
-    const totalIn = db.in.reduce((s, x) => s + x.qty, 0);
-    const totalOut = db.out.reduce((s, x) => s + x.qty, 0);
-
-    let totalProfit = 0;
-    const items = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
-    items.forEach(name => {
-        const pPrice = db.in.find(x => x.item === name)?.price || 0;
-        const outData = db.out.filter(x => x.item === name);
-        outData.forEach(x => {
-            totalProfit += (x.price - pPrice) * x.qty;
-        });
-    });
-
-    document.getElementById('total-items').textContent = totalItems;
-    document.getElementById('total-in').textContent = totalIn;
-    document.getElementById('total-out').textContent = totalOut;
-    document.getElementById('total-profit').textContent = `PKR ${totalProfit.toLocaleString()}`;
-
-    // Recent entries
-    const inBody = document.getElementById('dashboard-in');
-    if (inBody) {
-        inBody.innerHTML = db.in.slice(-5).reverse().map(x => `
-            <tr><td>${x.item}</td><td>${x.qty}</td><td>${x.vendor || ''}</td><td>${x.date}</td></tr>
-        `).join('');
-    }
-
-    const outBody = document.getElementById('dashboard-out');
-    if (outBody) {
-        outBody.innerHTML = db.out.slice(-5).reverse().map(x => `
-            <tr><td>${x.item}</td><td>${x.qty}</td><td>${x.cust || ''}</td><td>${x.date}</td></tr>
-        `).join('');
-    }
-}
-
-// ========================================
-// 16. DELETE ENTRY (Cloud + Local)
+// 14. DELETE ENTRY
 // ========================================
 async function deleteEntry(type, index) {
     if (!confirm('Bilal Bhai, kya aap waqai ye record delete karna chahte hain?')) return;
@@ -557,7 +615,7 @@ async function deleteEntry(type, index) {
 }
 
 // ========================================
-// 17. REPORTS
+// 15. REPORTS
 // ========================================
 function generateCustomReport() {
     const from = document.getElementById('rep-from-date').value;
@@ -575,34 +633,42 @@ function generateCustomReport() {
 
     const inBody = document.querySelector('#rep-in-table tbody');
     if (inBody) {
-        inBody.innerHTML = filteredIn.map(x => `
-            <tr>
-                <td>${x.date}</td>
-                <td>${x.item}</td>
-                <td>${x.vendor || ''}</td>
-                <td>${x.qty}</td>
-                <td>${x.price.toLocaleString()}</td>
-                <td>${(x.qty * x.price).toLocaleString()}</td>
-            </tr>
-        `).join('') || `<tr><td colspan="6" style="text-align:center; color:#7f8c8d;">No records</td></tr>`;
+        if (filteredIn.length === 0) {
+            inBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#7f8c8d; padding:20px;">📭 No records found</td></tr>`;
+        } else {
+            inBody.innerHTML = filteredIn.map(x => `
+                <tr>
+                    <td>${x.date}</td>
+                    <td>${x.item}</td>
+                    <td>${x.vendor || ''}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price ? x.price.toLocaleString() : '0'}</td>
+                    <td>${x.total ? x.total.toLocaleString() : '0'}</td>
+                </tr>
+            `).join('');
+        }
     }
 
     const outBody = document.querySelector('#rep-out-table tbody');
     if (outBody) {
-        outBody.innerHTML = filteredOut.map(x => `
-            <tr>
-                <td>${x.date}</td>
-                <td>${x.item}</td>
-                <td>${x.cust || ''}</td>
-                <td>${x.qty}</td>
-                <td>${x.price.toLocaleString()}</td>
-                <td>${(x.qty * x.price).toLocaleString()}</td>
-            </tr>
-        `).join('') || `<tr><td colspan="6" style="text-align:center; color:#7f8c8d;">No records</td></tr>`;
+        if (filteredOut.length === 0) {
+            outBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#7f8c8d; padding:20px;">📭 No records found</td></tr>`;
+        } else {
+            outBody.innerHTML = filteredOut.map(x => `
+                <tr>
+                    <td>${x.date}</td>
+                    <td>${x.item}</td>
+                    <td>${x.cust || ''}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price ? x.price.toLocaleString() : '0'}</td>
+                    <td>${x.total ? x.total.toLocaleString() : '0'}</td>
+                </tr>
+            `).join('');
+        }
     }
 
-    const totalIn = filteredIn.reduce((s, x) => s + (x.qty * x.price), 0);
-    const totalOut = filteredOut.reduce((s, x) => s + (x.qty * x.price), 0);
+    const totalIn = filteredIn.reduce((s, x) => s + (x.total || 0), 0);
+    const totalOut = filteredOut.reduce((s, x) => s + (x.total || 0), 0);
 
     document.getElementById('sum-in').textContent = `PKR ${totalIn.toLocaleString()}`;
     document.getElementById('sum-out').textContent = `PKR ${totalOut.toLocaleString()}`;
@@ -610,7 +676,7 @@ function generateCustomReport() {
 }
 
 // ========================================
-// 18. MASTER SEARCH
+// 16. MASTER SEARCH
 // ========================================
 function generateMasterSearch() {
     const from = document.getElementById('master-from').value;
@@ -626,49 +692,57 @@ function generateMasterSearch() {
 
     const inBody = document.querySelector('#master-in-table tbody');
     if (inBody) {
-        inBody.innerHTML = filteredIn.map((x, idx) => {
-            const originalIndex = db.in.indexOf(x);
-            return `
-                <tr>
-                    <td>${x.date}</td>
-                    <td>${x.item}</td>
-                    <td>${x.vendor || ''}</td>
-                    <td>${x.qty}</td>
-                    <td>${x.price.toLocaleString()}</td>
-                    <td>${(x.qty * x.price).toLocaleString()}</td>
-                    <td>
-                        <button onclick="editEntry('in', ${originalIndex})" class="btn btn-blue btn-sm">Edit</button>
-                        <button onclick="deleteEntry('in', ${originalIndex})" class="btn btn-red btn-sm">Del</button>
-                    </td>
-                </tr>
-            `;
-        }).join('') || `<tr><td colspan="7" style="text-align:center; color:#7f8c8d;">No records</td></tr>`;
+        if (filteredIn.length === 0) {
+            inBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#7f8c8d; padding:20px;">📭 No records found</td></tr>`;
+        } else {
+            inBody.innerHTML = filteredIn.map((x) => {
+                const originalIndex = db.in.indexOf(x);
+                return `
+                    <tr>
+                        <td>${x.date}</td>
+                        <td>${x.item}</td>
+                        <td>${x.vendor || ''}</td>
+                        <td>${x.qty}</td>
+                        <td>${x.price ? x.price.toLocaleString() : '0'}</td>
+                        <td>${x.total ? x.total.toLocaleString() : '0'}</td>
+                        <td>
+                            <button onclick="editEntry('in', ${originalIndex})" class="btn btn-blue btn-sm">Edit</button>
+                            <button onclick="deleteEntry('in', ${originalIndex})" class="btn btn-red btn-sm">Del</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
     }
 
     const outBody = document.querySelector('#master-out-table tbody');
     if (outBody) {
-        outBody.innerHTML = filteredOut.map((x, idx) => {
-            const originalIndex = db.out.indexOf(x);
-            return `
-                <tr>
-                    <td>${x.date}</td>
-                    <td>${x.item}</td>
-                    <td>${x.cust || ''}</td>
-                    <td>${x.qty}</td>
-                    <td>${x.price.toLocaleString()}</td>
-                    <td>${(x.qty * x.price).toLocaleString()}</td>
-                    <td>
-                        <button onclick="editEntry('out', ${originalIndex})" class="btn btn-blue btn-sm">Edit</button>
-                        <button onclick="deleteEntry('out', ${originalIndex})" class="btn btn-red btn-sm">Del</button>
-                    </td>
-                </tr>
-            `;
-        }).join('') || `<tr><td colspan="7" style="text-align:center; color:#7f8c8d;">No records</td></tr>`;
+        if (filteredOut.length === 0) {
+            outBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#7f8c8d; padding:20px;">📭 No records found</td></tr>`;
+        } else {
+            outBody.innerHTML = filteredOut.map((x) => {
+                const originalIndex = db.out.indexOf(x);
+                return `
+                    <tr>
+                        <td>${x.date}</td>
+                        <td>${x.item}</td>
+                        <td>${x.cust || ''}</td>
+                        <td>${x.qty}</td>
+                        <td>${x.price ? x.price.toLocaleString() : '0'}</td>
+                        <td>${x.total ? x.total.toLocaleString() : '0'}</td>
+                        <td>
+                            <button onclick="editEntry('out', ${originalIndex})" class="btn btn-blue btn-sm">Edit</button>
+                            <button onclick="deleteEntry('out', ${originalIndex})" class="btn btn-red btn-sm">Del</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
     }
 }
 
 // ========================================
-// 19. EDIT ENTRY
+// 17. EDIT ENTRY
 // ========================================
 async function editEntry(type, index) {
     const data = db[type][index];
@@ -703,7 +777,7 @@ async function editEntry(type, index) {
 }
 
 // ========================================
-// 20. BILLING SYSTEM
+// 18. BILLING SYSTEM
 // ========================================
 function addBillRow() {
     const tbody = document.getElementById('bill-items-body');
@@ -803,7 +877,6 @@ function saveBill() {
         grandTotal: items.reduce((s, x) => s + x.total, 0)
     };
 
-    // Save bill to local storage
     const bills = JSON.parse(localStorage.getItem('krt_bills')) || [];
     bills.push(billData);
     localStorage.setItem('krt_bills', JSON.stringify(bills));
@@ -833,7 +906,7 @@ function clearBill() {
 }
 
 // ========================================
-// 21. CUSTOMER LEDGERS
+// 19. CUSTOMER LEDGERS
 // ========================================
 function saveLedgerEntry() {
     const name = document.getElementById('ledger-cust-name').value.trim();
@@ -955,16 +1028,8 @@ function editLedger(custName, index) {
     showToast('Updated!', 'success');
 }
 
-function updateCustomerDropdown() {
-    const list = document.getElementById('customer-list');
-    if (!list) return;
-    if (!db.ledgers) db.ledgers = {};
-    const names = Object.keys(db.ledgers);
-    list.innerHTML = names.map(name => `<option value="${name}">`).join('');
-}
-
 // ========================================
-// 22. RENT BOOK
+// 20. RENT BOOK
 // ========================================
 function addRentEntry() {
     const name = document.getElementById('rent-name').value.trim();
@@ -1020,7 +1085,7 @@ function renderRentTable() {
             `;
         });
     } else {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#7f8c8d;">Naya Customer hai ya naam sahi nahi likha...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#7f8c8d; padding:20px;">📭 Naya Customer hai ya naam sahi nahi likha...</td></tr>`;
     }
 
     document.getElementById('rent-total-debit').textContent = tDebit.toLocaleString();
@@ -1038,7 +1103,7 @@ function deleteRent(index) {
 }
 
 // ========================================
-// 23. MULTI-USER MANAGEMENT
+// 21. MULTI-USER MANAGEMENT
 // ========================================
 function createNewUser() {
     const name = document.getElementById('new-username').value.trim();
@@ -1093,7 +1158,212 @@ function deleteExtraUser(index) {
 }
 
 // ========================================
-// 24. CLOUD SYNC
+// 22. TOAST NOTIFICATION
+// ========================================
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    
+    toast.textContent = message;
+    toast.className = `toast ${type}`;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
+}
+
+// ========================================
+// 23. CLOCK UPDATE
+// ========================================
+function updateClock() {
+    const now = new Date();
+    const clock = document.getElementById('clock-display');
+    if (clock) {
+        clock.textContent = now.toLocaleString('en-PK', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+    }
+}
+setInterval(updateClock, 1000);
+
+// ========================================
+// 24. LOGIN SYSTEM
+// ========================================
+function login() {
+    const userField = document.getElementById('user');
+    const passField = document.getElementById('pass');
+    const errorMsg = document.getElementById('login-error');
+
+    if (!userField || !passField) return;
+
+    const u = userField.value.trim().toLowerCase();
+    const p = passField.value.trim();
+
+    errorMsg.style.display = 'none';
+
+    // Admin
+    if (u === 'admin' && p === '123') {
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userRole', 'admin');
+        showSystem('admin');
+        showToast('Welcome Admin!', 'success');
+        return;
+    }
+
+    // Staff
+    if (u === 'ali' && p === '123') {
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userRole', 'staff');
+        showSystem('staff');
+        showToast('Welcome Staff!', 'success');
+        return;
+    }
+
+    // Manager
+    if (u === 'sattar' && p === '123') {
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userRole', 'manager');
+        showSystem('manager');
+        showToast('Welcome Manager!', 'success');
+        return;
+    }
+
+    // Extra Users
+    const found = extraUsers.find(user => user.id === u && user.pass === p);
+    if (found) {
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userRole', 'extra');
+        localStorage.setItem('extraUser', JSON.stringify(found));
+        showSystem(found);
+        showToast(`Welcome ${found.name}!`, 'success');
+        return;
+    }
+
+    errorMsg.style.display = 'block';
+}
+
+function showSystem(roleOrUser) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('sidebar').style.display = 'block';
+    document.getElementById('main-content').style.display = 'block';
+    document.getElementById('toggle-btn').style.display = 'block';
+
+    // Apply permissions
+    if (typeof roleOrUser === 'object') {
+        applyDynamicPermissions(roleOrUser);
+    } else {
+        const menuItems = document.querySelectorAll('#sidebar ul li');
+        menuItems.forEach(item => item.style.display = 'flex');
+
+        if (roleOrUser === 'staff') {
+            menuItems.forEach(item => {
+                const text = item.innerText;
+                if (!text.includes('Dashboard') && !text.includes('Stock IN') && 
+                    !text.includes('Stock OUT') && !text.includes('Stock Balance')) {
+                    item.style.display = 'none';
+                }
+            });
+            switchPage('page-dashboard', 'DASHBOARD');
+        } else if (roleOrUser === 'manager') {
+            menuItems.forEach(item => {
+                const text = item.innerText;
+                if (!text.includes('Dashboard') && !text.includes('Customer Ledgers') && 
+                    !text.includes('RENT BOOK') && !text.includes('Stock Balance')) {
+                    item.style.display = 'none';
+                }
+            });
+            switchPage('page-customer-ledgers', 'LEDGERS');
+        }
+    }
+
+    // Load data and render
+    loadAllData();
+    renderAll();
+    loadUserTable();
+    renderRentTable();
+}
+
+function applyDynamicPermissions(user) {
+    const menuItems = document.querySelectorAll('#sidebar ul li');
+    menuItems.forEach(item => {
+        const onclickAttr = item.getAttribute('onclick') || '';
+        
+        if (onclickAttr.includes('page-dashboard')) {
+            item.style.display = 'flex';
+            return;
+        }
+
+        const isAllowed = user.perms.some(p => onclickAttr.includes(p));
+        item.style.display = isAllowed ? 'flex' : 'none';
+    });
+    renderAll();
+}
+
+// ========================================
+// 25. LOGOUT
+// ========================================
+function logout() {
+    if (confirm('Bilal Bhai, kya aap waqai logout karna chahte hain?')) {
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('extraUser');
+        location.reload();
+    }
+}
+
+// ========================================
+// 26. SIDEBAR TOGGLE
+// ========================================
+function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    const mc = document.getElementById('main-content');
+
+    if (sb.style.left === '0px' || sb.style.left === '') {
+        sb.style.left = '-300px';
+        mc.style.marginLeft = '0';
+        sb.classList.remove('open');
+    } else {
+        sb.style.left = '0px';
+        mc.style.marginLeft = '280px';
+        sb.classList.add('open');
+    }
+}
+
+// ========================================
+// 27. PAGE SWITCHING
+// ========================================
+function switchPage(pageId, title) {
+    document.querySelectorAll('.erp-page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.erp-page').forEach(p => p.style.display = 'none');
+    
+    const page = document.getElementById(pageId);
+    if (page) {
+        page.style.display = 'block';
+        page.classList.add('active');
+    }
+    
+    document.getElementById('page-title').textContent = `KRT TRADERS ERP - ${title}`;
+
+    // Auto close sidebar on mobile
+    if (window.innerWidth <= 992) {
+        const sb = document.getElementById('sidebar');
+        const mc = document.getElementById('main-content');
+        sb.style.left = '-300px';
+        mc.style.marginLeft = '0';
+        sb.classList.remove('open');
+    }
+
+    // Refresh specific pages
+    if (pageId === 'page-balance') renderBalanceTable();
+    if (pageId === 'page-dashboard') updateDashboard();
+}
+
+// ========================================
+// 28. CLOUD SYNC
 // ========================================
 async function fetchCloudData() {
     try {
@@ -1207,7 +1477,7 @@ async function syncAllCloudData() {
 }
 
 // ========================================
-// 25. BACKUP FUNCTIONS
+// 29. BACKUP FUNCTIONS
 // ========================================
 function exportBackup() {
     const data = {
@@ -1275,79 +1545,102 @@ function clearAllData() {
     }
 }
 
+function addSampleData() {
+    if (confirm('Sample data add karein? (Existing data delete nahi hoga)')) {
+        const today = new Date().toISOString().split('T')[0];
+        
+        const sampleIn = [
+            { date: today, vendor: 'Al-Noor Traders', item: 'Cement', barcode: 'CEM001', qty: 100, price: 1200, total: 120000 },
+            { date: today, vendor: 'Al-Hassan Builders', item: 'Steel Bar 12mm', barcode: 'STL012', qty: 50, price: 8500, total: 425000 },
+            { date: today, vendor: 'Lahore Traders', item: 'Paint White', barcode: 'PNT001', qty: 30, price: 2500, total: 75000 }
+        ];
+        
+        const sampleOut = [
+            { date: today, cust: 'Bilal Suleman', phone: '0300-1234567', item: 'Cement', barcode: 'CEM001', qty: 20, price: 1500, total: 30000 },
+            { date: today, cust: 'Ahmed Traders', phone: '0300-7654321', item: 'Steel Bar 12mm', barcode: 'STL012', qty: 10, price: 9500, total: 95000 }
+        ];
+
+        sampleIn.forEach(x => {
+            db.in.push({ id: Date.now() + Math.random(), ...x });
+        });
+        
+        sampleOut.forEach(x => {
+            db.out.push({ id: Date.now() + Math.random(), ...x });
+        });
+
+        saveAndRefresh();
+        showToast('Sample data added successfully!', 'success');
+    }
+}
+
 // ========================================
-// 26. PRINT SECTION
+// 30. PRINT SECTION
 // ========================================
 function printSection() {
     window.print();
 }
 
 // ========================================
-// 27. SAVE AND REFRESH
+// 31. INITIALIZATION - FIXED
 // ========================================
-function saveAndRefresh() {
-    localStorage.setItem('krt_erp_data', JSON.stringify(db));
-    renderAll();
-}
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 KRT ERP Initializing...');
+    
+    // Load data first
+    loadAllData();
+    
+    // Set default dates
+    const today = new Date().toISOString().split('T')[0];
+    ['in-date', 'out-date', 'led-date', 'rent-date', 'bill-date'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = today;
+    });
 
-// ========================================
-// 28. INITIALIZATION
-// ========================================
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        renderAll();
-        loadUserTable();
-        renderRentTable();
+    // Check login state
+    const isLoggedIn = localStorage.getItem('isLoggedIn');
+    const role = localStorage.getItem('userRole');
 
-        // Set default dates
-        const today = new Date().toISOString().split('T')[0];
-        ['in-date', 'out-date', 'led-date', 'rent-date', 'bill-date'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = today;
-        });
-
-        // Auto sync from cloud
-        if (navigator.onLine) {
-            await syncAllCloudData();
-        }
-
-        // Check login state
-        const isLoggedIn = localStorage.getItem('isLoggedIn');
-        const role = localStorage.getItem('userRole');
-
-        if (isLoggedIn === 'true') {
-            if (role === 'admin') showSystem('admin');
-            else if (role === 'staff') showSystem('staff');
-            else if (role === 'manager') showSystem('manager');
-            else {
-                const userData = localStorage.getItem('extraUser');
-                if (userData) showSystem(JSON.parse(userData));
+    if (isLoggedIn === 'true') {
+        if (role === 'admin') {
+            showSystem('admin');
+        } else if (role === 'staff') {
+            showSystem('staff');
+        } else if (role === 'manager') {
+            showSystem('manager');
+        } else {
+            const userData = localStorage.getItem('extraUser');
+            if (userData) {
+                try {
+                    showSystem(JSON.parse(userData));
+                } catch (e) {
+                    showSystem('admin');
+                }
+            } else {
+                showSystem('admin');
             }
         }
-
-        // Initialize bill
-        document.getElementById('bill-number').textContent = `KRT-${new Date().getFullYear()}-${String(billCounter).padStart(3, '0')}`;
-
-    } catch (err) {
-        console.error('Startup Error:', err);
     }
-});
 
-// Rent name input live search
-document.addEventListener('DOMContentLoaded', () => {
+    // Initialize bill number
+    const billNumber = document.getElementById('bill-number');
+    if (billNumber) {
+        billNumber.textContent = `KRT-${new Date().getFullYear()}-${String(billCounter).padStart(3, '0')}`;
+    }
+
+    // Rent name input live search
     const rentName = document.getElementById('rent-name');
     if (rentName) {
         rentName.addEventListener('input', renderRentTable);
     }
+
+    console.log('✅ KRT ERP Initialized Successfully!');
+    console.log(`📊 Total IN: ${db.in.length}, Total OUT: ${db.out.length}`);
 });
 
 // ========================================
-// 29. EXTRA: Supabase Table Creation Helper
+// 32. SUPABASE TABLE SCHEMA
 // ========================================
 /*
-To create tables in Supabase:
-
-1. KRT Table:
 CREATE TABLE KRT (
     id BIGSERIAL PRIMARY KEY,
     Date DATE,
@@ -1362,7 +1655,6 @@ CREATE TABLE KRT (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-2. KRT_RENT Table:
 CREATE TABLE KRT_RENT (
     id BIGSERIAL PRIMARY KEY,
     name TEXT,
