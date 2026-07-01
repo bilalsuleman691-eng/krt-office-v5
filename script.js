@@ -1,5 +1,5 @@
 // ==========================================
-// KRT TRADERS ERP - COMPLETE SCRIPT
+// KRT TRADERS ERP - COMPLETE FIXED
 // Developed by Bilal Suleman
 // Version: 5.0
 // ==========================================
@@ -14,9 +14,54 @@ const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 // ==========================================
 // GLOBAL DATABASE OBJECTS
 // ==========================================
-let db = JSON.parse(localStorage.getItem('krt_erp_data')) || { in: [], out: [], ledgers: {}, opening_balances: {} };
-let dbRent = JSON.parse(localStorage.getItem('krt_rent_data')) || [];
-let extraUsers = JSON.parse(localStorage.getItem('krt_extra_users')) || [];
+let db = { in: [], out: [], ledgers: {}, opening_balances: {} };
+let dbRent = [];
+let extraUsers = [];
+
+// ==========================================
+// LOAD DATA FROM LOCALSTORAGE ON STARTUP
+// ==========================================
+function loadLocalData() {
+    const saved = localStorage.getItem('krt_erp_data');
+    if (saved) {
+        try {
+            db = JSON.parse(saved);
+            console.log("📦 Local data loaded:", db.in.length, "IN,", db.out.length, "OUT");
+        } catch(e) {
+            console.error("Local data parse error:", e);
+            db = { in: [], out: [], ledgers: {}, opening_balances: {} };
+        }
+    } else {
+        db = { in: [], out: [], ledgers: {}, opening_balances: {} };
+    }
+    
+    const rentSaved = localStorage.getItem('krt_rent_data');
+    if (rentSaved) {
+        try {
+            dbRent = JSON.parse(rentSaved);
+        } catch(e) {
+            dbRent = [];
+        }
+    } else {
+        dbRent = [];
+    }
+    
+    const usersSaved = localStorage.getItem('krt_extra_users');
+    if (usersSaved) {
+        try {
+            extraUsers = JSON.parse(usersSaved);
+        } catch(e) {
+            extraUsers = [];
+        }
+    } else {
+        extraUsers = [];
+    }
+}
+
+// ==========================================
+// CALL ON STARTUP
+// ==========================================
+loadLocalData();
 
 // ==========================================
 // IDLE SCREEN SYSTEM
@@ -195,11 +240,11 @@ function applyDynamicPermissions(user) {
 }
 
 // ==========================================
-// CLOUD DATA - FIXED (No Barcode)
+// CLOUD DATA - FIXED
 // ==========================================
 async function fetchCloudData() {
     try {
-        console.log("🔄 Fetching data from Supabase...");
+        console.log("🔄 Fetching from Supabase...");
         const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
         
         if (error) { 
@@ -208,12 +253,13 @@ async function fetchCloudData() {
         }
         
         if (!data || data.length === 0) {
-            console.log("⚠️ No data found in Supabase");
+            console.log("⚠️ No data in Supabase");
             return false;
         }
         
         console.log("📦 Data received:", data.length, "records");
         
+        // Clear existing
         db.in = [];
         db.out = [];
         
@@ -248,8 +294,9 @@ async function fetchCloudData() {
             }
         });
         
+        // SAVE TO LOCALSTORAGE
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
-        console.log("✅ Data loaded:", db.in.length, "IN,", db.out.length, "OUT");
+        console.log("✅ Data saved to localStorage:", db.in.length, "IN,", db.out.length, "OUT");
         return true;
     } catch (err) { 
         console.error("❌ Fetch Error:", err); 
@@ -291,20 +338,16 @@ async function syncAllCloudData() {
     showNotification("☁️ Syncing...", "info");
     
     try {
-        const stockSynced = await fetchCloudData();
-        const rentSynced = await fetchCloudRentData();
+        await fetchCloudData();
+        await fetchCloudRentData();
         
-        if (stockSynced || rentSynced) {
-            renderAll();
-            updateDashboardStats();
-            updateItemLists();
-            updateCustomerDropdown();
-            loadUserTable();
-            renderRentTable();
-            showNotification("✅ Sync complete!", "success");
-        } else {
-            showNotification("ℹ️ No new data found.", "info");
-        }
+        renderAll();
+        updateDashboardStats();
+        updateItemLists();
+        updateCustomerDropdown();
+        loadUserTable();
+        renderRentTable();
+        showNotification("✅ Sync complete!", "success");
     } catch (err) {
         showNotification("❌ Sync failed: " + err.message, "error");
     }
@@ -326,7 +369,7 @@ function showNotification(message, type = "info") {
 }
 
 // ==========================================
-// STOCK IN - FIXED (Only Date, Item, Qty required)
+// STOCK IN - FIXED
 // ==========================================
 async function addIn() {
     const date = document.getElementById('in-date').value;
@@ -335,19 +378,9 @@ async function addIn() {
     const qty = Number(document.getElementById('in-qty').value);
     const price = Number(document.getElementById('in-price').value) || 0;
     
-    // ONLY validate: date, item, qty
-    if (!date) { 
-        showNotification("⚠️ Please select Date!", "warning"); 
-        return; 
-    }
-    if (!item) { 
-        showNotification("⚠️ Please enter Item Name!", "warning"); 
-        return; 
-    }
-    if (!qty || qty <= 0) { 
-        showNotification("⚠️ Please enter valid Quantity!", "warning"); 
-        return; 
-    }
+    if (!date) { showNotification("⚠️ Please select Date!", "warning"); return; }
+    if (!item) { showNotification("⚠️ Please enter Item Name!", "warning"); return; }
+    if (!qty || qty <= 0) { showNotification("⚠️ Please enter valid Quantity!", "warning"); return; }
     
     try {
         const { data, error } = await _supabase.from('KRT').insert([{ 
@@ -375,7 +408,12 @@ async function addIn() {
                 total: qty * price 
             });
             
-            saveAndRefresh();
+            // IMMEDIATELY SAVE TO LOCALSTORAGE
+            localStorage.setItem('krt_erp_data', JSON.stringify(db));
+            
+            renderAll();
+            updateDashboardStats();
+            updateItemLists();
             
             document.getElementById('in-item').value = "";
             document.getElementById('in-qty').value = "";
@@ -388,7 +426,7 @@ async function addIn() {
 }
 
 // ==========================================
-// STOCK OUT - FIXED (Only Date, Item, Qty required)
+// STOCK OUT - FIXED
 // ==========================================
 async function addOut() {
     const date = document.getElementById('out-date').value;
@@ -397,21 +435,10 @@ async function addOut() {
     const qty = Number(document.getElementById('out-qty').value);
     const price = Number(document.getElementById('out-price').value) || 0;
     
-    // ONLY validate: date, item, qty
-    if (!date) { 
-        showNotification("⚠️ Please select Date!", "warning"); 
-        return; 
-    }
-    if (!item) { 
-        showNotification("⚠️ Please enter Item Name!", "warning"); 
-        return; 
-    }
-    if (!qty || qty <= 0) { 
-        showNotification("⚠️ Please enter valid Quantity!", "warning"); 
-        return; 
-    }
+    if (!date) { showNotification("⚠️ Please select Date!", "warning"); return; }
+    if (!item) { showNotification("⚠️ Please enter Item Name!", "warning"); return; }
+    if (!qty || qty <= 0) { showNotification("⚠️ Please enter valid Quantity!", "warning"); return; }
     
-    // Check stock availability (warning only)
     const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const available = tin - tout;
@@ -448,7 +475,12 @@ async function addOut() {
                 total: qty * price 
             });
             
-            saveAndRefresh();
+            // IMMEDIATELY SAVE TO LOCALSTORAGE
+            localStorage.setItem('krt_erp_data', JSON.stringify(db));
+            
+            renderAll();
+            updateDashboardStats();
+            updateItemLists();
             
             document.getElementById('out-item').value = "";
             document.getElementById('out-qty').value = "";
@@ -488,7 +520,7 @@ function showLiveStock(itemName) {
 }
 
 // ==========================================
-// RENDER ALL
+// RENDER ALL - FIXED
 // ==========================================
 function renderAll() {
     const today = new Date().toISOString().split('T')[0];
@@ -639,7 +671,9 @@ async function deleteEntry(type, index) {
     }
     
     db[type].splice(index, 1);
-    saveAndRefresh();
+    localStorage.setItem('krt_erp_data', JSON.stringify(db));
+    renderAll();
+    updateDashboardStats();
     showNotification("✅ Deleted!", "success");
 }
 
@@ -670,7 +704,9 @@ async function editEntry(type, index) {
         db[type][index].price = Number(newPrice) || 0;
         db[type][index].total = Number(newQty) * (Number(newPrice) || 0);
         
-        saveAndRefresh();
+        localStorage.setItem('krt_erp_data', JSON.stringify(db));
+        renderAll();
+        updateDashboardStats();
         generateMasterSearch();
         showNotification("✅ Updated!", "success");
     } catch (err) { 
@@ -846,14 +882,8 @@ function saveLedgerEntry() {
     const credit = parseFloat(document.getElementById('led-credit').value) || 0;
     const method = document.getElementById('led-method').value;
     
-    if (!name) { 
-        showNotification("⚠️ Customer Name required!", "warning"); 
-        return; 
-    }
-    if (!date) { 
-        showNotification("⚠️ Date required!", "warning"); 
-        return; 
-    }
+    if (!name) { showNotification("⚠️ Customer Name required!", "warning"); return; }
+    if (!date) { showNotification("⚠️ Date required!", "warning"); return; }
     
     if (!db.ledgers[name]) { 
         db.ledgers[name] = []; 
@@ -861,7 +891,7 @@ function saveLedgerEntry() {
     }
     
     db.ledgers[name].push({ date, item, ctn, debit, credit, method });
-    saveAndRefresh();
+    localStorage.setItem('krt_erp_data', JSON.stringify(db));
     updateCustomerDropdown();
     showLedger();
     
@@ -879,7 +909,7 @@ function updateOpeningBal() {
     
     if (name) { 
         db.opening_balances[name] = val; 
-        saveAndRefresh(); 
+        localStorage.setItem('krt_erp_data', JSON.stringify(db));
         showLedger(); 
     }
 }
@@ -941,7 +971,7 @@ function showLedger() {
 function delLedger(custName, index) {
     if (!confirm("⚠️ Delete this entry?")) return;
     db.ledgers[custName].splice(index, 1);
-    saveAndRefresh();
+    localStorage.setItem('krt_erp_data', JSON.stringify(db));
     showLedger();
     showNotification("✅ Deleted!", "success");
 }
@@ -954,7 +984,7 @@ function editLedger(custName, index) {
     if (nDebit !== null && nCredit !== null) {
         db.ledgers[custName][index].debit = Number(nDebit);
         db.ledgers[custName][index].credit = Number(nCredit);
-        saveAndRefresh();
+        localStorage.setItem('krt_erp_data', JSON.stringify(db));
         showLedger();
         showNotification("✅ Updated!", "success");
     }
@@ -972,14 +1002,8 @@ function addRentEntry() {
     const credit = parseFloat(document.getElementById('rent-credit').value) || 0;
     const method = document.getElementById('rent-method').value;
     
-    if (!name) { 
-        showNotification("⚠️ Name required!", "warning"); 
-        return; 
-    }
-    if (!date) { 
-        showNotification("⚠️ Date required!", "warning"); 
-        return; 
-    }
+    if (!name) { showNotification("⚠️ Name required!", "warning"); return; }
+    if (!date) { showNotification("⚠️ Date required!", "warning"); return; }
     
     dbRent.push({ name, shop, date, month, debit, credit, method });
     localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
@@ -1149,14 +1173,6 @@ function printSection() {
 }
 
 // ==========================================
-// SAVE AND REFRESH
-// ==========================================
-function saveAndRefresh() {
-    localStorage.setItem('krt_erp_data', JSON.stringify(db));
-    renderAll();
-}
-
-// ==========================================
 // UPDATE ITEM LISTS
 // ==========================================
 function updateItemLists() {
@@ -1168,24 +1184,31 @@ function updateItemLists() {
 }
 
 // ==========================================
-// APP STARTUP
+// APP STARTUP - FIXED
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("🚀 KRT ERP v5.0 Loading...");
     console.log("📦 Developed by Bilal Suleman");
     
+    // LOAD LOCAL DATA FIRST
+    loadLocalData();
+    
+    // RENDER IMMEDIATELY
     renderAll();
     renderRentTable();
     loadUserTable();
     updateCustomerDropdown();
     updateItemLists();
+    updateDashboardStats();
     
+    // THEN SYNC WITH CLOUD
     if (navigator.onLine) {
         await syncAllCloudData();
     } else {
         showNotification("⚠️ Offline mode", "warning");
     }
     
+    // CHECK LOGIN STATUS
     const loggedIn = localStorage.getItem('isLoggedIn');
     const role = localStorage.getItem('userRole');
     
