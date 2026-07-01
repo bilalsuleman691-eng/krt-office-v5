@@ -1,5 +1,5 @@
 // ================================================================
-// KRT TRADERS ERP - COMPLETE SYSTEM
+// KRT TRADERS ERP - COMPLETE WORKING
 // Developed by Bilal Suleman
 // ================================================================
 
@@ -18,13 +18,18 @@ let rentData = [];
 let users = [];
 
 // ================================================================
-// LOAD DATA
+// LOAD DATA FROM LOCALSTORAGE
 // ================================================================
 function loadData() {
     try {
         const saved = localStorage.getItem('krt_data');
-        if (saved) db = JSON.parse(saved);
-    } catch(e) { db = { in: [], out: [], ledgers: {}, opening_balances: {} }; }
+        if (saved) {
+            db = JSON.parse(saved);
+            console.log('✅ Local data loaded:', db.in.length, 'IN,', db.out.length, 'OUT');
+        }
+    } catch(e) {
+        db = { in: [], out: [], ledgers: {}, opening_balances: {} };
+    }
     
     try {
         const savedRent = localStorage.getItem('krt_rent');
@@ -41,6 +46,7 @@ function saveData() {
     localStorage.setItem('krt_data', JSON.stringify(db));
     localStorage.setItem('krt_rent', JSON.stringify(rentData));
     localStorage.setItem('krt_users', JSON.stringify(users));
+    console.log('💾 Data saved');
 }
 
 loadData();
@@ -67,48 +73,95 @@ function notify(msg, type) {
 }
 
 // ================================================================
-// SYNC FROM SUPABASE
+// SYNC FROM SUPABASE - FIXED
 // ================================================================
 async function syncData() {
-    if (!navigator.onLine) { notify('No internet!', 'warning'); return; }
-    notify('Syncing...', 'info');
+    if (!navigator.onLine) { 
+        notify('⚠️ No internet!', 'warning'); 
+        return; 
+    }
+    
+    notify('☁️ Syncing...', 'info');
+    console.log('🔄 Syncing from Supabase...');
     
     try {
-        // Stock data
+        // Fetch stock data
         const { data: stock, error: stockErr } = await supabase.from('KRT').select('*').order('id', { ascending: true });
-        if (stockErr) throw stockErr;
+        
+        if (stockErr) {
+            console.error('❌ Stock error:', stockErr);
+            throw stockErr;
+        }
         
         if (stock && stock.length > 0) {
+            console.log('📦 Stock records:', stock.length);
             db.in = [];
             db.out = [];
+            
             stock.forEach(row => {
                 const inQty = Number(row.stock_in || 0);
                 const outQty = Number(row.stock_out || 0);
                 const price = Number(row.price || 0);
                 const date = row.Date ? row.Date.split('T')[0] : today();
+                
                 if (inQty > 0) {
-                    db.in.push({ id: row.id, date, vendor: row.vendor_name || 'factory', item: row.item_name, qty: inQty, price, total: inQty * price });
+                    db.in.push({ 
+                        id: row.id, 
+                        date, 
+                        vendor: row.vendor_name || 'factory', 
+                        item: row.item_name, 
+                        qty: inQty, 
+                        price: price, 
+                        total: inQty * price 
+                    });
                 }
                 if (outQty > 0) {
-                    db.out.push({ id: row.id, date, cust: row.customer_name || 'General Sale', item: row.item_name, qty: outQty, price, total: outQty * price });
+                    db.out.push({ 
+                        id: row.id, 
+                        date, 
+                        cust: row.customer_name || 'General Sale', 
+                        item: row.item_name, 
+                        qty: outQty, 
+                        price: price, 
+                        total: outQty * price 
+                    });
                 }
             });
+            
             saveData();
+            console.log('✅ Stock loaded:', db.in.length, 'IN,', db.out.length, 'OUT');
+        } else {
+            console.log('⚠️ No stock data in Supabase');
         }
         
-        // Rent data
+        // Fetch rent data
         try {
             const { data: rent, error: rentErr } = await supabase.from('KRT_RENT').select('*').order('id', { ascending: true });
             if (!rentErr && rent && rent.length > 0) {
-                rentData = rent.map(r => ({ id: r.id, name: r.name, shop: r.shop, date: r.date, month: r.month, debit: Number(r.debit||0), credit: Number(r.credit||0), method: r.method }));
+                rentData = rent.map(r => ({ 
+                    id: r.id, 
+                    name: r.name, 
+                    shop: r.shop, 
+                    date: r.date, 
+                    month: r.month, 
+                    debit: Number(r.debit||0), 
+                    credit: Number(r.credit||0), 
+                    method: r.method 
+                }));
                 saveData();
+                console.log('✅ Rent loaded:', rentData.length);
             }
-        } catch(e) {}
+        } catch(e) {
+            console.log('⚠️ No rent data');
+        }
         
         renderAll();
-        notify('Sync complete!', 'success');
+        notify('✅ Sync complete!', 'success');
+        console.log('✅ Sync complete!');
+        
     } catch(e) {
-        notify('Sync failed: ' + e.message, 'error');
+        console.error('❌ Sync error:', e);
+        notify('❌ Sync failed: ' + e.message, 'error');
     }
 }
 
@@ -122,21 +175,48 @@ async function addIn() {
     const qty = Number(document.getElementById('inQty').value);
     const price = Number(document.getElementById('inPrice').value) || 0;
     
-    if (!date) { notify('Date required!', 'warning'); return; }
-    if (!item) { notify('Item required!', 'warning'); return; }
-    if (!qty || qty <= 0) { notify('Valid quantity required!', 'warning'); return; }
+    if (!date) { notify('⚠️ Date required!', 'warning'); return; }
+    if (!item) { notify('⚠️ Item required!', 'warning'); return; }
+    if (!qty || qty <= 0) { notify('⚠️ Valid quantity required!', 'warning'); return; }
     
     try {
-        const { data, error } = await supabase.from('KRT').insert([{ Date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor }]).select();
-        if (error) { notify(error.message, 'error'); return; }
+        const { data, error } = await supabase.from('KRT').insert([{ 
+            Date: date, 
+            item_name: item, 
+            stock_in: qty, 
+            stock_out: 0, 
+            price: price, 
+            vendor_name: vendor 
+        }]).select();
         
-        db.in.push({ id: data[0].id, date, vendor, item, qty, price, total: qty * price });
+        if (error) { 
+            notify('❌ ' + error.message, 'error'); 
+            return; 
+        }
+        
+        db.in.push({ 
+            id: data[0].id, 
+            date, 
+            vendor, 
+            item, 
+            qty, 
+            price, 
+            total: qty * price 
+        });
+        
         saveData();
         renderAll();
+        
         document.getElementById('inItem').value = '';
         document.getElementById('inQty').value = '';
-        notify('Stock IN saved!', 'success');
-    } catch(e) { notify('Network error!', 'error'); }
+        
+        notify('✅ Stock IN saved!', 'success');
+        console.log('✅ Stock IN saved:', item, qty);
+        
+    } catch(e) {
+        notify('❌ Network error!', 'error');
+        console.error('❌', e);
+    }
 }
 
 // ================================================================
@@ -149,22 +229,49 @@ async function addOut() {
     const qty = Number(document.getElementById('outQty').value);
     const price = Number(document.getElementById('outPrice').value) || 0;
     
-    if (!date) { notify('Date required!', 'warning'); return; }
-    if (!item) { notify('Item required!', 'warning'); return; }
-    if (!qty || qty <= 0) { notify('Valid quantity required!', 'warning'); return; }
+    if (!date) { notify('⚠️ Date required!', 'warning'); return; }
+    if (!item) { notify('⚠️ Item required!', 'warning'); return; }
+    if (!qty || qty <= 0) { notify('⚠️ Valid quantity required!', 'warning'); return; }
     
     try {
-        const { data, error } = await supabase.from('KRT').insert([{ Date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: cust }]).select();
-        if (error) { notify(error.message, 'error'); return; }
+        const { data, error } = await supabase.from('KRT').insert([{ 
+            Date: date, 
+            item_name: item, 
+            stock_in: 0, 
+            stock_out: qty, 
+            price: price, 
+            customer_name: cust 
+        }]).select();
         
-        db.out.push({ id: data[0].id, date, cust, item, qty, price, total: qty * price });
+        if (error) { 
+            notify('❌ ' + error.message, 'error'); 
+            return; 
+        }
+        
+        db.out.push({ 
+            id: data[0].id, 
+            date, 
+            cust, 
+            item, 
+            qty, 
+            price, 
+            total: qty * price 
+        });
+        
         saveData();
         renderAll();
+        
         document.getElementById('outItem').value = '';
         document.getElementById('outQty').value = '';
         document.getElementById('stockStatus').innerHTML = '';
-        notify('Stock OUT saved!', 'success');
-    } catch(e) { notify('Network error!', 'error'); }
+        
+        notify('✅ Stock OUT saved!', 'success');
+        console.log('✅ Stock OUT saved:', item, qty);
+        
+    } catch(e) {
+        notify('❌ Network error!', 'error');
+        console.error('❌', e);
+    }
 }
 
 // ================================================================
@@ -172,13 +279,25 @@ async function addOut() {
 // ================================================================
 function checkStock(item) {
     const el = document.getElementById('stockStatus');
-    if (!item || !item.trim()) { el.innerHTML = ''; return; }
+    if (!item || !item.trim()) { 
+        el.innerHTML = ''; 
+        return; 
+    }
+    
     const tin = db.in.filter(x => x.item === item).reduce((s,x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s,x) => s + x.qty, 0);
     const bal = tin - tout;
-    if (bal > 0) { el.style.color = '#10b981'; el.innerHTML = '✅ Available: <strong>' + bal + '</strong>'; }
-    else if (bal <= 0 && tin > 0) { el.style.color = '#ef4444'; el.innerHTML = '⚠️ Out of Stock!'; }
-    else { el.style.color = '#94a3b8'; el.innerHTML = 'ℹ️ No record found.'; }
+    
+    if (bal > 0) {
+        el.style.color = '#10b981';
+        el.innerHTML = '✅ Available: <strong>' + bal + '</strong>';
+    } else if (bal <= 0 && tin > 0) {
+        el.style.color = '#ef4444';
+        el.innerHTML = '⚠️ Out of Stock!';
+    } else {
+        el.style.color = '#94a3b8';
+        el.innerHTML = 'ℹ️ No record found.';
+    }
 }
 
 // ================================================================
@@ -186,13 +305,15 @@ function checkStock(item) {
 // ================================================================
 function renderAll() {
     const d = today();
+    console.log('📅 Rendering for date:', d);
+    console.log('📊 Data:', db.in.length, 'IN,', db.out.length, 'OUT');
     
     // Today IN
     const inBody = document.getElementById('todayIn');
     if (inBody) {
         const todayIn = db.in.filter(x => x.date === d);
         if (todayIn.length === 0) {
-            inBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">No entries today</td></tr>';
+            inBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">📭 No entries today</td></tr>';
         } else {
             let html = '';
             todayIn.forEach((x, i) => {
@@ -208,7 +329,7 @@ function renderAll() {
     if (outBody) {
         const todayOut = db.out.filter(x => x.date === d);
         if (todayOut.length === 0) {
-            outBody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:#94a3b8;">No sales today</td></tr>';
+            outBody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:#94a3b8;">📭 No sales today</td></tr>';
         } else {
             let html = '';
             todayOut.forEach((x, i) => {
@@ -224,7 +345,7 @@ function renderAll() {
     if (balBody) {
         const items = [...new Set([...db.in.map(x=>x.item), ...db.out.map(x=>x.item)])];
         if (items.length === 0) {
-            balBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">No items</td></tr>';
+            balBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">📭 No items</td></tr>';
         } else {
             let html = '';
             items.forEach(name => {
@@ -249,11 +370,15 @@ function renderAll() {
 // UPDATE STATS
 // ================================================================
 function updateStats() {
-    document.getElementById('totalIn').textContent = db.in.reduce((s,x) => s + x.qty, 0);
-    document.getElementById('totalOut').textContent = db.out.reduce((s,x) => s + x.qty, 0);
+    const totalIn = db.in.reduce((s,x) => s + x.qty, 0);
+    const totalOut = db.out.reduce((s,x) => s + x.qty, 0);
     const items = [...new Set([...db.in.map(x=>x.item), ...db.out.map(x=>x.item)])];
+    const revenue = db.out.reduce((s,x) => s + x.total, 0);
+    
+    document.getElementById('totalIn').textContent = totalIn;
+    document.getElementById('totalOut').textContent = totalOut;
     document.getElementById('totalItems').textContent = items.length;
-    document.getElementById('totalRevenue').textContent = 'PKR ' + db.out.reduce((s,x) => s + x.total, 0).toLocaleString();
+    document.getElementById('totalRevenue').textContent = 'PKR ' + revenue.toLocaleString();
     
     // Recent Activity
     const act = document.getElementById('recentActivity');
@@ -300,7 +425,7 @@ async function deleteEntry(type, index) {
     db[type].splice(index, 1);
     saveData();
     renderAll();
-    notify('Deleted!', 'success');
+    notify('✅ Deleted!', 'success');
 }
 
 // ================================================================
@@ -326,7 +451,7 @@ async function editEntry(type, index) {
     db[type][index].total = Number(newQty) * (Number(newPrice) || 0);
     saveData();
     renderAll();
-    notify('Updated!', 'success');
+    notify('✅ Updated!', 'success');
 }
 
 // ================================================================
@@ -335,7 +460,7 @@ async function editEntry(type, index) {
 function searchRecords() {
     const from = document.getElementById('searchFrom').value;
     const to = document.getElementById('searchTo').value;
-    if (!from || !to) { notify('Select both dates!', 'warning'); return; }
+    if (!from || !to) { notify('⚠️ Select both dates!', 'warning'); return; }
     
     const fin = db.in.filter(x => x.date >= from && x.date <= to);
     const fout = db.out.filter(x => x.date >= from && x.date <= to);
@@ -364,7 +489,7 @@ function searchRecords() {
         }
     }
     
-    notify('Found ' + (fin.length + fout.length) + ' records', 'success');
+    notify('✅ Found ' + (fin.length + fout.length) + ' records', 'success');
 }
 
 // ================================================================
@@ -373,7 +498,7 @@ function searchRecords() {
 function generateReport() {
     const from = document.getElementById('repFrom').value;
     const to = document.getElementById('repTo').value;
-    if (!from || !to) { notify('Select both dates!', 'warning'); return; }
+    if (!from || !to) { notify('⚠️ Select both dates!', 'warning'); return; }
     
     document.getElementById('reportPeriod').textContent = '📅 ' + from + ' to ' + to;
     
@@ -408,7 +533,7 @@ function generateReport() {
     summary.style.cssText = 'display:flex;justify-content:space-around;background:#0f172a;color:white;padding:15px;border-radius:8px;margin-top:20px;flex-wrap:wrap;gap:10px;';
     summary.innerHTML = '<span>📥 Total IN: PKR ' + totalIn.toLocaleString() + '</span><span>📤 Total OUT: PKR ' + totalOut.toLocaleString() + '</span><span style="color:' + (profit >= 0 ? '#10b981' : '#ef4444') + ';font-weight:bold;">💰 ' + (profit >= 0 ? 'Profit' : 'Loss') + ': PKR ' + Math.abs(profit).toLocaleString() + '</span>';
     document.getElementById('reportArea').appendChild(summary);
-    notify('Report generated!', 'success');
+    notify('✅ Report generated!', 'success');
 }
 
 // ================================================================
@@ -417,7 +542,7 @@ function generateReport() {
 function saveLedger() {
     const name = document.getElementById('ledgerName').value.trim();
     const date = document.getElementById('ledDate').value;
-    if (!name || !date) { notify('Name and Date required!', 'warning'); return; }
+    if (!name || !date) { notify('⚠️ Name and Date required!', 'warning'); return; }
     if (!db.ledgers[name]) { db.ledgers[name] = []; db.opening_balances[name] = 0; }
     db.ledgers[name].push({
         date,
@@ -429,7 +554,7 @@ function saveLedger() {
     });
     saveData();
     showLedger();
-    notify('Ledger saved!', 'success');
+    notify('✅ Ledger saved!', 'success');
 }
 
 function updateOpening() {
@@ -469,7 +594,7 @@ function delLedger(name, index) {
     db.ledgers[name].splice(index, 1);
     saveData();
     showLedger();
-    notify('Deleted!', 'success');
+    notify('✅ Deleted!', 'success');
 }
 
 function editLedger(name, index) {
@@ -482,7 +607,7 @@ function editLedger(name, index) {
     db.ledgers[name][index].credit = Number(c);
     saveData();
     showLedger();
-    notify('Updated!', 'success');
+    notify('✅ Updated!', 'success');
 }
 
 // ================================================================
@@ -491,7 +616,7 @@ function editLedger(name, index) {
 function addRent() {
     const name = document.getElementById('rentName').value.trim();
     const date = document.getElementById('rentDate').value;
-    if (!name || !date) { notify('Name and Date required!', 'warning'); return; }
+    if (!name || !date) { notify('⚠️ Name and Date required!', 'warning'); return; }
     rentData.push({
         name,
         shop: document.getElementById('rentShop').value || '-',
@@ -503,7 +628,7 @@ function addRent() {
     });
     saveData();
     showRent();
-    notify('Rent saved!', 'success');
+    notify('✅ Rent saved!', 'success');
 }
 
 function showRent() {
@@ -536,7 +661,7 @@ function delRent(index) {
     rentData.splice(index, 1);
     saveData();
     showRent();
-    notify('Deleted!', 'success');
+    notify('✅ Deleted!', 'success');
 }
 
 // ================================================================
@@ -546,7 +671,7 @@ function createUser() {
     const name = document.getElementById('newName').value;
     const id = document.getElementById('newId').value;
     const pass = document.getElementById('newPass').value;
-    if (!name || !id || !pass) { notify('Fill all fields!', 'warning'); return; }
+    if (!name || !id || !pass) { notify('⚠️ Fill all fields!', 'warning'); return; }
     const perms = [];
     document.querySelectorAll('.perm:checked').forEach(cb => perms.push(cb.value));
     users.push({ id, pass, name, perms });
@@ -556,7 +681,7 @@ function createUser() {
     document.getElementById('newId').value = '';
     document.getElementById('newPass').value = '';
     document.querySelectorAll('.perm').forEach(cb => cb.checked = false);
-    notify('User created!', 'success');
+    notify('✅ User created!', 'success');
 }
 
 function loadUsers() {
@@ -574,7 +699,7 @@ function delUser(index) {
     users.splice(index, 1);
     saveData();
     loadUsers();
-    notify('User deleted!', 'success');
+    notify('✅ User deleted!', 'success');
 }
 
 // ================================================================
@@ -583,26 +708,33 @@ function delUser(index) {
 function loginUser() {
     const u = document.getElementById('username').value.trim().toLowerCase();
     const p = document.getElementById('password').value.trim();
+    
     if (u === 'admin' && p === '123') {
         localStorage.setItem('loggedIn', 'true');
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('sidebar').style.display = 'block';
-        document.getElementById('mainContent').style.display = 'block';
-        document.getElementById('toggleBtn').style.display = 'block';
-        renderAll();
+        showApp();
         return;
     }
+    
     const found = users.find(x => x.id === u && x.pass === p);
     if (found) {
         localStorage.setItem('loggedIn', 'true');
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('sidebar').style.display = 'block';
-        document.getElementById('mainContent').style.display = 'block';
-        document.getElementById('toggleBtn').style.display = 'block';
-        renderAll();
+        showApp();
         return;
     }
-    alert('Invalid credentials!');
+    
+    alert('❌ Invalid credentials!');
+}
+
+function showApp() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('sidebar').style.display = 'block';
+    document.getElementById('mainContent').style.display = 'block';
+    document.getElementById('toggleBtn').style.display = 'block';
+    renderAll();
+    // Auto sync on login
+    if (navigator.onLine) {
+        setTimeout(syncData, 500);
+    }
 }
 
 function logoutUser() {
@@ -627,15 +759,19 @@ function toggleSidebar() {
 
 function showPage(page) {
     document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-    document.getElementById('page-' + page).style.display = 'block';
+    const target = document.getElementById('page-' + page);
+    if (target) target.style.display = 'block';
+    
     document.querySelectorAll('#sidebar ul li').forEach(li => li.classList.remove('active'));
     document.querySelectorAll('#sidebar ul li').forEach(li => {
         if (li.textContent.toLowerCase().includes(page)) li.classList.add('active');
     });
+    
     if (window.innerWidth <= 768) {
         document.getElementById('sidebar').style.left = '-240px';
         document.getElementById('mainContent').style.marginLeft = '0';
     }
+    
     if (page === 'dashboard') renderAll();
     if (page === 'ledger') { updateCustomerList(); showLedger(); }
     if (page === 'rent') showRent();
@@ -643,13 +779,30 @@ function showPage(page) {
 }
 
 // ================================================================
-// STARTUP
+// STARTUP - FIXED
 // ================================================================
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 KRT ERP Starting...');
+    
+    // Load local data
+    loadData();
+    console.log('📊 Local data:', db.in.length, 'IN,', db.out.length, 'OUT');
+    
+    // Render from local
     renderAll();
     loadUsers();
     updateCustomerList();
     updateItemsList();
+    
+    // ✅ FORCE SYNC FROM SUPABASE ON EVERY REFRESH
+    if (navigator.onLine) {
+        console.log('🔄 Syncing from Supabase...');
+        setTimeout(syncData, 300);
+    } else {
+        notify('⚠️ Offline mode', 'warning');
+    }
+    
+    // Check login
     if (localStorage.getItem('loggedIn') === 'true') {
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('sidebar').style.display = 'block';
@@ -657,13 +810,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('toggleBtn').style.display = 'block';
         renderAll();
     }
-    // Auto sync
-    if (navigator.onLine) {
-        setTimeout(syncData, 1000);
-    }
 });
 
 // Rent live search
 document.getElementById('rentName')?.addEventListener('input', showRent);
 
-console.log('✅ KRT ERP v5.0 Loaded!');
+console.log('✅ KRT ERP v5.0 Ready!');
