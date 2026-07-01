@@ -1,7 +1,7 @@
 // ================================================================
-// KRT TRADERS ERP - COMPLETE SYSTEM
+// KRT TRADERS ERP - COMPLETE SYSTEM (FIXED VERSION)
 // Developed by Bilal Suleman
-// Version: 5.0
+// Version: 5.1 - Fixed Data Persistence Issue
 // ================================================================
 
 // ================================================================
@@ -77,7 +77,6 @@ function saveAllDataToLocalStorage() {
         localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
         localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
         console.log('💾 All data saved to localStorage');
-        console.log('📊 IN:', db.in.length, 'OUT:', db.out.length);
     } catch (error) {
         console.error('❌ Error saving data:', error);
     }
@@ -385,13 +384,13 @@ function applyDynamicPermissionsToUser(user) {
 }
 
 // ================================================================
-// SECTION 8: CLOUD DATA SYNCHRONIZATION
+// SECTION 8: CLOUD DATA SYNCHRONIZATION (FIXED - MERGE INSTEAD OF REPLACE)
 // ================================================================
 
 async function fetchStockDataFromSupabase() {
     try {
         console.log('🔄 Fetching stock data from Supabase...');
-
+        
         const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
 
         if (error) {
@@ -406,8 +405,13 @@ async function fetchStockDataFromSupabase() {
 
         console.log('📦 Data received:', data.length, 'records');
 
-        db.in = [];
-        db.out = [];
+        // *** FIX: MERGE data instead of replacing ***
+        // Create set of existing IDs
+        const existingIds = new Set();
+        db.in.forEach(entry => { if (entry.id) existingIds.add(entry.id); });
+        db.out.forEach(entry => { if (entry.id) existingIds.add(entry.id); });
+
+        let addedCount = 0;
 
         data.forEach(function(row) {
             const stockInQuantity = Number(row.stock_in || 0);
@@ -421,35 +425,41 @@ async function fetchStockDataFromSupabase() {
                 date = new Date().toISOString().split('T')[0];
             }
 
-            if (stockInQuantity > 0) {
-                db.in.push({
-                    id: row.id,
-                    date: date,
-                    vendor: row.vendor_name || 'factory',
-                    item: row.item_name || 'Unknown',
-                    qty: stockInQuantity,
-                    price: price,
-                    total: stockInQuantity * price
-                });
-            }
+            // Only add if not already in db
+            if (!existingIds.has(row.id)) {
+                if (stockInQuantity > 0) {
+                    db.in.push({
+                        id: row.id,
+                        date: date,
+                        vendor: row.vendor_name || 'factory',
+                        item: row.item_name || 'Unknown',
+                        qty: stockInQuantity,
+                        price: price,
+                        total: stockInQuantity * price
+                    });
+                    addedCount++;
+                }
 
-            if (stockOutQuantity > 0) {
-                db.out.push({
-                    id: row.id,
-                    date: date,
-                    cust: row.customer_name || 'General Sale',
-                    item: row.item_name || 'Unknown',
-                    qty: stockOutQuantity,
-                    price: price,
-                    total: stockOutQuantity * price
-                });
+                if (stockOutQuantity > 0) {
+                    db.out.push({
+                        id: row.id,
+                        date: date,
+                        cust: row.customer_name || 'General Sale',
+                        item: row.item_name || 'Unknown',
+                        qty: stockOutQuantity,
+                        price: price,
+                        total: stockOutQuantity * price
+                    });
+                    addedCount++;
+                }
             }
         });
 
         saveAllDataToLocalStorage();
-        console.log('✅ Stock data loaded successfully');
-        console.log('📊 IN entries:', db.in.length);
-        console.log('📊 OUT entries:', db.out.length);
+        console.log('✅ Stock data merged successfully');
+        console.log('📊 Added new entries:', addedCount);
+        console.log('📊 Total IN entries:', db.in.length);
+        console.log('📊 Total OUT entries:', db.out.length);
 
         return true;
     } catch (error) {
@@ -474,21 +484,30 @@ async function fetchRentDataFromSupabase() {
             return false;
         }
 
-        dbRent = data.map(function(row) {
-            return {
-                id: row.id,
-                name: row.name,
-                shop: row.shop,
-                date: row.date,
-                month: row.month,
-                debit: Number(row.debit || 0),
-                credit: Number(row.credit || 0),
-                method: row.method
-            };
+        // *** FIX: MERGE data instead of replacing ***
+        const existingIds = new Set(dbRent.map(entry => entry.id));
+        let addedCount = 0;
+
+        data.forEach(function(row) {
+            if (!existingIds.has(row.id)) {
+                dbRent.push({
+                    id: row.id,
+                    name: row.name,
+                    shop: row.shop,
+                    date: row.date,
+                    month: row.month,
+                    debit: Number(row.debit || 0),
+                    credit: Number(row.credit || 0),
+                    method: row.method
+                });
+                addedCount++;
+            }
         });
 
         saveAllDataToLocalStorage();
-        console.log('✅ Rent data loaded:', dbRent.length);
+        console.log('✅ Rent data merged successfully');
+        console.log('📊 Added new entries:', addedCount);
+        console.log('📊 Total rent entries:', dbRent.length);
         return true;
     } catch (error) {
         console.error('❌ Error fetching rent data:', error);
@@ -750,10 +769,7 @@ function checkLiveStock(itemName) {
 function renderAllData() {
     const today = getCurrentDateInPakistan();
 
-    // ================================================================
     // TODAY'S STOCK IN
-    // ================================================================
-
     const inTableBody = document.getElementById('today-list-in');
     if (inTableBody) {
         const todayInEntries = db.in.filter(function(entry) {
@@ -786,10 +802,7 @@ function renderAllData() {
         }
     }
 
-    // ================================================================
     // TODAY'S STOCK OUT
-    // ================================================================
-
     const outTableBody = document.getElementById('today-list-out');
     if (outTableBody) {
         const todayOutEntries = db.out.filter(function(entry) {
@@ -823,10 +836,7 @@ function renderAllData() {
         }
     }
 
-    // ================================================================
     // STOCK BALANCE
-    // ================================================================
-
     const balanceTableBody = document.getElementById('table-balance-body');
     if (balanceTableBody) {
         const uniqueItems = [];
@@ -927,10 +937,7 @@ function updateDashboardStatistics() {
     document.getElementById('dash-unique-items').textContent = uniqueItems.length;
     document.getElementById('dash-revenue').textContent = 'PKR ' + totalRevenue.toLocaleString();
 
-    // ================================================================
     // RECENT ACTIVITY
-    // ================================================================
-
     const recentActivityElement = document.getElementById('recent-activity');
 
     if (recentActivityElement) {
@@ -1046,7 +1053,6 @@ async function editEntry(type, index) {
         renderAllData();
         updateDashboardStatistics();
 
-        // If search page is open, refresh it
         const searchPage = document.getElementById('page-search');
         if (searchPage && searchPage.style.display !== 'none') {
             generateMasterSearch();
@@ -1079,10 +1085,7 @@ function generateMasterSearch() {
         return entry.date >= fromDate && entry.date <= toDate;
     });
 
-    // ================================================================
     // SEARCH RESULTS - STOCK IN
-    // ================================================================
-
     const inSearchTable = document.querySelector('#master-in-table');
 
     if (inSearchTable) {
@@ -1112,10 +1115,7 @@ function generateMasterSearch() {
         }
     }
 
-    // ================================================================
     // SEARCH RESULTS - STOCK OUT
-    // ================================================================
-
     const outSearchTable = document.querySelector('#master-out-table');
 
     if (outSearchTable) {
@@ -1172,10 +1172,7 @@ function generateCustomReport() {
         return entry.date >= fromDate && entry.date <= toDate;
     });
 
-    // ================================================================
     // REPORT - STOCK IN
-    // ================================================================
-
     const inReportTable = document.querySelector('#rep-in-table');
 
     if (inReportTable) {
@@ -1199,10 +1196,7 @@ function generateCustomReport() {
         }
     }
 
-    // ================================================================
     // REPORT - STOCK OUT
-    // ================================================================
-
     const outReportTable = document.querySelector('#rep-out-table');
 
     if (outReportTable) {
@@ -1226,10 +1220,7 @@ function generateCustomReport() {
         }
     }
 
-    // ================================================================
     // REPORT SUMMARY
-    // ================================================================
-
     const totalInValue = filteredIn.reduce(function(sum, entry) {
         return sum + entry.total;
     }, 0);
@@ -1242,7 +1233,6 @@ function generateCustomReport() {
     const profitColor = profit >= 0 ? '#10b981' : '#ef4444';
     const profitLabel = profit >= 0 ? 'Profit' : 'Loss';
 
-    // Remove old summary
     document.querySelectorAll('.report-summary').forEach(function(element) {
         element.remove();
     });
@@ -1725,7 +1715,7 @@ function updateItemDropdownList() {
 // ================================================================
 
 document.addEventListener('DOMContentLoaded', async function() {
-    console.log('🚀 KRT ERP v5.0 - Starting Application');
+    console.log('🚀 KRT ERP v5.1 - Starting Application');
     console.log('📦 Developed by Bilal Suleman');
     console.log('🐘 Elephant Never Forgets!');
 
@@ -1739,7 +1729,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     updateCustomerDropdownList();
     updateItemDropdownList();
 
-    // Sync with cloud if online
+    // Sync with cloud if online (MERGE mode - preserves existing data)
     if (navigator.onLine) {
         await fetchStockDataFromSupabase();
         await fetchRentDataFromSupabase();
@@ -1798,7 +1788,7 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
-console.log('✅ KRT ERP v5.0 - Application Ready!');
+console.log('✅ KRT ERP v5.1 - Application Ready!');
 console.log('📊 Total IN entries:', db.in.length);
 console.log('📊 Total OUT entries:', db.out.length);
 console.log('📊 Total customers:', Object.keys(db.ledgers).length);
