@@ -24,7 +24,7 @@ window.addEventListener('unhandledrejection', function(e) {
 // SUPABASE INITIALIZATION
 // ==========================================
 const supabaseUrl = 'https://jsxcmlpjdxgloofdrugz.supabase.co/rest/v1/';
-const supabaseKey = 'sb_secret_fpd976V4-WWT4_dTdyhcxw_Kf3Vstjw';
+const supabaseKey = 'sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb';
 let _supabase = null;
 let isSupabaseConnected = false;
 
