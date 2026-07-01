@@ -1,5 +1,6 @@
 // ==========================================
 // KRT TRADERS ERP - COMPLETE SCRIPT
+// 100% SUPABASE - NO LOCALSTORAGE
 // Developed by Bilal Suleman
 // ==========================================
 
@@ -8,8 +9,8 @@
 // ==========================================
 window.onerror = function(msg, url, line, col, error) {
     console.error('❌ Global Error:', msg, 'at', url, 'line', line);
-    console.error('Stack:', error ? error.stack : 'No stack');
-    showNotification('⚠️ An error occurred. Check console for details.', 'error');
+    if (error) console.error('Stack:', error.stack);
+    showNotification('⚠️ An error occurred. Check console.', 'error');
     return false;
 };
 
@@ -31,7 +32,7 @@ try {
     console.log('✅ Supabase initialized');
 } catch (err) {
     console.error('❌ Supabase init failed:', err);
-    showNotification('⚠️ Database connection failed. Running in offline mode.', 'warning');
+    showNotification('⚠️ Database connection failed!', 'error');
 }
 
 // ==========================================
@@ -41,58 +42,109 @@ let db = { in: [], out: [], ledgers: {}, opening_balances: {} };
 let dbRent = [];
 let extraUsers = [];
 
-// Pending sync queue for offline operations
-let pendingSync = [];
-
 // ==========================================
-// LOAD DATA FROM LOCALSTORAGE WITH ERROR HANDLING
+// LOAD DATA FROM SUPABASE (NO LOCALSTORAGE)
 // ==========================================
-function loadLocalData() {
+async function loadDataFromSupabase() {
     try {
-        const stored = localStorage.getItem('krt_erp_data');
-        db = stored ? JSON.parse(stored) : { in: [], out: [], ledgers: {}, opening_balances: {} };
+        if (!_supabase) {
+            showNotification('⚠️ Database not available!', 'error');
+            return false;
+        }
         
-        const rentStored = localStorage.getItem('krt_rent_data');
-        dbRent = rentStored ? JSON.parse(rentStored) : [];
+        if (!navigator.onLine) {
+            showNotification('⚠️ Internet connection required!', 'error');
+            return false;
+        }
         
-        const usersStored = localStorage.getItem('krt_extra_users');
-        extraUsers = usersStored ? JSON.parse(usersStored) : [];
+        console.log('📥 Loading data from Supabase...');
+        showNotification('📥 Loading data...', 'info');
         
-        const pendingStored = localStorage.getItem('krt_pending_sync');
-        pendingSync = pendingStored ? JSON.parse(pendingStored) : [];
+        // Fetch main data
+        const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
+        if (error) {
+            console.error('❌ Supabase Error:', error.message);
+            showNotification('❌ Failed to load data: ' + error.message, 'error');
+            return false;
+        }
         
-        console.log('✅ Local data loaded');
+        // Reset local arrays
+        db.in = [];
+        db.out = [];
+        
+        if (data && data.length > 0) {
+            data.forEach(function(row) {
+                try {
+                    const inQty = Number(row.stock_in || 0);
+                    const outQty = Number(row.stock_out || 0);
+                    const price = Number(row.price || 0);
+                    const date = (row.Date || row.date || row.created_at || '').split('T')[0] || new Date().toISOString().split('T')[0];
+                    
+                    if (inQty > 0) {
+                        db.in.push({
+                            id: row.id,
+                            date: date,
+                            vendor: row.vendor_name || 'factory',
+                            item: row.item_name || 'Unknown',
+                            qty: inQty,
+                            price: price,
+                            total: inQty * price
+                        });
+                    } else if (outQty > 0) {
+                        db.out.push({
+                            id: row.id,
+                            date: date,
+                            cust: row.customer_name || 'General Sale',
+                            item: row.item_name || 'Unknown',
+                            qty: outQty,
+                            price: price,
+                            total: outQty * price
+                        });
+                    }
+                } catch (rowErr) {
+                    console.warn('⚠️ Error processing row:', rowErr);
+                }
+            });
+        }
+        
+        // Fetch rent data
+        const rentResult = await _supabase.from('KRT_RENT').select('*').order('id', { ascending: true });
+        if (rentResult.error) {
+            console.error('❌ Rent fetch error:', rentResult.error);
+        } else if (rentResult.data) {
+            dbRent = rentResult.data.map(function(row) {
+                return {
+                    id: row.id,
+                    name: row.name,
+                    shop: row.shop,
+                    date: row.date,
+                    month: row.month,
+                    debit: Number(row.debit || 0),
+                    credit: Number(row.credit || 0),
+                    method: row.method
+                };
+            });
+        }
+        
+        // Load extra users from Supabase (or keep existing)
+        // For users, we'll keep them in memory only since they're managed locally
+        
+        console.log('✅ Data loaded: IN=' + db.in.length + ', OUT=' + db.out.length + ', RENT=' + dbRent.length);
+        showNotification('✅ Data loaded successfully!', 'success');
+        
+        renderAll();
+        renderRentTable();
+        updateDashboardStats();
+        updateItemLists();
+        updateCustomerDropdown();
+        loadUserTable();
+        
+        return true;
     } catch (err) {
-        console.error('❌ Failed to load local data:', err);
-        db = { in: [], out: [], ledgers: {}, opening_balances: {} };
-        dbRent = [];
-        extraUsers = [];
-        pendingSync = [];
+        console.error('❌ Load data error:', err);
+        showNotification('❌ Failed to load data: ' + err.message, 'error');
+        return false;
     }
-}
-
-// ==========================================
-// SAVE DATA TO LOCALSTORAGE
-// ==========================================
-function saveLocalData() {
-    try {
-        localStorage.setItem('krt_erp_data', JSON.stringify(db));
-        localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
-        localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
-        localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
-    } catch (err) {
-        console.error('❌ Failed to save local data:', err);
-        showNotification('⚠️ Failed to save data locally.', 'error');
-    }
-}
-
-// ==========================================
-// SAVE AND REFRESH - COMBINED FUNCTION
-// ==========================================
-function saveAndRefresh() {
-    saveLocalData();
-    renderAll();
-    updateDashboardStats();
 }
 
 // ==========================================
@@ -104,12 +156,9 @@ let isIdle = false;
 let idleSeconds = 0;
 let idleInterval = null;
 
-// Create Idle Overlay
 function createIdleOverlay() {
     try {
-        // Check if overlay already exists
         if (document.getElementById('idle-overlay')) return;
-        
         const overlay = document.createElement('div');
         overlay.id = 'idle-overlay';
         overlay.innerHTML = `
@@ -126,7 +175,6 @@ function createIdleOverlay() {
             <div id="idle-version">✦ MEMORY DRIVEN • ELEPHANT NEVER FORGETS ✦</div>
         `;
         document.body.appendChild(overlay);
-        
         overlay.addEventListener('click', dismissIdleScreen);
         const touchBtn = document.getElementById('idle-touch-btn');
         if (touchBtn) {
@@ -135,7 +183,6 @@ function createIdleOverlay() {
                 dismissIdleScreen();
             });
         }
-        
         generateIdleParticles();
         generateIdleEmojis();
     } catch (err) {
@@ -279,7 +326,6 @@ function setupIdleDetection() {
             if (!document.hidden) resetIdleTimer();
         });
         resetIdleTimer();
-        console.log('✅ Idle detection setup complete');
     } catch (err) {
         console.error('❌ Failed to setup idle detection:', err);
     }
@@ -416,233 +462,23 @@ function applyDynamicPermissions(user) {
 }
 
 // ==========================================
-// CLOUD DATA FUNCTIONS
-// ==========================================
-async function fetchCloudData() {
-    try {
-        if (!_supabase) {
-            console.warn('⚠️ Supabase not initialized, skipping cloud fetch');
-            return;
-        }
-        
-        const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
-        if (error) {
-            console.error("❌ Supabase Error:", error.message);
-            showNotification('⚠️ Failed to fetch cloud data: ' + error.message, 'error');
-            return;
-        }
-        if (!data || data.length === 0) {
-            console.log('ℹ️ No cloud data found');
-            return;
-        }
-        
-        db.in = [];
-        db.out = [];
-        data.forEach(function(row) {
-            try {
-                const inQty = Number(row.stock_in || 0);
-                const outQty = Number(row.stock_out || 0);
-                const price = Number(row.price || 0);
-                const date = (row.Date || row.date || row.created_at || '').split('T')[0] || new Date().toISOString().split('T')[0];
-                
-                if (inQty > 0) {
-                    db.in.push({
-                        id: row.id,
-                        date: date,
-                        vendor: row.vendor_name || 'factory',
-                        item: row.item_name || 'Unknown',
-                        qty: inQty,
-                        price: price,
-                        total: inQty * price
-                    });
-                } else if (outQty > 0) {
-                    db.out.push({
-                        id: row.id,
-                        date: date,
-                        cust: row.customer_name || 'General Sale',
-                        item: row.item_name || 'Unknown',
-                        qty: outQty,
-                        price: price,
-                        total: outQty * price
-                    });
-                }
-            } catch (rowErr) {
-                console.warn('⚠️ Error processing row:', rowErr);
-            }
-        });
-        saveLocalData();
-        renderAll();
-        updateDashboardStats();
-        console.log("✅ Cloud sync complete!");
-    } catch (err) {
-        console.error("❌ Fetch Error:", err);
-        showNotification('⚠️ Failed to sync cloud data: ' + err.message, 'error');
-    }
-}
-
-async function fetchCloudRentData() {
-    try {
-        if (!_supabase) {
-            console.warn('⚠️ Supabase not initialized, skipping rent fetch');
-            return;
-        }
-        
-        const { data, error } = await _supabase.from('KRT_RENT').select('*').order('id', { ascending: true });
-        if (error) {
-            console.error("❌ Rent Fetch Error:", error.message);
-            return;
-        }
-        if (!data) return;
-        dbRent = data.map(function(row) {
-            return {
-                id: row.id,
-                name: row.name,
-                shop: row.shop,
-                date: row.date,
-                month: row.month,
-                debit: Number(row.debit||0),
-                credit: Number(row.credit||0),
-                method: row.method
-            };
-        });
-        saveLocalData();
-        renderRentTable();
-        console.log("✅ Rent cloud sync done!");
-    } catch (err) {
-        console.error("❌ Rent Sync Error:", err);
-    }
-}
-
-async function syncAllCloudData() {
-    try {
-        if (!navigator.onLine) {
-            showNotification("⚠️ Internet nahi hai! Offline mode.", "warning");
-            // Process pending sync queue
-            await processPendingSync();
-            return;
-        }
-        if (!_supabase) {
-            showNotification('⚠️ Database not available. Running offline.', 'warning');
-            return;
-        }
-        
-        showNotification("☁️ Cloud sync shuru...", "info");
-        await fetchCloudData();
-        await fetchCloudRentData();
-        await processPendingSync();
-        updateItemLists();
-        updateCustomerDropdown();
-        loadUserTable();
-        showNotification("✅ Cloud sync complete!", "success");
-    } catch (err) {
-        console.error('❌ Sync failed:', err);
-        showNotification("❌ Sync failed: " + err.message, "error");
-    }
-}
-
-// ==========================================
-// PENDING SYNC QUEUE (Offline Support)
-// ==========================================
-async function processPendingSync() {
-    try {
-        if (!_supabase || !navigator.onLine) return;
-        if (pendingSync.length === 0) return;
-        
-        console.log(`📤 Processing ${pendingSync.length} pending operations...`);
-        const failed = [];
-        
-        for (const op of pendingSync) {
-            try {
-                if (op.type === 'insert') {
-                    const { error } = await _supabase.from(op.table).insert(op.data);
-                    if (error) {
-                        console.error('❌ Pending insert failed:', error);
-                        failed.push(op);
-                    }
-                } else if (op.type === 'delete') {
-                    const { error } = await _supabase.from(op.table).delete().eq('id', op.id);
-                    if (error) {
-                        console.error('❌ Pending delete failed:', error);
-                        failed.push(op);
-                    }
-                } else if (op.type === 'update') {
-                    const { error } = await _supabase.from(op.table).update(op.data).eq('id', op.id);
-                    if (error) {
-                        console.error('❌ Pending update failed:', error);
-                        failed.push(op);
-                    }
-                }
-            } catch (opErr) {
-                console.error('❌ Pending operation failed:', opErr);
-                failed.push(op);
-            }
-        }
-        
-        pendingSync = failed;
-        localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
-        
-        if (failed.length > 0) {
-            console.warn(`⚠️ ${failed.length} operations still pending`);
-        } else {
-            console.log('✅ All pending operations synced');
-        }
-    } catch (err) {
-        console.error('❌ Failed to process pending sync:', err);
-    }
-}
-
-function addPendingSync(op) {
-    try {
-        pendingSync.push(op);
-        localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
-        // Try to process immediately if online
-        if (navigator.onLine && _supabase) {
-            setTimeout(processPendingSync, 1000);
-        }
-    } catch (err) {
-        console.error('❌ Failed to add pending sync:', err);
-    }
-}
-
-// ==========================================
 // NOTIFICATIONS
 // ==========================================
-let toastTimeout = null;
-
 function showNotification(message, type = "info") {
     try {
-        const colors = {
-            success: "#27ae60",
-            error: "#e74c3c",
-            warning: "#f39c12",
-            info: "#3498db"
-        };
-        
-        // Remove existing toasts with same message to prevent duplicates
-        const existing = document.querySelectorAll('.toast-notification');
-        existing.forEach(function(el) {
-            if (el.textContent === message) {
-                el.remove();
-            }
+        document.querySelectorAll('.toast-notification').forEach(function(el) {
+            if (el.textContent === message) el.remove();
         });
         
         const div = document.createElement('div');
         div.className = `toast-notification ${type}`;
         div.textContent = message;
-        div.style.borderLeft = '4px solid ' + (colors[type] || '#3498db');
         document.body.appendChild(div);
         
-        // Trigger animation
-        setTimeout(function() {
-            div.classList.add('show');
-        }, 50);
-        
-        // Auto remove after 4 seconds
+        setTimeout(function() { div.classList.add('show'); }, 50);
         setTimeout(function() {
             div.classList.remove('show');
-            setTimeout(function() {
-                if (div.parentNode) div.remove();
-            }, 500);
+            setTimeout(function() { if (div.parentNode) div.remove(); }, 500);
         }, 4000);
     } catch (err) {
         console.error('❌ Failed to show notification:', err);
@@ -650,10 +486,21 @@ function showNotification(message, type = "info") {
 }
 
 // ==========================================
-// STOCK IN
+// STOCK IN - 100% SUPABASE
 // ==========================================
 async function addIn() {
     try {
+        // Check internet connection first
+        if (!navigator.onLine) {
+            showNotification('⚠️ Internet connection required!', 'error');
+            return;
+        }
+        
+        if (!_supabase) {
+            showNotification('⚠️ Database not available!', 'error');
+            return;
+        }
+        
         const dateInput = document.getElementById('in-date');
         const vendorInput = document.getElementById('in-vendor');
         const itemInput = document.getElementById('in-item');
@@ -673,83 +520,70 @@ async function addIn() {
         const qty = Number(qtyInput.value);
         const price = Number(priceInput.value);
         
-        if (!date) {
-            showNotification("⚠️ Bilal Bhai, date select karein!", "warning");
-            return;
-        }
-        if (!item) {
-            showNotification("⚠️ Bilal Bhai, item name lazmi hai!", "warning");
-            return;
-        }
-        if (qty <= 0 || isNaN(qty)) {
-            showNotification("⚠️ Bilal Bhai, sahi quantity likhain!", "warning");
-            return;
-        }
-        if (price <= 0 || isNaN(price)) {
-            showNotification("⚠️ Bilal Bhai, sahi price likhain!", "warning");
+        if (!date) { showNotification("⚠️ Date select karein!", "warning"); return; }
+        if (!item) { showNotification("⚠️ Item name lazmi hai!", "warning"); return; }
+        if (qty <= 0 || isNaN(qty)) { showNotification("⚠️ Sahi quantity likhain!", "warning"); return; }
+        if (price <= 0 || isNaN(price)) { showNotification("⚠️ Sahi price likhain!", "warning"); return; }
+        
+        showNotification('⏳ Saving to database...', 'info');
+        
+        // Insert directly into Supabase
+        const { data, error } = await _supabase.from('KRT')
+            .insert([{ 
+                Date: date, 
+                item_name: item, 
+                stock_in: qty, 
+                stock_out: 0, 
+                price: price, 
+                vendor_name: vendor || 'factory' 
+            }])
+            .select();
+        
+        if (error) {
+            console.error('❌ Supabase insert error:', error);
+            showNotification('❌ Failed to save: ' + error.message, 'error');
             return;
         }
         
-        // Check for duplicate entry (same item, same date, same vendor)
-        const duplicate = db.in.some(function(x) {
-            return x.item === item && x.date === date && x.vendor === vendor && x.qty === qty && x.price === price;
-        });
-        if (duplicate) {
-            showNotification("⚠️ Yeh entry pehle se mojud hai!", "warning");
+        if (!data || data.length === 0) {
+            showNotification('❌ No data returned from database', 'error');
             return;
         }
         
-        // Try cloud insert first
-        if (_supabase && navigator.onLine) {
-            try {
-                const { data, error } = await _supabase.from('KRT')
-                    .insert([{ Date: date, item_name: item, stock_in: qty, stock_out: 0, price: price, vendor_name: vendor || 'factory' }])
-                    .select();
-                if (error) {
-                    console.error('❌ Cloud insert failed:', error);
-                    // Add to pending sync
-                    addPendingSync({ type: 'insert', table: 'KRT', data: { Date: date, item_name: item, stock_in: qty, stock_out: 0, price: price, vendor_name: vendor || 'factory' } });
-                } else if (data && data.length > 0) {
-                    db.in.push({ id: data[0].id, date: date, vendor: vendor || 'factory', item: item, barcode: barcode, qty: qty, price: price, total: qty * price });
-                    saveAndRefresh();
-                    if (dateInput) dateInput.value = '';
-                    if (itemInput) itemInput.value = '';
-                    if (qtyInput) qtyInput.value = '';
-                    if (priceInput) priceInput.value = '';
-                    if (barcodeInput) barcodeInput.value = '';
-                    showNotification("✅ Stock IN saved to cloud!", "success");
-                    return;
-                }
-            } catch (cloudErr) {
-                console.error('❌ Cloud insert error:', cloudErr);
-                addPendingSync({ type: 'insert', table: 'KRT', data: { Date: date, item_name: item, stock_in: qty, stock_out: 0, price: price, vendor_name: vendor || 'factory' } });
-            }
-        } else {
-            // Offline mode - add to pending sync
-            addPendingSync({ type: 'insert', table: 'KRT', data: { Date: date, item_name: item, stock_in: qty, stock_out: 0, price: price, vendor_name: vendor || 'factory' } });
-        }
+        showNotification('✅ Stock IN saved to database!', 'success');
         
-        // Local save (for offline or if cloud failed)
-        const tempId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        db.in.push({ id: tempId, date: date, vendor: vendor || 'factory', item: item, barcode: barcode, qty: qty, price: price, total: qty * price });
-        saveAndRefresh();
-        if (dateInput) dateInput.value = '';
+        // Clear form
+        dateInput.value = '';
         if (itemInput) itemInput.value = '';
         if (qtyInput) qtyInput.value = '';
         if (priceInput) priceInput.value = '';
         if (barcodeInput) barcodeInput.value = '';
-        showNotification("✅ Stock IN saved locally!", "success");
+        
+        // Auto refresh data from Supabase
+        await loadDataFromSupabase();
+        
     } catch (err) {
         console.error('❌ addIn error:', err);
-        showNotification('❌ Error saving stock IN: ' + err.message, 'error');
+        showNotification('❌ Error: ' + err.message, 'error');
     }
 }
 
 // ==========================================
-// STOCK OUT
+// STOCK OUT - 100% SUPABASE
 // ==========================================
 async function addOut() {
     try {
+        // Check internet connection first
+        if (!navigator.onLine) {
+            showNotification('⚠️ Internet connection required!', 'error');
+            return;
+        }
+        
+        if (!_supabase) {
+            showNotification('⚠️ Database not available!', 'error');
+            return;
+        }
+        
         const dateInput = document.getElementById('out-date');
         const customerInput = document.getElementById('out-customer');
         const itemInput = document.getElementById('out-item');
@@ -769,24 +603,12 @@ async function addOut() {
         const custName = customerInput.value.trim() || "General Sale";
         const barcode = barcodeInput ? barcodeInput.value : "";
         
-        if (!date) {
-            showNotification("⚠️ Bilal Bhai, date select karein!", "warning");
-            return;
-        }
-        if (!item) {
-            showNotification("⚠️ Bilal Bhai, item name lazmi hai!", "warning");
-            return;
-        }
-        if (qty <= 0 || isNaN(qty)) {
-            showNotification("⚠️ Bilal Bhai, sahi quantity likhain!", "warning");
-            return;
-        }
-        if (price <= 0 || isNaN(price)) {
-            showNotification("⚠️ Bilal Bhai, sahi price likhain!", "warning");
-            return;
-        }
+        if (!date) { showNotification("⚠️ Date select karein!", "warning"); return; }
+        if (!item) { showNotification("⚠️ Item name lazmi hai!", "warning"); return; }
+        if (qty <= 0 || isNaN(qty)) { showNotification("⚠️ Sahi quantity likhain!", "warning"); return; }
+        if (price <= 0 || isNaN(price)) { showNotification("⚠️ Sahi price likhain!", "warning"); return; }
         
-        // Check stock availability
+        // Check stock availability from current db
         const totalIn = db.in.filter(function(x) { return x.item === item; }).reduce(function(s, x) { return s + x.qty; }, 0);
         const totalOut = db.out.filter(function(x) { return x.item === item; }).reduce(function(s, x) { return s + x.qty; }, 0);
         const available = totalIn - totalOut;
@@ -796,56 +618,46 @@ async function addOut() {
             return;
         }
         
-        // Check for duplicate entry
-        const duplicate = db.out.some(function(x) {
-            return x.item === item && x.date === date && x.cust === custName && x.qty === qty && x.price === price;
-        });
-        if (duplicate) {
-            showNotification("⚠️ Yeh sale pehle se recorded hai!", "warning");
+        showNotification('⏳ Saving sale to database...', 'info');
+        
+        // Insert directly into Supabase
+        const { data, error } = await _supabase.from('KRT')
+            .insert([{ 
+                Date: date, 
+                item_name: item, 
+                stock_in: 0, 
+                stock_out: qty, 
+                price: price, 
+                customer_name: custName 
+            }])
+            .select();
+        
+        if (error) {
+            console.error('❌ Supabase insert error:', error);
+            showNotification('❌ Failed to save: ' + error.message, 'error');
             return;
         }
         
-        // Try cloud insert first
-        if (_supabase && navigator.onLine) {
-            try {
-                const { data, error } = await _supabase.from('KRT')
-                    .insert([{ Date: date, item_name: item, stock_in: 0, stock_out: qty, price: price, customer_name: custName }])
-                    .select();
-                if (error) {
-                    console.error('❌ Cloud insert failed:', error);
-                    addPendingSync({ type: 'insert', table: 'KRT', data: { Date: date, item_name: item, stock_in: 0, stock_out: qty, price: price, customer_name: custName } });
-                } else if (data && data.length > 0) {
-                    db.out.push({ id: data[0].id, item: item, qty: qty, date: date, cust: custName, barcode: barcode, price: price, total: qty * price });
-                    saveAndRefresh();
-                    if (qtyInput) qtyInput.value = "";
-                    if (customerInput) customerInput.value = "";
-                    if (barcodeInput) barcodeInput.value = "";
-                    const statusEl = document.getElementById('stock-status');
-                    if (statusEl) statusEl.innerHTML = "";
-                    showNotification("✅ Stock OUT saved to cloud!", "success");
-                    return;
-                }
-            } catch (cloudErr) {
-                console.error('❌ Cloud insert error:', cloudErr);
-                addPendingSync({ type: 'insert', table: 'KRT', data: { Date: date, item_name: item, stock_in: 0, stock_out: qty, price: price, customer_name: custName } });
-            }
-        } else {
-            addPendingSync({ type: 'insert', table: 'KRT', data: { Date: date, item_name: item, stock_in: 0, stock_out: qty, price: price, customer_name: custName } });
+        if (!data || data.length === 0) {
+            showNotification('❌ No data returned from database', 'error');
+            return;
         }
         
-        // Local save
-        const tempId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        db.out.push({ id: tempId, item: item, qty: qty, date: date, cust: custName, barcode: barcode, price: price, total: qty * price });
-        saveAndRefresh();
+        showNotification('✅ Stock OUT saved to database!', 'success');
+        
+        // Clear form
         if (qtyInput) qtyInput.value = "";
         if (customerInput) customerInput.value = "";
         if (barcodeInput) barcodeInput.value = "";
         const statusEl = document.getElementById('stock-status');
         if (statusEl) statusEl.innerHTML = "";
-        showNotification("✅ Stock OUT saved locally!", "success");
+        
+        // Auto refresh data from Supabase
+        await loadDataFromSupabase();
+        
     } catch (err) {
         console.error('❌ addOut error:', err);
-        showNotification('❌ Error saving stock OUT: ' + err.message, 'error');
+        showNotification('❌ Error: ' + err.message, 'error');
     }
 }
 
@@ -961,7 +773,7 @@ function renderAll() {
 }
 
 // ==========================================
-// HTML ESCAPE (Prevent XSS)
+// HTML ESCAPE
 // ==========================================
 function escapeHtml(text) {
     if (!text) return '';
@@ -1011,10 +823,18 @@ function updateDashboardStats() {
 }
 
 // ==========================================
-// DELETE ENTRY
+// DELETE ENTRY - SUPABASE
 // ==========================================
 async function deleteEntry(type, index) {
     try {
+        if (!navigator.onLine) {
+            showNotification('⚠️ Internet connection required!', 'error');
+            return;
+        }
+        if (!_supabase) {
+            showNotification('⚠️ Database not available!', 'error');
+            return;
+        }
         if (!confirm("⚠️ Bilal Bhai, kya aap waqai ye record delete karna chahte hain?")) return;
         
         const record = db[type] && db[type][index];
@@ -1023,39 +843,38 @@ async function deleteEntry(type, index) {
             return;
         }
         
-        if (record.id && !record.id.toString().startsWith('local_') && _supabase && navigator.onLine) {
-            try {
-                const { error } = await _supabase.from('KRT').delete().eq('id', record.id);
-                if (error) {
-                    console.error('❌ Cloud delete failed:', error);
-                    addPendingSync({ type: 'delete', table: 'KRT', id: record.id });
-                }
-            } catch (err) {
-                console.error('❌ Cloud delete error:', err);
-                addPendingSync({ type: 'delete', table: 'KRT', id: record.id });
-            }
-        } else if (record.id && record.id.toString().startsWith('local_')) {
-            // Remove from pending sync if exists
-            pendingSync = pendingSync.filter(function(op) {
-                return !(op.type === 'insert' && op.data && op.data.id === record.id);
-            });
-            localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
+        showNotification('⏳ Deleting from database...', 'info');
+        
+        const { error } = await _supabase.from('KRT').delete().eq('id', record.id);
+        if (error) {
+            console.error('❌ Supabase delete error:', error);
+            showNotification('❌ Failed to delete: ' + error.message, 'error');
+            return;
         }
         
-        db[type].splice(index, 1);
-        saveAndRefresh();
-        showNotification("✅ Record deleted!", "success");
+        showNotification('✅ Record deleted!', 'success');
+        await loadDataFromSupabase();
+        
     } catch (err) {
         console.error('❌ deleteEntry error:', err);
-        showNotification('❌ Error deleting record: ' + err.message, 'error');
+        showNotification('❌ Error: ' + err.message, 'error');
     }
 }
 
 // ==========================================
-// EDIT ENTRY
+// EDIT ENTRY - SUPABASE
 // ==========================================
 async function editEntry(type, index) {
     try {
+        if (!navigator.onLine) {
+            showNotification('⚠️ Internet connection required!', 'error');
+            return;
+        }
+        if (!_supabase) {
+            showNotification('⚠️ Database not available!', 'error');
+            return;
+        }
+        
         const data = db[type] && db[type][index];
         if (!data) {
             showNotification("⚠️ Record not found!", "error");
@@ -1078,32 +897,27 @@ async function editEntry(type, index) {
             return;
         }
         
-        if (data.id && !data.id.toString().startsWith('local_') && _supabase && navigator.onLine) {
-            try {
-                const { error } = await _supabase.from('KRT').update({
-                    stock_in: type === 'in' ? qtyNum : 0,
-                    stock_out: type === 'out' ? qtyNum : 0,
-                    price: priceNum
-                }).eq('id', data.id);
-                if (error) {
-                    console.error('❌ Update failed:', error);
-                    addPendingSync({ type: 'update', table: 'KRT', id: data.id, data: { stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum } });
-                }
-            } catch (err) {
-                console.error('❌ Update error:', err);
-                addPendingSync({ type: 'update', table: 'KRT', id: data.id, data: { stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum } });
-            }
+        showNotification('⏳ Updating in database...', 'info');
+        
+        const { error } = await _supabase.from('KRT').update({
+            stock_in: type === 'in' ? qtyNum : 0,
+            stock_out: type === 'out' ? qtyNum : 0,
+            price: priceNum
+        }).eq('id', data.id);
+        
+        if (error) {
+            console.error('❌ Supabase update error:', error);
+            showNotification('❌ Failed to update: ' + error.message, 'error');
+            return;
         }
         
-        db[type][index].qty = qtyNum;
-        db[type][index].price = priceNum;
-        db[type][index].total = qtyNum * priceNum;
-        saveAndRefresh();
+        showNotification('✅ Updated successfully!', 'success');
+        await loadDataFromSupabase();
         generateMasterSearch();
-        showNotification("✅ Updated successfully!", "success");
+        
     } catch (err) {
         console.error('❌ editEntry error:', err);
-        showNotification('❌ Error updating record: ' + err.message, 'error');
+        showNotification('❌ Error: ' + err.message, 'error');
     }
 }
 
@@ -1229,7 +1043,6 @@ function generateCustomReport() {
         const tIn = fIn.reduce(function(s, x) { return s + x.total; }, 0);
         const tOut = fOut.reduce(function(s, x) { return s + x.total; }, 0);
         
-        // Remove old summary
         document.querySelectorAll('.report-summary').forEach(function(el) { el.remove(); });
         const summary = document.createElement('div');
         summary.className = 'report-summary';
@@ -1249,7 +1062,7 @@ function generateCustomReport() {
 }
 
 // ==========================================
-// CUSTOMER LEDGERS
+// CUSTOMER LEDGERS - KEPT AS IS (local only)
 // ==========================================
 function updateCustomerDropdown() {
     try {
@@ -1286,14 +1099,8 @@ function saveLedgerEntry() {
         const credit = parseFloat(creditInput ? creditInput.value : 0) || 0;
         const method = methodInput ? methodInput.value : 'Cash';
         
-        if (!name) {
-            showNotification("⚠️ Customer Name lazmi hai!", "warning");
-            return;
-        }
-        if (!date) {
-            showNotification("⚠️ Date lazmi hai!", "warning");
-            return;
-        }
+        if (!name) { showNotification("⚠️ Customer Name lazmi hai!", "warning"); return; }
+        if (!date) { showNotification("⚠️ Date lazmi hai!", "warning"); return; }
         if (debit === 0 && credit === 0) {
             showNotification("⚠️ Debit ya Credit value lazmi hai!", "warning");
             return;
@@ -1304,7 +1111,11 @@ function saveLedgerEntry() {
             db.opening_balances[name] = 0;
         }
         db.ledgers[name].push({ date: date, item: item, ctn: ctn, debit: debit, credit: credit, method: method });
-        saveLocalData();
+        
+        // Save locally (ledgers are local only)
+        localStorage.setItem('krt_ledgers_data', JSON.stringify(db.ledgers));
+        localStorage.setItem('krt_opening_balances', JSON.stringify(db.opening_balances));
+        
         updateCustomerDropdown();
         showLedger();
         if (itemInput) itemInput.value = "";
@@ -1327,7 +1138,7 @@ function updateOpeningBal() {
         const val = parseFloat(balInput.value) || 0;
         if (name) {
             db.opening_balances[name] = val;
-            saveLocalData();
+            localStorage.setItem('krt_opening_balances', JSON.stringify(db.opening_balances));
             showLedger();
         }
     } catch (err) {
@@ -1394,7 +1205,8 @@ function delLedger(custName, index) {
                 delete db.ledgers[custName];
                 delete db.opening_balances[custName];
             }
-            saveLocalData();
+            localStorage.setItem('krt_ledgers_data', JSON.stringify(db.ledgers));
+            localStorage.setItem('krt_opening_balances', JSON.stringify(db.opening_balances));
             showLedger();
             showNotification("✅ Entry deleted!", "success");
         }
@@ -1417,7 +1229,7 @@ function editLedger(custName, index) {
         if (nCredit === null) return;
         db.ledgers[custName][index].debit = Number(nDebit) || 0;
         db.ledgers[custName][index].credit = Number(nCredit) || 0;
-        saveLocalData();
+        localStorage.setItem('krt_ledgers_data', JSON.stringify(db.ledgers));
         showLedger();
         showNotification("✅ Updated!", "success");
     } catch (err) {
@@ -1427,10 +1239,19 @@ function editLedger(custName, index) {
 }
 
 // ==========================================
-// RENT BOOK
+// RENT BOOK - 100% SUPABASE
 // ==========================================
-function addRentEntry() {
+async function addRentEntry() {
     try {
+        if (!navigator.onLine) {
+            showNotification('⚠️ Internet connection required!', 'error');
+            return;
+        }
+        if (!_supabase) {
+            showNotification('⚠️ Database not available!', 'error');
+            return;
+        }
+        
         const nameInput = document.getElementById('rent-name');
         const shopInput = document.getElementById('rent-shop-no');
         const dateInput = document.getElementById('rent-date');
@@ -1452,47 +1273,32 @@ function addRentEntry() {
         const credit = parseFloat(creditInput ? creditInput.value : 0) || 0;
         const method = methodInput ? methodInput.value : 'Cash';
         
-        if (!name) {
-            showNotification("⚠️ Customer Name lazmi hai!", "warning");
-            return;
-        }
-        if (!date) {
-            showNotification("⚠️ Date lazmi hai!", "warning");
-            return;
-        }
+        if (!name) { showNotification("⚠️ Customer Name lazmi hai!", "warning"); return; }
+        if (!date) { showNotification("⚠️ Date lazmi hai!", "warning"); return; }
         if (debit === 0 && credit === 0) {
             showNotification("⚠️ Debit ya Credit value lazmi hai!", "warning");
             return;
         }
         
-        const tempId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        dbRent.push({ id: tempId, name: name, shop: shop, date: date, month: month, debit: debit, credit: credit, method: method });
-        saveLocalData();
+        showNotification('⏳ Saving rent entry...', 'info');
         
-        // Try cloud sync
-        if (_supabase && navigator.onLine) {
-            _supabase.from('KRT_RENT').insert([{ name: name, shop: shop, date: date, month: month, debit: debit, credit: credit, method: method }])
-                .then(function(result) {
-                    if (result.error) {
-                        console.error('❌ Rent cloud insert failed:', result.error);
-                        addPendingSync({ type: 'insert', table: 'KRT_RENT', data: { name: name, shop: shop, date: date, month: month, debit: debit, credit: credit, method: method } });
-                    } else {
-                        console.log('✅ Rent entry synced to cloud');
-                    }
-                })
-                .catch(function(err) {
-                    console.error('❌ Rent cloud insert error:', err);
-                    addPendingSync({ type: 'insert', table: 'KRT_RENT', data: { name: name, shop: shop, date: date, month: month, debit: debit, credit: credit, method: method } });
-                });
-        } else {
-            addPendingSync({ type: 'insert', table: 'KRT_RENT', data: { name: name, shop: shop, date: date, month: month, debit: debit, credit: credit, method: method } });
+        const { data, error } = await _supabase.from('KRT_RENT')
+            .insert([{ name: name, shop: shop, date: date, month: month, debit: debit, credit: credit, method: method }])
+            .select();
+        
+        if (error) {
+            console.error('❌ Rent insert error:', error);
+            showNotification('❌ Failed to save: ' + error.message, 'error');
+            return;
         }
         
-        renderRentTable();
         showNotification(`✅ ${name} ki entry save ho gayi!`, "success");
+        await loadDataFromSupabase();
+        renderRentTable();
+        
     } catch (err) {
         console.error('❌ addRentEntry error:', err);
-        showNotification('❌ Error saving rent entry: ' + err.message, 'error');
+        showNotification('❌ Error: ' + err.message, 'error');
     }
 }
 
@@ -1543,30 +1349,40 @@ function renderRentTable() {
     }
 }
 
-function deleteRentEntry(index) {
+async function deleteRentEntry(index) {
     try {
-        if (!confirm("⚠️ Kya ye entry delete kar dein?")) return;
-        const record = dbRent[index];
-        if (record && record.id && !record.id.toString().startsWith('local_') && _supabase && navigator.onLine) {
-            _supabase.from('KRT_RENT').delete().eq('id', record.id)
-                .then(function(result) {
-                    if (result.error) {
-                        console.error('❌ Rent delete failed:', result.error);
-                        addPendingSync({ type: 'delete', table: 'KRT_RENT', id: record.id });
-                    }
-                })
-                .catch(function(err) {
-                    console.error('❌ Rent delete error:', err);
-                    addPendingSync({ type: 'delete', table: 'KRT_RENT', id: record.id });
-                });
+        if (!navigator.onLine) {
+            showNotification('⚠️ Internet connection required!', 'error');
+            return;
         }
-        dbRent.splice(index, 1);
-        saveLocalData();
-        renderRentTable();
+        if (!_supabase) {
+            showNotification('⚠️ Database not available!', 'error');
+            return;
+        }
+        if (!confirm("⚠️ Kya ye entry delete kar dein?")) return;
+        
+        const record = dbRent[index];
+        if (!record) {
+            showNotification("⚠️ Record not found!", "error");
+            return;
+        }
+        
+        showNotification('⏳ Deleting rent entry...', 'info');
+        
+        const { error } = await _supabase.from('KRT_RENT').delete().eq('id', record.id);
+        if (error) {
+            console.error('❌ Rent delete error:', error);
+            showNotification('❌ Failed to delete: ' + error.message, 'error');
+            return;
+        }
+        
         showNotification("✅ Rent entry deleted!", "success");
+        await loadDataFromSupabase();
+        renderRentTable();
+        
     } catch (err) {
         console.error('❌ deleteRentEntry error:', err);
-        showNotification('❌ Error deleting rent entry: ' + err.message, 'error');
+        showNotification('❌ Error: ' + err.message, 'error');
     }
 }
 
@@ -1591,27 +1407,17 @@ function createNewUser() {
         const perms = [];
         permCheckboxes.forEach(function(cb) { perms.push(cb.value); });
         
-        if (!name) {
-            showNotification("⚠️ Bilal Bhai, naam likhain!", "warning");
-            return;
-        }
-        if (!id) {
-            showNotification("⚠️ Bilal Bhai, user ID likhain!", "warning");
-            return;
-        }
-        if (!pass) {
-            showNotification("⚠️ Bilal Bhai, password likhain!", "warning");
-            return;
-        }
+        if (!name) { showNotification("⚠️ Bilal Bhai, naam likhain!", "warning"); return; }
+        if (!id) { showNotification("⚠️ Bilal Bhai, user ID likhain!", "warning"); return; }
+        if (!pass) { showNotification("⚠️ Bilal Bhai, password likhain!", "warning"); return; }
         
-        // Check if user already exists
         if (extraUsers.some(function(u) { return u.id === id; })) {
             showNotification("⚠️ Ye user ID pehle se mojud hai!", "warning");
             return;
         }
         
         extraUsers.push({ id: id, pass: pass, name: name, perms: perms });
-        saveLocalData();
+        localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
         loadUserTable();
         if (nameInput) nameInput.value = '';
         if (idInput) idInput.value = '';
@@ -1645,7 +1451,7 @@ function deleteExtraUser(index) {
     try {
         if (!confirm("⚠️ Kya aap is user ko delete karna chahte hain?")) return;
         extraUsers.splice(index, 1);
-        saveLocalData();
+        localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
         loadUserTable();
         showNotification("✅ User deleted!", "success");
     } catch (err) {
@@ -1756,42 +1562,58 @@ function updateItemLists() {
 }
 
 // ==========================================
+// SYNC FUNCTION (Now just reloads from Supabase)
+// ==========================================
+async function syncAllCloudData() {
+    await loadDataFromSupabase();
+}
+
+// ==========================================
 // APP STARTUP
 // ==========================================
 document.addEventListener('DOMContentLoaded', function() {
     try {
-        // Load local data first
-        loadLocalData();
-        
         // Setup idle detection
         setupIdleDetection();
         
-        // Initial render
-        renderAll();
-        renderRentTable();
-        loadUserTable();
-        updateCustomerDropdown();
-        updateItemLists();
+        // Load ledgers from localStorage
+        try {
+            const ledgersStored = localStorage.getItem('krt_ledgers_data');
+            if (ledgersStored) db.ledgers = JSON.parse(ledgersStored);
+            const openingStored = localStorage.getItem('krt_opening_balances');
+            if (openingStored) db.opening_balances = JSON.parse(openingStored);
+        } catch (err) {
+            console.warn('⚠️ Failed to load ledgers:', err);
+        }
         
-        // Cloud sync if online
-        if (navigator.onLine && _supabase) {
-            setTimeout(function() {
-                syncAllCloudData().catch(function(err) {
-                    console.error('❌ Initial sync failed:', err);
-                });
-            }, 2000);
+        // Load extra users
+        try {
+            const usersStored = localStorage.getItem('krt_extra_users');
+            if (usersStored) extraUsers = JSON.parse(usersStored);
+        } catch (err) {
+            console.warn('⚠️ Failed to load users:', err);
         }
         
         // Check login status
         const loggedIn = localStorage.getItem('isLoggedIn');
         const role = localStorage.getItem('userRole');
+        
         if (loggedIn === 'true') {
-            if (role === 'admin') showSystem('admin');
-            else if (role === 'staff') showSystem('staff');
-            else if (role === 'manager') showSystem('manager');
+            // Load data from Supabase
+            loadDataFromSupabase().then(function() {
+                if (role === 'admin') showSystem('admin');
+                else if (role === 'staff') showSystem('staff');
+                else if (role === 'manager') showSystem('manager');
+            }).catch(function(err) {
+                console.error('❌ Initial load failed:', err);
+                showNotification('⚠️ Failed to load data. Please refresh.', 'error');
+            });
+        } else {
+            // Show login screen
+            document.getElementById('login-screen').style.display = 'flex';
         }
         
-        console.log("🚀 KRT TRADERS ERP v5.0 Loaded!");
+        console.log("🚀 KRT TRADERS ERP v5.0 Loaded! (100% Supabase)");
         console.log("📦 Developed by Bilal Suleman");
         console.log("🐘 Elephant Never Forgets!");
     } catch (err) {
@@ -1805,13 +1627,11 @@ document.addEventListener('DOMContentLoaded', function() {
 // ==========================================
 document.addEventListener('DOMContentLoaded', function() {
     try {
-        // Rent name live search
         const rentName = document.getElementById('rent-name');
         if (rentName) {
             rentName.addEventListener('input', renderRentTable);
         }
         
-        // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey && e.key === 's') {
                 e.preventDefault();
@@ -1825,7 +1645,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // Enter key on login
         const passInput = document.getElementById('pass');
         if (passInput) {
             passInput.addEventListener('keydown', function(e) {
@@ -1842,6 +1661,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+        
+        // Auto sync every 60 seconds if online
+        setInterval(function() {
+            if (navigator.onLine && _supabase && localStorage.getItem('isLoggedIn') === 'true') {
+                console.log('🔄 Auto sync...');
+                loadDataFromSupabase().catch(function(err) {
+                    console.warn('⚠️ Auto sync failed:', err);
+                });
+            }
+        }, 60000);
         
         console.log('✅ Event listeners setup complete');
     } catch (err) {
