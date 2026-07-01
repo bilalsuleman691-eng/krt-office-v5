@@ -31,12 +31,28 @@ let isSupabaseConnected = false;
 try {
     _supabase = supabase.createClient(supabaseUrl, supabaseKey);
     console.log('✅ Supabase client created');
-    // Test connection
     testSupabaseConnection();
 } catch (err) {
     console.error('❌ Supabase init failed:', err);
     showNotification('⚠️ Database connection failed. Running in offline mode.', 'warning');
 }
+
+// ==========================================
+// IDLE SYSTEM VARIABLES
+// ==========================================
+const IDLE_TIMEOUT = 30000;
+let idleTimer = null;
+let isIdle = false;
+let idleSeconds = 0;
+let idleInterval = null;
+
+// ==========================================
+// GLOBAL DATABASE OBJECTS
+// ==========================================
+let db = { in: [], out: [], ledgers: {}, opening_balances: {} };
+let dbRent = [];
+let extraUsers = [];
+let pendingSync = [];
 
 // ==========================================
 // TEST SUPABASE CONNECTION
@@ -63,7 +79,6 @@ async function testSupabaseConnection() {
         console.log('✅ Supabase connected successfully!');
         console.log(`📊 Total records: ${data?.count || 0}`);
         
-        // Process pending syncs if any
         if (navigator.onLine) {
             await processPendingSync();
         }
@@ -72,14 +87,6 @@ async function testSupabaseConnection() {
         isSupabaseConnected = false;
     }
 }
-
-// ==========================================
-// GLOBAL DATABASE OBJECTS
-// ==========================================
-let db = { in: [], out: [], ledgers: {}, opening_balances: {} };
-let dbRent = [];
-let extraUsers = [];
-let pendingSync = [];
 
 // ==========================================
 // LOAD DATA FROM LOCALSTORAGE
@@ -191,11 +198,9 @@ async function fetchCloudData() {
             return;
         }
         
-        // Clear local data
         db.in = [];
         db.out = [];
         
-        // Process cloud data
         data.forEach(function(row) {
             try {
                 const inQty = Number(row.stock_in || 0);
@@ -288,7 +293,7 @@ async function fetchCloudRentData() {
 }
 
 // ==========================================
-// PENDING SYNC QUEUE (Offline Support)
+// PENDING SYNC QUEUE
 // ==========================================
 async function processPendingSync() {
     try {
@@ -357,7 +362,6 @@ function addPendingSync(op) {
         localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
         console.log(`📝 Added to pending sync: ${op.type} on ${op.table}`);
         
-        // Try to process immediately if online
         if (navigator.onLine && isSupabaseConnected) {
             setTimeout(processPendingSync, 1000);
         }
@@ -390,7 +394,6 @@ async function addIn() {
         const qty = Number(qtyInput.value);
         const price = Number(priceInput.value);
         
-        // Validation
         if (!date) {
             showNotification("⚠️ Bilal Bhai, date select karein!", "warning");
             return;
@@ -408,7 +411,6 @@ async function addIn() {
             return;
         }
         
-        // Check for duplicate
         const duplicate = db.in.some(function(x) {
             return x.item === item && x.date === date && x.vendor === vendor && x.qty === qty && x.price === price;
         });
@@ -426,7 +428,6 @@ async function addIn() {
             vendor_name: vendor || 'factory'
         };
         
-        // Try cloud insert
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 console.log('📤 Saving to cloud...');
@@ -437,7 +438,6 @@ async function addIn() {
                 
                 if (error) {
                     console.error('❌ Cloud insert failed:', error);
-                    // Save locally and add to pending
                     saveStockInLocal(date, vendor, item, barcode, qty, price);
                     addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
                     showNotification('⚠️ Cloud save failed. Saved locally.', 'warning');
@@ -445,10 +445,8 @@ async function addIn() {
                     return;
                 }
                 
-                // ✅ Cloud success
                 if (data && data.length > 0) {
                     console.log('✅ Cloud save success:', data[0]);
-                    // Add to local DB with cloud ID
                     db.in.push({
                         id: data[0].id,
                         date: date,
@@ -462,12 +460,11 @@ async function addIn() {
                     saveAndRefresh();
                     clearInForm(dateInput, itemInput, qtyInput, priceInput, barcodeInput);
                     showNotification("✅ Stock IN saved to cloud!", "success");
-                    await fetchCloudData(); // Refresh
+                    await fetchCloudData();
                     return;
                 }
             } catch (cloudErr) {
                 console.error('❌ Cloud error:', cloudErr);
-                // Fallback to local
                 saveStockInLocal(date, vendor, item, barcode, qty, price);
                 addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
                 showNotification('⚠️ Cloud error. Saved locally.', 'warning');
@@ -476,7 +473,6 @@ async function addIn() {
             }
         }
         
-        // Offline or disconnected - save locally
         saveStockInLocal(date, vendor, item, barcode, qty, price);
         addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
         showNotification("✅ Stock IN saved locally! Will sync when online.", "warning");
@@ -535,7 +531,6 @@ async function addOut() {
         const qty = Number(qtyInput.value);
         const price = Number(priceInput.value);
         
-        // Validation
         if (!date) {
             showNotification("⚠️ Bilal Bhai, date select karein!", "warning");
             return;
@@ -553,7 +548,6 @@ async function addOut() {
             return;
         }
         
-        // Check stock availability
         const totalIn = db.in.filter(function(x) { return x.item === item; }).reduce(function(s, x) { return s + x.qty; }, 0);
         const totalOut = db.out.filter(function(x) { return x.item === item; }).reduce(function(s, x) { return s + x.qty; }, 0);
         const available = totalIn - totalOut;
@@ -563,7 +557,6 @@ async function addOut() {
             return;
         }
         
-        // Check duplicate
         const duplicate = db.out.some(function(x) {
             return x.item === item && x.date === date && x.cust === custName && x.qty === qty && x.price === price;
         });
@@ -581,7 +574,6 @@ async function addOut() {
             customer_name: custName
         };
         
-        // Try cloud insert
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 console.log('📤 Saving sale to cloud...');
@@ -627,7 +619,6 @@ async function addOut() {
             }
         }
         
-        // Offline - save locally
         saveStockOutLocal(date, custName, item, barcode, qty, price);
         addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
         showNotification("✅ Stock OUT saved locally! Will sync when online.", "warning");
@@ -675,7 +666,6 @@ async function deleteEntry(type, index) {
             return;
         }
         
-        // Delete from cloud if it's a cloud record
         if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 const { error } = await _supabase.from('KRT').delete().eq('id', record.id);
@@ -690,7 +680,6 @@ async function deleteEntry(type, index) {
                 addPendingSync({ type: 'delete', table: 'KRT', id: record.id });
             }
         } else if (record.id && record.id.toString().startsWith('local_')) {
-            // Remove from pending sync if exists
             pendingSync = pendingSync.filter(function(op) {
                 return !(op.type === 'insert' && op.data && op.data.id === record.id);
             });
@@ -707,13 +696,68 @@ async function deleteEntry(type, index) {
 }
 
 // ==========================================
+// EDIT ENTRY
+// ==========================================
+async function editEntry(type, index) {
+    try {
+        const data = db[type] && db[type][index];
+        if (!data) {
+            showNotification("⚠️ Record not found!", "error");
+            return;
+        }
+        
+        const newQty = prompt("New Qty:", data.qty);
+        if (newQty === null) return;
+        const newPrice = prompt("New Price:", data.price);
+        if (newPrice === null) return;
+        
+        const qtyNum = Number(newQty);
+        const priceNum = Number(newPrice);
+        if (isNaN(qtyNum) || qtyNum < 0) {
+            showNotification("⚠️ Invalid quantity!", "warning");
+            return;
+        }
+        if (isNaN(priceNum) || priceNum < 0) {
+            showNotification("⚠️ Invalid price!", "warning");
+            return;
+        }
+        
+        if (data.id && !data.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
+            try {
+                const { error } = await _supabase.from('KRT').update({
+                    stock_in: type === 'in' ? qtyNum : 0,
+                    stock_out: type === 'out' ? qtyNum : 0,
+                    price: priceNum
+                }).eq('id', data.id);
+                if (error) {
+                    console.error('❌ Update failed:', error);
+                    addPendingSync({ type: 'update', table: 'KRT', id: data.id, data: { stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum } });
+                }
+            } catch (err) {
+                console.error('❌ Update error:', err);
+                addPendingSync({ type: 'update', table: 'KRT', id: data.id, data: { stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum } });
+            }
+        }
+        
+        db[type][index].qty = qtyNum;
+        db[type][index].price = priceNum;
+        db[type][index].total = qtyNum * priceNum;
+        saveAndRefresh();
+        generateMasterSearch();
+        showNotification("✅ Updated successfully!", "success");
+    } catch (err) {
+        console.error('❌ editEntry error:', err);
+        showNotification('❌ Error updating record: ' + err.message, 'error');
+    }
+}
+
+// ==========================================
 // RENDER ALL
 // ==========================================
 function renderAll() {
     try {
         const today = new Date().toISOString().split('T')[0];
         
-        // Today's IN
         const inBody = document.getElementById('today-list-in');
         if (inBody) {
             let html = "";
@@ -734,7 +778,6 @@ function renderAll() {
             inBody.innerHTML = html || `<tr><td colspan="7" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Aaj ki koi entry nahi hai...</td></tr>`;
         }
         
-        // Today's OUT
         const outBody = document.getElementById('today-list-out');
         if (outBody) {
             let html = "";
@@ -757,7 +800,6 @@ function renderAll() {
             outBody.innerHTML = html || `<tr><td colspan="9" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Aaj ki koi sale nahi hai...</td></tr>`;
         }
         
-        // Balance
         const balBody = document.getElementById('table-balance-body');
         if (balBody) {
             const items = [...new Set([...db.in.map(function(x) { return x.item; }), ...db.out.map(function(x) { return x.item; })])];
@@ -817,7 +859,6 @@ function updateDashboardStats() {
         if (el3) el3.textContent = uniqueItems.length;
         if (el4) el4.textContent = 'PKR ' + revenue.toLocaleString();
         
-        // Recent Activity
         const act = document.getElementById('recent-activity');
         if (act) {
             const all = [
@@ -835,6 +876,63 @@ function updateDashboardStats() {
         }
     } catch (err) {
         console.error('❌ updateDashboardStats error:', err);
+    }
+}
+
+// ==========================================
+// LIVE STOCK CHECK
+// ==========================================
+function showLiveStock(itemName) {
+    try {
+        const status = document.getElementById('stock-status');
+        if (!status) return;
+        if (!itemName || !itemName.trim()) {
+            status.innerHTML = "";
+            return;
+        }
+        const totalIn = db.in.filter(function(x) { return x.item === itemName; }).reduce(function(s, x) { return s + x.qty; }, 0);
+        const totalOut = db.out.filter(function(x) { return x.item === itemName; }).reduce(function(s, x) { return s + x.qty; }, 0);
+        const balance = totalIn - totalOut;
+        if (balance > 0) {
+            status.style.color = "#27ae60";
+            status.innerHTML = `✅ Available Stock: <strong>${balance}</strong>`;
+        } else if (balance <= 0 && totalIn > 0) {
+            status.style.color = "#e74c3c";
+            status.innerHTML = `⚠️ Out of Stock! (Balance: ${balance})`;
+        } else {
+            status.style.color = "#7f8c8d";
+            status.innerHTML = "ℹ️ No record found for this item.";
+        }
+    } catch (err) {
+        console.error('❌ showLiveStock error:', err);
+    }
+}
+
+// ==========================================
+// UPDATE ITEM LISTS
+// ==========================================
+function updateItemLists() {
+    try {
+        const list = document.getElementById('items-list');
+        if (!list) return;
+        const items = [...new Set([...db.in.map(function(x) { return x.item; }), ...db.out.map(function(x) { return x.item; })])];
+        list.innerHTML = items.map(function(name) {
+            return `<option value="${escapeHtml(name)}">`;
+        }).join('');
+    } catch (err) {
+        console.error('❌ updateItemLists error:', err);
+    }
+}
+
+function updateCustomerDropdown() {
+    try {
+        const list = document.getElementById('customer-list');
+        if (!list) return;
+        list.innerHTML = Object.keys(db.ledgers).map(function(name) {
+            return `<option value="${escapeHtml(name)}">`;
+        }).join('');
+    } catch (err) {
+        console.error('❌ updateCustomerDropdown error:', err);
     }
 }
 
@@ -887,13 +985,11 @@ function addRentEntry() {
             method: method
         };
         
-        // Add to local
         const tempId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         dbRent.push({ id: tempId, ...entryData });
         saveLocalData();
         renderRentTable();
         
-        // Try cloud sync
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             _supabase.from('KRT_RENT').insert([entryData])
                 .then(function(result) {
@@ -902,7 +998,6 @@ function addRentEntry() {
                         addPendingSync({ type: 'insert', table: 'KRT_RENT', data: entryData });
                     } else {
                         console.log('✅ Rent entry synced to cloud');
-                        // Update local with cloud ID
                         if (result.data && result.data.length > 0) {
                             const idx = dbRent.findIndex(function(x) { return x.id === tempId; });
                             if (idx !== -1) {
@@ -920,7 +1015,6 @@ function addRentEntry() {
             addPendingSync({ type: 'insert', table: 'KRT_RENT', data: entryData });
         }
         
-        // Clear form
         if (nameInput) nameInput.value = '';
         if (shopInput) shopInput.value = '';
         if (debitInput) debitInput.value = '0';
@@ -1008,6 +1102,764 @@ function deleteRentEntry(index) {
 }
 
 // ==========================================
+// CUSTOMER LEDGERS
+// ==========================================
+function saveLedgerEntry() {
+    try {
+        const nameInput = document.getElementById('ledger-cust-name');
+        const dateInput = document.getElementById('led-date');
+        const itemInput = document.getElementById('led-item');
+        const ctnInput = document.getElementById('led-ctn');
+        const debitInput = document.getElementById('led-debit');
+        const creditInput = document.getElementById('led-credit');
+        const methodInput = document.getElementById('led-method');
+        
+        if (!nameInput || !dateInput) {
+            showNotification('⚠️ Form elements not found!', 'error');
+            return;
+        }
+        
+        const name = nameInput.value.trim();
+        const date = dateInput.value;
+        const item = itemInput ? itemInput.value : '';
+        const ctn = parseFloat(ctnInput ? ctnInput.value : 0) || 0;
+        const debit = parseFloat(debitInput ? debitInput.value : 0) || 0;
+        const credit = parseFloat(creditInput ? creditInput.value : 0) || 0;
+        const method = methodInput ? methodInput.value : 'Cash';
+        
+        if (!name) {
+            showNotification("⚠️ Customer Name lazmi hai!", "warning");
+            return;
+        }
+        if (!date) {
+            showNotification("⚠️ Date lazmi hai!", "warning");
+            return;
+        }
+        if (debit === 0 && credit === 0) {
+            showNotification("⚠️ Debit ya Credit value lazmi hai!", "warning");
+            return;
+        }
+        
+        if (!db.ledgers[name]) {
+            db.ledgers[name] = [];
+            db.opening_balances[name] = 0;
+        }
+        db.ledgers[name].push({ date: date, item: item, ctn: ctn, debit: debit, credit: credit, method: method });
+        saveLocalData();
+        updateCustomerDropdown();
+        showLedger();
+        if (itemInput) itemInput.value = "";
+        if (ctnInput) ctnInput.value = "0";
+        if (debitInput) debitInput.value = "0";
+        if (creditInput) creditInput.value = "0";
+        showNotification(`✅ Entry saved for ${name}!`, "success");
+    } catch (err) {
+        console.error('❌ saveLedgerEntry error:', err);
+        showNotification('❌ Error saving ledger entry: ' + err.message, 'error');
+    }
+}
+
+function updateOpeningBal() {
+    try {
+        const nameInput = document.getElementById('ledger-cust-name');
+        const balInput = document.getElementById('opening-bal');
+        if (!nameInput || !balInput) return;
+        const name = nameInput.value.trim();
+        const val = parseFloat(balInput.value) || 0;
+        if (name) {
+            db.opening_balances[name] = val;
+            saveLocalData();
+            showLedger();
+        }
+    } catch (err) {
+        console.error('❌ updateOpeningBal error:', err);
+    }
+}
+
+function showLedger() {
+    try {
+        const nameInput = document.getElementById('ledger-cust-name');
+        const tbody = document.getElementById('ledger-table-body');
+        if (!tbody || !nameInput) return;
+        const name = nameInput.value.trim();
+        const opening = parseFloat(db.opening_balances[name]) || 0;
+        const balInput = document.getElementById('opening-bal');
+        if (balInput) balInput.value = opening;
+        tbody.innerHTML = "";
+        const totalCtn = document.getElementById('total-ctn');
+        const totalDebit = document.getElementById('total-debit');
+        const totalCredit = document.getElementById('total-credit');
+        const finalBalance = document.getElementById('final-balance');
+        
+        if (!name || !db.ledgers[name]) {
+            if (totalCtn) totalCtn.textContent = "0";
+            if (totalDebit) totalDebit.textContent = "0";
+            if (totalCredit) totalCredit.textContent = "0";
+            if (finalBalance) finalBalance.textContent = "💰 Balance: 0";
+            return;
+        }
+        let tCtn = 0, tDebit = 0, tCredit = 0;
+        db.ledgers[name].forEach(function(x, i) {
+            tCtn += Number(x.ctn || 0);
+            tDebit += Number(x.debit || 0);
+            tCredit += Number(x.credit || 0);
+            tbody.innerHTML += `<tr>
+                <td>${i+1}</td>
+                <td>${x.date}</td>
+                <td>${escapeHtml(x.item)}</td>
+                <td>${x.ctn}</td>
+                <td>${x.debit.toLocaleString()}</td>
+                <td>${x.credit.toLocaleString()}</td>
+                <td>${escapeHtml(x.method)}</td>
+                <td>
+                    <button class="btn-action btn-edit" onclick="editLedger('${escapeHtml(name)}',${i})">Edit</button>
+                    <button class="btn-action btn-delete" onclick="delLedger('${escapeHtml(name)}',${i})">Del</button>
+                </td>
+            </tr>`;
+        });
+        if (totalCtn) totalCtn.textContent = tCtn;
+        if (totalDebit) totalDebit.textContent = tDebit.toLocaleString();
+        if (totalCredit) totalCredit.textContent = tCredit.toLocaleString();
+        if (finalBalance) finalBalance.textContent = `💰 Balance: ${((opening + tDebit) - tCredit).toLocaleString()}`;
+    } catch (err) {
+        console.error('❌ showLedger error:', err);
+    }
+}
+
+function delLedger(custName, index) {
+    try {
+        if (!confirm("⚠️ Kya ye entry delete kar dein?")) return;
+        if (db.ledgers[custName] && db.ledgers[custName][index]) {
+            db.ledgers[custName].splice(index, 1);
+            if (db.ledgers[custName].length === 0) {
+                delete db.ledgers[custName];
+                delete db.opening_balances[custName];
+            }
+            saveLocalData();
+            showLedger();
+            showNotification("✅ Entry deleted!", "success");
+        }
+    } catch (err) {
+        console.error('❌ delLedger error:', err);
+        showNotification('❌ Error deleting entry: ' + err.message, 'error');
+    }
+}
+
+function editLedger(custName, index) {
+    try {
+        const entry = db.ledgers[custName] && db.ledgers[custName][index];
+        if (!entry) {
+            showNotification("⚠️ Entry not found!", "error");
+            return;
+        }
+        const nDebit = prompt("Naya Debit (Udhaar):", entry.debit);
+        if (nDebit === null) return;
+        const nCredit = prompt("Naya Credit (Wasuli):", entry.credit);
+        if (nCredit === null) return;
+        db.ledgers[custName][index].debit = Number(nDebit) || 0;
+        db.ledgers[custName][index].credit = Number(nCredit) || 0;
+        saveLocalData();
+        showLedger();
+        showNotification("✅ Updated!", "success");
+    } catch (err) {
+        console.error('❌ editLedger error:', err);
+        showNotification('❌ Error updating entry: ' + err.message, 'error');
+    }
+}
+
+// ==========================================
+// USER MANAGEMENT
+// ==========================================
+function loadUserTable() {
+    try {
+        const tbody = document.getElementById('user-table-body');
+        if (!tbody) return;
+        tbody.innerHTML = extraUsers.map(function(u, i) {
+            return `<tr>
+                <td>${escapeHtml(u.id)}</td>
+                <td>${escapeHtml(u.name)}</td>
+                <td><small>${escapeHtml(u.perms ? u.perms.join(', ') : '')}</small></td>
+                <td><button class="btn-action btn-delete" onclick="deleteExtraUser(${i})">Del</button></td>
+            </tr>`;
+        }).join('') || `<tr><td colspan="4" style="text-align:center;padding:20px;color:#7f8c8d;">No users created yet</td></tr>`;
+    } catch (err) {
+        console.error('❌ loadUserTable error:', err);
+    }
+}
+
+function deleteExtraUser(index) {
+    try {
+        if (!confirm("⚠️ Kya aap is user ko delete karna chahte hain?")) return;
+        extraUsers.splice(index, 1);
+        saveLocalData();
+        loadUserTable();
+        showNotification("✅ User deleted!", "success");
+    } catch (err) {
+        console.error('❌ deleteExtraUser error:', err);
+        showNotification('❌ Error deleting user: ' + err.message, 'error');
+    }
+}
+
+function createNewUser() {
+    try {
+        const nameInput = document.getElementById('new-username');
+        const idInput = document.getElementById('new-userid');
+        const passInput = document.getElementById('new-password');
+        const permCheckboxes = document.querySelectorAll('.perm:checked');
+        
+        if (!nameInput || !idInput || !passInput) {
+            showNotification('⚠️ Form elements not found!', 'error');
+            return;
+        }
+        
+        const name = nameInput.value.trim();
+        const id = idInput.value.trim();
+        const pass = passInput.value.trim();
+        const perms = [];
+        permCheckboxes.forEach(function(cb) { perms.push(cb.value); });
+        
+        if (!name) {
+            showNotification("⚠️ Bilal Bhai, naam likhain!", "warning");
+            return;
+        }
+        if (!id) {
+            showNotification("⚠️ Bilal Bhai, user ID likhain!", "warning");
+            return;
+        }
+        if (!pass) {
+            showNotification("⚠️ Bilal Bhai, password likhain!", "warning");
+            return;
+        }
+        
+        if (extraUsers.some(function(u) { return u.id === id; })) {
+            showNotification("⚠️ Ye user ID pehle se mojud hai!", "warning");
+            return;
+        }
+        
+        extraUsers.push({ id: id, pass: pass, name: name, perms: perms });
+        saveLocalData();
+        loadUserTable();
+        if (nameInput) nameInput.value = '';
+        if (idInput) idInput.value = '';
+        if (passInput) passInput.value = '';
+        permCheckboxes.forEach(function(cb) { cb.checked = false; });
+        showNotification(`✅ New user "${name}" created!`, "success");
+    } catch (err) {
+        console.error('❌ createNewUser error:', err);
+        showNotification('❌ Error creating user: ' + err.message, 'error');
+    }
+}
+
+// ==========================================
+// LOGIN / LOGOUT / SHOW SYSTEM
+// ==========================================
+function login() {
+    try {
+        const userInput = document.getElementById('user');
+        const passInput = document.getElementById('pass');
+        if (!userInput || !passInput) {
+            showNotification('⚠️ Login form not found!', 'error');
+            return;
+        }
+        
+        const u = userInput.value.trim().toLowerCase();
+        const p = passInput.value.trim();
+        
+        if (u === "admin" && p === "123") {
+            localStorage.setItem('isLoggedIn','true');
+            localStorage.setItem('userRole','admin');
+            showSystem("admin");
+        } else if (u === "ali" && p === "123") {
+            localStorage.setItem('isLoggedIn','true');
+            localStorage.setItem('userRole','staff');
+            showSystem("staff");
+        } else if (u === "sattar" && p === "123") {
+            localStorage.setItem('isLoggedIn','true');
+            localStorage.setItem('userRole','manager');
+            showSystem("manager");
+        } else {
+            const found = extraUsers.find(function(user) {
+                return user.id === u && user.pass === p;
+            });
+            if (found) {
+                localStorage.setItem('isLoggedIn','true');
+                localStorage.setItem('userRole','extra');
+                showSystem(found);
+                const toggleBtn = document.getElementById('toggle-btn');
+                if (toggleBtn) toggleBtn.style.display = "block";
+            } else {
+                showNotification("❌ Ghalat ID ya Password!", "error");
+                const loginBox = document.querySelector('#login-screen .login-box');
+                if (loginBox) {
+                    loginBox.style.animation = 'shake 0.5s ease';
+                    setTimeout(function() {
+                        loginBox.style.animation = '';
+                    }, 500);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('❌ Login error:', err);
+        showNotification('⚠️ Login failed. Please try again.', 'error');
+    }
+}
+
+function showSystem(roleOrUser) {
+    try {
+        const loginScreen = document.getElementById('login-screen');
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
+        const toggleBtn = document.getElementById('toggle-btn');
+        
+        if (loginScreen) loginScreen.style.display = "none";
+        if (sidebar) sidebar.style.display = "block";
+        if (mainContent) mainContent.style.display = "block";
+        if (toggleBtn) toggleBtn.style.display = "block";
+        
+        if (typeof roleOrUser === "object") {
+            applyDynamicPermissions(roleOrUser);
+        } else {
+            const items = document.querySelectorAll('#sidebar ul li');
+            items.forEach(function(item) {
+                item.style.display = "flex";
+            });
+            if (roleOrUser === "staff") {
+                items.forEach(function(item) {
+                    const t = item.innerText || '';
+                    if (!t.includes("Dashboard") && !t.includes("Daily Report") && 
+                        !t.includes("Stock Balance") && !t.includes("Logout")) {
+                        item.style.display = "none";
+                    }
+                });
+                switchPage('page-Report','DAILY REPORT');
+            } else if (roleOrUser === "manager") {
+                items.forEach(function(item) {
+                    const t = item.innerText || '';
+                    if (!t.includes("Dashboard") && !t.includes("Customer Ledgers") && 
+                        !t.includes("Market Rent Book") && !t.includes("Stock Balance") && 
+                        !t.includes("Logout")) {
+                        item.style.display = "none";
+                    }
+                });
+                switchPage('page-customer-ledgers','CUSTOMER LEDGERS');
+            }
+        }
+        renderAll();
+        updateDashboardStats();
+        loadUserTable();
+        resetIdleTimer();
+    } catch (err) {
+        console.error('❌ Failed to show system:', err);
+        showNotification('⚠️ Failed to load system. Please refresh.', 'error');
+    }
+}
+
+function applyDynamicPermissions(user) {
+    try {
+        const items = document.querySelectorAll('#sidebar ul li');
+        items.forEach(function(item) {
+            const onclick = item.getAttribute('onclick') || "";
+            if (onclick.includes('page-dashboard') || onclick.includes('logout')) {
+                item.style.display = "flex";
+                return;
+            }
+            let hasPerm = false;
+            if (user.perms) {
+                hasPerm = user.perms.some(function(p) {
+                    return onclick.includes(p);
+                });
+            }
+            item.style.display = hasPerm ? "flex" : "none";
+        });
+        renderAll();
+    } catch (err) {
+        console.error('❌ Failed to apply permissions:', err);
+    }
+}
+
+function logout() {
+    try {
+        if (!confirm("🚪 Bilal Bhai, kya aap waqai logout karna chahte hain?")) return;
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('userRole');
+        if (idleTimer) clearTimeout(idleTimer);
+        if (idleInterval) clearInterval(idleInterval);
+        const overlay = document.getElementById('idle-overlay');
+        if (overlay) overlay.style.display = 'none';
+        isIdle = false;
+        location.reload();
+    } catch (err) {
+        console.error('❌ logout error:', err);
+        location.reload();
+    }
+}
+
+// ==========================================
+// SIDEBAR / PAGE SWITCHING
+// ==========================================
+function toggleSidebar() {
+    try {
+        const sb = document.getElementById('sidebar');
+        const mc = document.getElementById('main-content');
+        if (!sb || !mc) return;
+        const currentLeft = sb.style.left || '';
+        if (currentLeft === "0px" || currentLeft === "") {
+            sb.style.left = "-260px";
+            mc.style.marginLeft = "0";
+        } else {
+            sb.style.left = "0px";
+            mc.style.marginLeft = "260px";
+        }
+    } catch (err) {
+        console.error('❌ toggleSidebar error:', err);
+    }
+}
+
+function switchPage(pageId, title) {
+    try {
+        document.querySelectorAll('.erp-page').forEach(function(p) {
+            p.style.display = 'none';
+        });
+        const page = document.getElementById(pageId);
+        if (page) page.style.display = 'block';
+        
+        const titleEl = document.getElementById('page-title');
+        if (titleEl) {
+            titleEl.innerHTML = `<i class="fas fa-chart-line" style="color:#f1c40f; margin-right:12px;"></i>KRT TRADERS ERP - ${title}`;
+        }
+        
+        if (window.innerWidth <= 768) {
+            const sb = document.getElementById('sidebar');
+            const mc = document.getElementById('main-content');
+            if (sb) sb.style.left = "-260px";
+            if (mc) mc.style.marginLeft = "0";
+        }
+        resetIdleTimer();
+    } catch (err) {
+        console.error('❌ switchPage error:', err);
+    }
+}
+
+// ==========================================
+// IDLE SCREEN FUNCTIONS
+// ==========================================
+function createIdleOverlay() {
+    try {
+        if (document.getElementById('idle-overlay')) return;
+        
+        const overlay = document.createElement('div');
+        overlay.id = 'idle-overlay';
+        overlay.innerHTML = `
+            <div id="idle-status">🟢 ACTIVE</div>
+            <div id="idle-particles"></div>
+            <div id="idle-content">
+                <span id="idle-icon">🐘</span>
+                <h1 id="idle-title">⚡ <span class="highlight">KRT</span> ERP</h1>
+                <div id="idle-timer">00:00</div>
+                <p id="idle-message">🌟 An <strong>elephant never forgets</strong> —<br>and neither does your KRT ERP!<br>Your session is <strong>paused</strong>, ready to resume.</p>
+                <button id="idle-touch-btn"><span class="icon">👆</span> Touch to Continue</button>
+                <div id="idle-motto">✦ <span>Bilal Suleman</span> • KRT TRADERS ERP v5.0 ✦</div>
+            </div>
+            <div id="idle-version">✦ MEMORY DRIVEN • ELEPHANT NEVER FORGETS ✦</div>
+        `;
+        document.body.appendChild(overlay);
+        
+        overlay.addEventListener('click', dismissIdleScreen);
+        const touchBtn = document.getElementById('idle-touch-btn');
+        if (touchBtn) {
+            touchBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                dismissIdleScreen();
+            });
+        }
+        
+        generateIdleParticles();
+        generateIdleEmojis();
+    } catch (err) {
+        console.error('❌ Failed to create idle overlay:', err);
+    }
+}
+
+function generateIdleParticles() {
+    try {
+        const container = document.getElementById('idle-particles');
+        if (!container) return;
+        container.innerHTML = '';
+        const colors = ['#f1c40f', '#e67e22', '#3498db', '#27ae60', '#e74c3c', '#9b59b6'];
+        for (let i = 0; i < 30; i++) {
+            const p = document.createElement('div');
+            p.className = 'idle-particle';
+            const size = Math.random() * 10 + 4;
+            p.style.cssText = `
+                width:${size}px; height:${size}px;
+                left:${Math.random()*100}%;
+                background:${colors[Math.floor(Math.random()*colors.length)]};
+                opacity:${Math.random()*0.15+0.05};
+                animation-duration:${Math.random()*20+15}s;
+                animation-delay:${Math.random()*20}s;
+                border-radius:${Math.random()>0.5?'50%':'4px'};
+            `;
+            container.appendChild(p);
+        }
+    } catch (err) {
+        console.error('❌ Failed to generate particles:', err);
+    }
+}
+
+function generateIdleEmojis() {
+    try {
+        const overlay = document.getElementById('idle-overlay');
+        if (!overlay) return;
+        document.querySelectorAll('.floating-emoji').forEach(el => el.remove());
+        const emojis = ['🐘','🌟','✨','💎','⚡','🔥','💫','🎯','🏆','👑','🦋','🌈'];
+        for (let i = 0; i < 20; i++) {
+            const e = document.createElement('div');
+            e.className = 'floating-emoji';
+            e.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+            e.style.cssText = `
+                left:${Math.random()*100}%;
+                font-size:${Math.random()*30+20}px;
+                animation-duration:${Math.random()*30+20}s;
+                animation-delay:${Math.random()*30}s;
+                opacity:${Math.random()*0.05+0.03};
+            `;
+            overlay.appendChild(e);
+        }
+    } catch (err) {
+        console.error('❌ Failed to generate emojis:', err);
+    }
+}
+
+function showIdleScreen() {
+    try {
+        if (isIdle) return;
+        const loginScreen = document.getElementById('login-screen');
+        const welcomeOverlay = document.getElementById('welcome-overlay');
+        if (!loginScreen || !welcomeOverlay) return;
+        if (loginScreen.style.display !== 'none') return;
+        if (welcomeOverlay.style.display !== 'none') return;
+        
+        isIdle = true;
+        let overlay = document.getElementById('idle-overlay');
+        if (!overlay) {
+            createIdleOverlay();
+            overlay = document.getElementById('idle-overlay');
+            if (!overlay) return;
+        }
+        
+        idleSeconds = 0;
+        const timerEl = document.getElementById('idle-timer');
+        if (timerEl) timerEl.textContent = '00:00';
+        overlay.style.display = 'flex';
+        overlay.style.animation = 'idleIn 0.8s ease';
+        const statusEl = document.getElementById('idle-status');
+        if (statusEl) statusEl.textContent = '🔴 IDLE';
+        
+        generateIdleParticles();
+        generateIdleEmojis();
+        
+        if (idleInterval) clearInterval(idleInterval);
+        idleInterval = setInterval(function() {
+            idleSeconds++;
+            const m = String(Math.floor(idleSeconds/60)).padStart(2,'0');
+            const s = String(idleSeconds%60).padStart(2,'0');
+            const timer = document.getElementById('idle-timer');
+            if (timer) timer.textContent = `${m}:${s}`;
+        }, 1000);
+    } catch (err) {
+        console.error('❌ Failed to show idle screen:', err);
+    }
+}
+
+function dismissIdleScreen() {
+    try {
+        if (!isIdle) return;
+        isIdle = false;
+        const overlay = document.getElementById('idle-overlay');
+        if (overlay) {
+            overlay.style.animation = 'idleOut 0.5s ease forwards';
+            setTimeout(function() {
+                overlay.style.display = 'none';
+                overlay.style.animation = '';
+            }, 500);
+        }
+        if (idleInterval) {
+            clearInterval(idleInterval);
+            idleInterval = null;
+        }
+        const statusEl = document.getElementById('idle-status');
+        if (statusEl) statusEl.textContent = '🟢 ACTIVE';
+        resetIdleTimer();
+    } catch (err) {
+        console.error('❌ Failed to dismiss idle screen:', err);
+    }
+}
+
+function resetIdleTimer() {
+    try {
+        if (idleTimer) clearTimeout(idleTimer);
+        if (isIdle) return;
+        idleTimer = setTimeout(showIdleScreen, IDLE_TIMEOUT);
+    } catch (err) {
+        console.error('❌ Failed to reset idle timer:', err);
+    }
+}
+
+function setupIdleDetection() {
+    try {
+        createIdleOverlay();
+        const events = ['mousedown','mousemove','keypress','scroll','touchstart','click','wheel','touchmove'];
+        events.forEach(function(e) {
+            document.addEventListener(e, resetIdleTimer);
+        });
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) resetIdleTimer();
+        });
+        resetIdleTimer();
+        console.log('✅ Idle detection setup complete');
+    } catch (err) {
+        console.error('❌ Failed to setup idle detection:', err);
+    }
+}
+
+// ==========================================
+// SEARCH / REPORT FUNCTIONS
+// ==========================================
+function generateMasterSearch() {
+    try {
+        const fromInput = document.getElementById('master-from');
+        const toInput = document.getElementById('master-to');
+        if (!fromInput || !toInput) {
+            showNotification('⚠️ Search elements not found!', 'error');
+            return;
+        }
+        
+        const from = fromInput.value;
+        const to = toInput.value;
+        if (!from || !to) {
+            showNotification("⚠️ Pehle Dates select karein!", "warning");
+            return;
+        }
+        
+        const fIn = db.in.filter(function(x) { return x.date >= from && x.date <= to; });
+        const fOut = db.out.filter(function(x) { return x.date >= from && x.date <= to; });
+        
+        const inTable = document.getElementById("master-in-table");
+        if (inTable) {
+            inTable.innerHTML = fIn.map(function(x) {
+                const idx = db.in.indexOf(x);
+                return `<tr>
+                    <td>${x.date}</td>
+                    <td>${escapeHtml(x.item)}</td>
+                    <td>${escapeHtml(x.vendor)}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price}</td>
+                    <td>${x.total}</td>
+                    <td>
+                        <button class="btn-action btn-edit" onclick="editEntry('in',${idx})">Edit</button>
+                        <button class="btn-action btn-delete" onclick="deleteEntry('in',${idx})">Del</button>
+                    </td>
+                </tr>`;
+            }).join('') || `<tr><td colspan="7" style="text-align:center;padding:20px;color:#7f8c8d;">No records found</td></tr>`;
+        }
+        
+        const outTable = document.getElementById("master-out-table");
+        if (outTable) {
+            outTable.innerHTML = fOut.map(function(x) {
+                const idx = db.out.indexOf(x);
+                return `<tr>
+                    <td>${x.date}</td>
+                    <td>${escapeHtml(x.item)}</td>
+                    <td>${escapeHtml(x.cust)}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price}</td>
+                    <td>${x.total}</td>
+                    <td>
+                        <button class="btn-action btn-edit" onclick="editEntry('out',${idx})">Edit</button>
+                        <button class="btn-action btn-delete" onclick="deleteEntry('out',${idx})">Del</button>
+                    </td>
+                </tr>`;
+            }).join('') || `<tr><td colspan="7" style="text-align:center;padding:20px;color:#7f8c8d;">No records found</td></tr>`;
+        }
+        showNotification(`✅ Found ${fIn.length + fOut.length} records`, "success");
+    } catch (err) {
+        console.error('❌ generateMasterSearch error:', err);
+        showNotification('❌ Error searching records: ' + err.message, 'error');
+    }
+}
+
+function generateCustomReport() {
+    try {
+        const fromInput = document.getElementById('rep-from-date');
+        const toInput = document.getElementById('rep-to-date');
+        if (!fromInput || !toInput) {
+            showNotification('⚠️ Report elements not found!', 'error');
+            return;
+        }
+        
+        const from = fromInput.value;
+        const to = toInput.value;
+        if (!from || !to) {
+            showNotification("⚠️ Dono dates select karein!", "warning");
+            return;
+        }
+        
+        const periodEl = document.getElementById('report-period');
+        if (periodEl) periodEl.innerText = `📅 Period: ${from} to ${to}`;
+        
+        const fIn = db.in.filter(function(x) { return x.date >= from && x.date <= to; });
+        const fOut = db.out.filter(function(x) { return x.date >= from && x.date <= to; });
+        
+        const inTable = document.querySelector("#rep-in-table");
+        if (inTable) {
+            inTable.innerHTML = fIn.map(function(x) {
+                return `<tr>
+                    <td>${x.date}</td>
+                    <td>${escapeHtml(x.item)}</td>
+                    <td>${escapeHtml(x.vendor)}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price}</td>
+                    <td>${x.total.toLocaleString()}</td>
+                </tr>`;
+            }).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#7f8c8d;">No records</td></tr>`;
+        }
+        
+        const outTable = document.querySelector("#rep-out-table");
+        if (outTable) {
+            outTable.innerHTML = fOut.map(function(x) {
+                return `<tr>
+                    <td>${x.date}</td>
+                    <td>${escapeHtml(x.item)}</td>
+                    <td>${escapeHtml(x.cust)}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price}</td>
+                    <td>${x.total.toLocaleString()}</td>
+                </tr>`;
+            }).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#7f8c8d;">No records</td></tr>`;
+        }
+        
+        const tIn = fIn.reduce(function(s, x) { return s + x.total; }, 0);
+        const tOut = fOut.reduce(function(s, x) { return s + x.total; }, 0);
+        
+        document.querySelectorAll('.report-summary').forEach(function(el) { el.remove(); });
+        const summary = document.createElement('div');
+        summary.className = 'report-summary';
+        summary.style.cssText = 'display:flex;justify-content:space-around;background:#2c3e50;color:white;padding:15px;border-radius:8px;margin-top:20px;flex-wrap:wrap;gap:10px;';
+        summary.innerHTML = `
+            <span>📥 Total IN: PKR ${tIn.toLocaleString()}</span>
+            <span>📤 Total OUT: PKR ${tOut.toLocaleString()}</span>
+            <span style="color:${tOut-tIn>=0?'#2ecc71':'#e74c3c'};font-weight:bold;">💰 Profit: PKR ${(tOut-tIn).toLocaleString()}</span>
+        `;
+        const printArea = document.getElementById('print-area');
+        if (printArea) printArea.appendChild(summary);
+        showNotification("✅ Report generated!", "success");
+    } catch (err) {
+        console.error('❌ generateCustomReport error:', err);
+        showNotification('❌ Error generating report: ' + err.message, 'error');
+    }
+}
+
+// ==========================================
 // NOTIFICATIONS
 // ==========================================
 function showNotification(message, type = "info") {
@@ -1019,7 +1871,6 @@ function showNotification(message, type = "info") {
             info: "#3498db"
         };
         
-        // Remove existing toasts with same message
         const existing = document.querySelectorAll('.toast-notification');
         existing.forEach(function(el) {
             if (el.textContent === message) {
@@ -1049,30 +1900,18 @@ function showNotification(message, type = "info") {
 }
 
 // ==========================================
-// UPDATE ITEM LISTS
+// PRINT SECTION
 // ==========================================
-function updateItemLists() {
+function printSection() {
     try {
-        const list = document.getElementById('items-list');
-        if (!list) return;
-        const items = [...new Set([...db.in.map(function(x) { return x.item; }), ...db.out.map(function(x) { return x.item; })])];
-        list.innerHTML = items.map(function(name) {
-            return `<option value="${escapeHtml(name)}">`;
-        }).join('');
+        if (!db || !db.in) {
+            showNotification("⚠️ Pehle data mukammal load hone dein!", "warning");
+            return;
+        }
+        window.print();
     } catch (err) {
-        console.error('❌ updateItemLists error:', err);
-    }
-}
-
-function updateCustomerDropdown() {
-    try {
-        const list = document.getElementById('customer-list');
-        if (!list) return;
-        list.innerHTML = Object.keys(db.ledgers).map(function(name) {
-            return `<option value="${escapeHtml(name)}">`;
-        }).join('');
-    } catch (err) {
-        console.error('❌ updateCustomerDropdown error:', err);
+        console.error('❌ printSection error:', err);
+        showNotification('❌ Error printing: ' + err.message, 'error');
     }
 }
 
@@ -1083,14 +1922,14 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
         loadLocalData();
         
-        // Render everything
         renderAll();
         renderRentTable();
         loadUserTable();
         updateCustomerDropdown();
         updateItemLists();
         
-        // Check cloud connection and sync
+        setupIdleDetection();
+        
         setTimeout(function() {
             testSupabaseConnection();
             if (navigator.onLine && isSupabaseConnected) {
@@ -1098,7 +1937,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 2000);
         
-        // Check login status
         const loggedIn = localStorage.getItem('isLoggedIn');
         const role = localStorage.getItem('userRole');
         if (loggedIn === 'true') {
@@ -1131,17 +1969,10 @@ document.addEventListener('keydown', function(e) {
             toggleSidebar();
         }
     }
+    if (e.key === 'Enter') {
+        const passInput = document.getElementById('pass');
+        if (passInput && document.activeElement === passInput) {
+            login();
+        }
+    }
 });
-
-// ==========================================
-// OTHER FUNCTIONS (Keep from original)
-// ==========================================
-// Keep all other functions from your original code:
-// - login(), showSystem(), logout()
-// - toggleSidebar(), switchPage()
-// - editEntry(), generateMasterSearch()
-// - printSection(), showLedger()
-// - updateOpeningBal(), saveLedgerEntry()
-// - etc.
-
-// [Add your existing functions here...]
