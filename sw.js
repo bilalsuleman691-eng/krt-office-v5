@@ -12,32 +12,77 @@ const ASSETS = [
 self.addEventListener('install', e => {
     e.waitUntil(
         caches.open(CACHE_NAME)
-            .then(cache => cache.addAll(ASSETS))
-            .then(() => self.skipWaiting())
+            .then(cache => {
+                console.log('[SW] Caching assets...');
+                return cache.addAll(ASSETS);
+            })
+            .then(() => {
+                console.log('[SW] Assets cached successfully');
+                return self.skipWaiting();
+            })
+            .catch(err => {
+                console.error('[SW] Cache installation failed:', err);
+            })
     );
 });
 
 self.addEventListener('activate', e => {
     e.waitUntil(
-        caches.keys().then(keys => Promise.all(
-            keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-        )).then(() => self.clients.claim())
+        caches.keys().then(keys => {
+            return Promise.all(
+                keys.filter(k => k !== CACHE_NAME).map(k => {
+                    console.log('[SW] Deleting old cache:', k);
+                    return caches.delete(k);
+                })
+            );
+        }).then(() => {
+            console.log('[SW] Activation complete');
+            return self.clients.claim();
+        })
     );
 });
 
 self.addEventListener('fetch', e => {
     const url = new URL(e.request.url);
-    if (url.hostname.includes('supabase.co') || e.request.method !== 'GET') return;
+    
+    // Skip Supabase API calls and non-GET requests
+    if (url.hostname.includes('supabase.co') || e.request.method !== 'GET') {
+        return;
+    }
+    
+    // Skip if request is for analytics or tracking
+    if (url.hostname.includes('google') || url.hostname.includes('analytics')) {
+        return;
+    }
     
     e.respondWith(
         fetch(e.request)
             .then(res => {
-                const clone = res.clone();
-                caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+                // Only cache successful responses
+                if (res.status === 200) {
+                    const clone = res.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        try {
+                            cache.put(e.request, clone);
+                        } catch (err) {
+                            console.warn('[SW] Cache put failed:', err);
+                        }
+                    });
+                }
                 return res;
             })
-            .catch(() => caches.match(e.request)
-                .then(cached => cached || caches.match('/offline.html'))
-            )
+            .catch(() => {
+                // Network failed, try cache
+                return caches.match(e.request)
+                    .then(cached => {
+                        if (cached) {
+                            console.log('[SW] Serving from cache:', e.request.url);
+                            return cached;
+                        }
+                        // If not in cache, serve offline page
+                        return caches.match('/offline.html')
+                            .then(offline => offline || new Response('Offline', { status: 503 }));
+                    });
+            })
     );
 });
