@@ -2,558 +2,174 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KRT TRADERS ERP - Premium v5.0</title>
-    
-   
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KRT TRADERS ERP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<!-- =========================================== -->
-<!-- WELCOME OVERLAY -->
-<!-- =========================================== -->
-<div id="welcome-overlay">
-    <canvas id="welcome-canvas"></canvas>
-    <div class="welcome-content">
-        <div class="welcome-logo"><i class="fas fa-cube"></i></div>
-        <p class="bismillah">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</p>
-        <h1 id="welcome-text"></h1>
-        <p id="creator-text">✦ CREATED BY BILAL SULEMAN ✦</p>
-        <div id="loading-bar-container"><div id="loading-bar"></div></div>
-        <p class="welcome-footer">🔒 SECURE • ENCRYPTED • CLOUD SYNC</p>
-    </div>
-</div>
-
-<!-- =========================================== -->
 <!-- LOGIN SCREEN -->
-<!-- =========================================== -->
-<div id="login-screen">
-    <div class="login-container">
-        <div class="login-box">
-            <div class="login-logo"><i class="fas fa-cube"></i></div>
-            <h2>KRT ENTERPRISE</h2>
-            <p class="login-subtitle">Resource Planning System v5.0</p>
-            
-            <div class="login-form">
-                <div class="input-group">
-                    <label><i class="fas fa-user"></i> USERNAME</label>
-                    <input type="text" id="user" placeholder="Enter username">
-                </div>
-                <div class="input-group">
-                    <label><i class="fas fa-lock"></i> PASSWORD</label>
-                    <input type="password" id="pass" placeholder="Enter password">
-                </div>
-                <button class="login-btn" onclick="login()">
-                    <i class="fas fa-arrow-right"></i> ACCESS SYSTEM
-                </button>
-            </div>
-            
-            <div class="login-footer">
-                <p>🔒 Secure • Cloud Sync • v5.0</p>
-            </div>
+<div id="loginScreen">
+    <div class="login-box">
+        <div class="login-logo"><i class="fas fa-cube"></i></div>
+        <h2>KRT ENTERPRISE</h2>
+        <p class="login-sub">Resource Planning System</p>
+        <div class="login-form">
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="loginUser()">ACCESS SYSTEM</button>
         </div>
+        <div class="login-footer">🔒 Secure • Cloud Sync • v5.0</div>
     </div>
 </div>
 
-<!-- =========================================== -->
-<!-- IDLE OVERLAY -->
-<!-- =========================================== -->
-<div id="idle-overlay">
-    <div id="idle-status">🟢 ACTIVE</div>
-    <div id="idle-particles"></div>
-    <div id="idle-content">
-        <span id="idle-icon">🚀</span>
-        <h1 id="idle-title">⚡ <span class="highlight">KRT</span> ERP</h1>
-        <div id="idle-timer">00:00</div>
-        <p id="idle-message">💫 Your session is paused<br>Touch to continue</p>
-        <button id="idle-touch-btn"><span class="icon">👆</span> RESUME SESSION</button>
-    </div>
-</div>
-
-<!-- =========================================== -->
-<!-- TOGGLE BUTTON -->
-<!-- =========================================== -->
-<button id="toggle-btn" onclick="toggleSidebar()">
-    <i class="fas fa-bars"></i>
-</button>
-
-<!-- =========================================== -->
 <!-- SIDEBAR -->
-<!-- =========================================== -->
 <div id="sidebar">
     <div class="sidebar-header">
-        <div class="logo-container">
-            <div class="logo-icon"><i class="fas fa-cube"></i></div>
-            <div>
-                <h3>KRT ERP</h3>
-                <p class="version">v5.0</p>
-            </div>
-        </div>
+        <div class="logo"><i class="fas fa-cube"></i> KRT ERP</div>
+        <span class="version">v5.0</span>
     </div>
     <ul>
-        <li class="active" onclick="switchPage('page-dashboard','DASHBOARD')">
-            <i class="fas fa-chart-pie"></i> <span>Dashboard</span>
-        </li>
-        <li onclick="switchPage('page-stock-in','STOCK IN')">
-            <i class="fas fa-arrow-down"></i> <span>Stock IN</span>
-        </li>
-        <li onclick="switchPage('page-stock-out','STOCK OUT')">
-            <i class="fas fa-arrow-up"></i> <span>Stock OUT</span>
-        </li>
-        <li onclick="switchPage('page-balance','STOCK BALANCE')">
-            <i class="fas fa-balance-scale"></i> <span>Stock Balance</span>
-        </li>
-        <li onclick="switchPage('page-Report','REPORTS')">
-            <i class="fas fa-file-alt"></i> <span>Reports</span>
-        </li>
-        <li onclick="switchPage('page-search','SEARCH RECORDS')">
-            <i class="fas fa-search"></i> <span>Search Records</span>
-        </li>
-        <li onclick="switchPage('page-customer-ledgers','CUSTOMER LEDGERS')">
-            <i class="fas fa-address-book"></i> <span>Customer Ledgers</span>
-        </li>
-        <li onclick="switchPage('page-rent-book','RENT BOOK')">
-            <i class="fas fa-building"></i> <span>Market Rent Book</span>
-        </li>
-        <li onclick="switchPage('page-settings','SETTINGS')">
-            <i class="fas fa-users-cog"></i> <span>Settings</span>
-        </li>
-        <li class="logout-item" onclick="logout()">
-            <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
-        </li>
+        <li class="active" onclick="showPage('dashboard')"><i class="fas fa-chart-pie"></i> Dashboard</li>
+        <li onclick="showPage('stockin')"><i class="fas fa-arrow-down"></i> Stock IN</li>
+        <li onclick="showPage('stockout')"><i class="fas fa-arrow-up"></i> Stock OUT</li>
+        <li onclick="showPage('balance')"><i class="fas fa-balance-scale"></i> Balance</li>
+        <li onclick="showPage('report')"><i class="fas fa-file-alt"></i> Reports</li>
+        <li onclick="showPage('search')"><i class="fas fa-search"></i> Search</li>
+        <li onclick="showPage('ledger')"><i class="fas fa-address-book"></i> Ledgers</li>
+        <li onclick="showPage('rent')"><i class="fas fa-building"></i> Rent</li>
+        <li onclick="showPage('settings')"><i class="fas fa-users-cog"></i> Settings</li>
+        <li class="logout" onclick="logoutUser()"><i class="fas fa-sign-out-alt"></i> Logout</li>
     </ul>
 </div>
 
-<!-- =========================================== -->
+<!-- TOGGLE BUTTON -->
+<button id="toggleBtn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+
 <!-- MAIN CONTENT -->
-<!-- =========================================== -->
-<div id="main-content">
+<div id="mainContent">
     
     <!-- HEADER -->
-    <div class="page-header">
-        <h1 id="page-title"><i class="fas fa-chart-line"></i> KRT ERP - DASHBOARD</h1>
-        <div class="header-actions">
-            <span class="header-clock"><i class="fas fa-clock"></i> <span id="live-clock"></span></span>
-            <button class="sync-btn" onclick="syncAllCloudData()"><i class="fas fa-sync"></i> Sync Cloud</button>
+    <div class="header">
+        <h1 id="pageTitle"><i class="fas fa-chart-line"></i> KRT ERP - DASHBOARD</h1>
+        <div class="header-right">
+            <span id="clock"></span>
+            <button onclick="syncData()"><i class="fas fa-sync"></i> Sync</button>
         </div>
     </div>
 
-    <!-- ===== DASHBOARD ===== -->
-    <div id="page-dashboard" class="erp-page">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon blue"><i class="fas fa-arrow-down"></i></div>
-                <div class="stat-info">
-                    <p class="stat-label">Total Stock IN</p>
-                    <h2 class="stat-value" id="dash-total-in">0</h2>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon red"><i class="fas fa-arrow-up"></i></div>
-                <div class="stat-info">
-                    <p class="stat-label">Total Stock OUT</p>
-                    <h2 class="stat-value" id="dash-total-out">0</h2>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon purple"><i class="fas fa-boxes"></i></div>
-                <div class="stat-info">
-                    <p class="stat-label">Unique Items</p>
-                    <h2 class="stat-value" id="dash-unique-items">0</h2>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon gold"><i class="fas fa-dollar-sign"></i></div>
-                <div class="stat-info">
-                    <p class="stat-label">Total Revenue</p>
-                    <h2 class="stat-value" id="dash-revenue">PKR 0</h2>
-                </div>
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page">
+        <div class="stats">
+            <div class="stat"><div class="icon blue"><i class="fas fa-arrow-down"></i></div><div><p>Total IN</p><h2 id="totalIn">0</h2></div></div>
+            <div class="stat"><div class="icon red"><i class="fas fa-arrow-up"></i></div><div><p>Total OUT</p><h2 id="totalOut">0</h2></div></div>
+            <div class="stat"><div class="icon purple"><i class="fas fa-boxes"></i></div><div><p>Items</p><h2 id="totalItems">0</h2></div></div>
+            <div class="stat"><div class="icon gold"><i class="fas fa-dollar-sign"></i></div><div><p>Revenue</p><h2 id="totalRevenue">PKR 0</h2></div></div>
+        </div>
+        <div class="card"><h3><i class="fas fa-clock"></i> Recent Activity</h3><div id="recentActivity"></div></div>
+    </div>
+
+    <!-- STOCK IN -->
+    <div id="page-stockin" class="page" style="display:none">
+        <div class="card">
+            <h3><i class="fas fa-arrow-down" style="color:#10b981;"></i> Add Stock IN</h3>
+            <div class="form">
+                <input type="date" id="inDate">
+                <input type="text" id="inVendor" placeholder="Vendor">
+                <input type="text" id="inItem" placeholder="Item *">
+                <input type="number" id="inQty" placeholder="Qty *">
+                <input type="number" id="inPrice" placeholder="Price">
+                <button class="btn-green" onclick="addIn()"><i class="fas fa-save"></i> Save</button>
             </div>
         </div>
-        
+        <div class="card"><h3>Today's Stock IN</h3><div class="table-wrap"><table><thead><tr><th>#</th><th>Item</th><th>Vendor</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr></thead><tbody id="todayIn"></tbody></table></div></div>
+    </div>
+
+    <!-- STOCK OUT -->
+    <div id="page-stockout" class="page" style="display:none">
         <div class="card">
-            <h3 class="card-title"><i class="fas fa-clock"></i> Recent Activity</h3>
-            <div id="recent-activity"></div>
+            <h3><i class="fas fa-arrow-up" style="color:#ef4444;"></i> Add Stock OUT</h3>
+            <div class="form">
+                <input type="date" id="outDate">
+                <input type="text" id="outCustomer" placeholder="Customer">
+                <input type="text" id="outItem" list="itemsList" placeholder="Item *" oninput="checkStock(this.value)">
+                <datalist id="itemsList"></datalist>
+                <input type="number" id="outQty" placeholder="Qty *">
+                <input type="number" id="outPrice" placeholder="Price">
+                <button class="btn-red" onclick="addOut()"><i class="fas fa-cash-register"></i> Sale</button>
+            </div>
+            <div id="stockStatus"></div>
+        </div>
+        <div class="card"><h3>Today's Sales</h3><div class="table-wrap"><table><thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Item</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr></thead><tbody id="todayOut"></tbody></table></div></div>
+    </div>
+
+    <!-- BALANCE -->
+    <div id="page-balance" class="page" style="display:none">
+        <div class="card"><h3><i class="fas fa-balance-scale"></i> Stock Balance</h3><div class="table-wrap"><table><thead><tr><th>Item</th><th>Total In</th><th>Total Out</th><th>Available</th><th>Profit</th></tr></thead><tbody id="balanceBody"></tbody></table></div></div>
+    </div>
+
+    <!-- REPORTS -->
+    <div id="page-report" class="page" style="display:none">
+        <div class="card"><h3><i class="fas fa-file-alt"></i> Generate Report</h3><div class="form"><input type="date" id="repFrom"><input type="date" id="repTo"><button class="btn-gold" onclick="generateReport()"><i class="fas fa-search"></i> Generate</button><button onclick="window.print()"><i class="fas fa-print"></i> Print</button></div></div>
+        <div class="card" id="reportArea"><h2 style="text-align:center;">KRT TRADERS - STATEMENT</h2><p id="reportPeriod" style="text-align:center;"></p><h4 class="section-green">📥 STOCK IN</h4><div class="table-wrap"><table><thead><tr><th>Date</th><th>Item</th><th>Vendor</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody id="repInTable"></tbody></table></div><h4 class="section-red">📤 STOCK OUT</h4><div class="table-wrap"><table><thead><tr><th>Date</th><th>Item</th><th>Customer</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody id="repOutTable"></tbody></table></div></div>
+    </div>
+
+    <!-- SEARCH -->
+    <div id="page-search" class="page" style="display:none">
+        <div class="search-box"><h3><i class="fas fa-search"></i> Master Search</h3><div class="form"><input type="date" id="searchFrom"><input type="date" id="searchTo"><button class="btn-cyan" onclick="searchRecords()"><i class="fas fa-search"></i> Search</button></div></div>
+        <h4 class="section-green">📥 STOCK IN</h4><div class="table-wrap"><table><thead><tr><th>Date</th><th>Item</th><th>Vendor</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr></thead><tbody id="searchInTable"></tbody></table></div>
+        <h4 class="section-red">📤 STOCK OUT</h4><div class="table-wrap"><table><thead><tr><th>Date</th><th>Item</th><th>Customer</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr></thead><tbody id="searchOutTable"></tbody></table></div>
+    </div>
+
+    <!-- LEDGERS -->
+    <div id="page-ledger" class="page" style="display:none">
+        <div class="card"><h3><i class="fas fa-address-book"></i> Customer Ledgers</h3>
+            <div class="flex"><div><label>Customer</label><input type="text" id="ledgerName" list="customerList" placeholder="Enter name" oninput="showLedger()"><datalist id="customerList"></datalist></div><div><label>Opening Balance</label><input type="number" id="openingBal" value="0" onchange="updateOpening()"></div></div>
+            <div class="ledger-form"><input type="date" id="ledDate"><input type="text" id="ledItem" placeholder="Item"><input type="number" id="ledCtn" placeholder="CTN"><input type="number" id="ledDebit" placeholder="Debit"><input type="number" id="ledCredit" placeholder="Credit"><select id="ledMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Cheque">Cheque</option></select><button class="btn-cyan" onclick="saveLedger()"><i class="fas fa-save"></i> Save</button></div>
+            <div class="table-wrap"><table><thead><tr><th>#</th><th>Date</th><th>Item</th><th>CTN</th><th>Debit</th><th>Credit</th><th>Method</th><th>Action</th></tr></thead><tbody id="ledgerBody"></tbody><tfoot><tr><td colspan="3">Total:</td><td id="ledTotalCtn">0</td><td id="ledTotalDebit">0</td><td id="ledTotalCredit">0</td><td colspan="2" id="ledFinalBalance">Balance: 0</td></tr></tfoot></table></div>
         </div>
     </div>
 
-    <!-- ===== STOCK IN ===== -->
-    <div id="page-stock-in" class="erp-page" style="display:none;">
-        <div class="card">
-            <h3 class="card-title"><i class="fas fa-arrow-down" style="color:#10b981;"></i> Add Stock IN</h3>
-            <div class="form-grid">
-                <input type="date" id="in-date" class="form-input">
-                <input type="text" id="in-vendor" placeholder="Vendor Name" class="form-input">
-                <input type="text" id="in-item" placeholder="Item Name *" class="form-input">
-                <input type="number" id="in-qty" placeholder="Quantity *" class="form-input">
-                <input type="number" id="in-price" placeholder="Price" class="form-input">
-                <button class="btn-primary" onclick="addIn()"><i class="fas fa-save"></i> Save Entry</button>
-            </div>
-        </div>
-        
-        <div class="card">
-            <h3 class="card-title"><i class="fas fa-calendar-day"></i> Today's Stock IN</h3>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>#</th><th>Item</th><th>Vendor</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr></thead>
-                    <tbody id="today-list-in"></tbody>
-                </table>
-            </div>
+    <!-- RENT -->
+    <div id="page-rent" class="page" style="display:none">
+        <div class="card"><h3><i class="fas fa-building"></i> Rent Book</h3>
+            <div class="flex"><div><label>Shopkeeper</label><input type="text" id="rentName" placeholder="Enter name" oninput="showRent()"></div><div><label>Shop No</label><input type="text" id="rentShop" placeholder="Shop #"></div></div>
+            <div class="rent-form"><input type="date" id="rentDate"><input type="text" id="rentMonth" placeholder="Month"><input type="number" id="rentDebit" placeholder="Rent"><input type="number" id="rentCredit" placeholder="Paid"><select id="rentMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Cheque">Cheque</option></select><button class="btn-red" onclick="addRent()"><i class="fas fa-save"></i> Save</button></div>
+            <div class="table-wrap"><table><thead><tr><th>Shop</th><th>Date</th><th>Month</th><th>Debit</th><th>Credit</th><th>Method</th><th>Action</th></tr></thead><tbody id="rentBody"></tbody><tfoot><tr><td colspan="3">Total:</td><td id="rentTotalDebit">0</td><td id="rentTotalCredit">0</td><td>Balance:</td><td id="rentFinalBalance">0</td></tr></tfoot></table></div>
         </div>
     </div>
 
-    <!-- ===== STOCK OUT ===== -->
-    <div id="page-stock-out" class="erp-page" style="display:none;">
-        <div class="card">
-            <h3 class="card-title"><i class="fas fa-arrow-up" style="color:#ef4444;"></i> Add Stock OUT</h3>
-            <div class="form-grid">
-                <input type="date" id="out-date" class="form-input">
-                <input type="text" id="out-customer" placeholder="Customer Name" class="form-input">
-                <input type="text" id="out-item" list="items-list" placeholder="Item Name *" class="form-input" oninput="showLiveStock(this.value)">
-                <datalist id="items-list"></datalist>
-                <input type="number" id="out-qty" placeholder="Quantity *" class="form-input">
-                <input type="number" id="out-price" placeholder="Price" class="form-input">
-                <button class="btn-danger" onclick="addOut()"><i class="fas fa-cash-register"></i> Register Sale</button>
-            </div>
-            <div id="stock-status"></div>
-        </div>
-        
-        <div class="card">
-            <h3 class="card-title"><i class="fas fa-calendar-day"></i> Today's Sales</h3>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Item</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr></thead>
-                    <tbody id="today-list-out"></tbody>
-                </table>
-            </div>
+    <!-- SETTINGS -->
+    <div id="page-settings" class="page" style="display:none">
+        <div class="card"><h3><i class="fas fa-users-cog"></i> User Management</h3>
+            <div class="settings-box"><h4>Create User</h4><div class="form"><input type="text" id="newName" placeholder="Full Name"><input type="text" id="newId" placeholder="User ID"><input type="password" id="newPass" placeholder="Password"></div><div class="perms"><label><input type="checkbox" class="perm" value="stockin"> Stock In</label><label><input type="checkbox" class="perm" value="stockout"> Stock Out</label><label><input type="checkbox" class="perm" value="report"> Reports</label><label><input type="checkbox" class="perm" value="balance"> Balance</label><label><input type="checkbox" class="perm" value="search"> Search</label><label><input type="checkbox" class="perm" value="ledger"> Ledgers</label><label><input type="checkbox" class="perm" value="rent"> Rent</label><button class="btn-green" onclick="createUser()"><i class="fas fa-user-plus"></i> Create</button></div></div>
+            <div class="table-wrap"><table><thead><tr><th>User ID</th><th>Name</th><th>Permissions</th><th>Action</th></tr></thead><tbody id="userTable"></tbody></table></div>
         </div>
     </div>
 
-    <!-- ===== STOCK BALANCE ===== -->
-    <div id="page-balance" class="erp-page" style="display:none;">
-        <div class="card">
-            <div class="flex-between">
-                <h3 class="card-title"><i class="fas fa-balance-scale"></i> Stock Balance</h3>
-                <button class="btn-print" onclick="printSection()"><i class="fas fa-print"></i> Print</button>
-            </div>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Item Name</th><th>Total In</th><th>Total Out</th><th>Available</th><th>Profit</th></tr></thead>
-                    <tbody id="table-balance-body"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== REPORTS ===== -->
-    <div id="page-Report" class="erp-page" style="display:none;">
-        <div class="card">
-            <h3 class="card-title"><i class="fas fa-file-alt"></i> Generate Report</h3>
-            <div class="form-grid">
-                <input type="date" id="rep-from-date" class="form-input">
-                <input type="date" id="rep-to-date" class="form-input">
-                <button class="btn-warning" onclick="generateCustomReport()"><i class="fas fa-search"></i> Generate</button>
-                <button class="btn-print" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
-            </div>
-        </div>
-        
-        <div id="print-area" class="card">
-            <h2 style="text-align:center; color:#0f172a;">KRT TRADERS - STATEMENT</h2>
-            <p id="report-period" style="text-align:center; color:#64748b;"></p>
-            
-            <h4 class="section-title green">📥 STOCK IN</h4>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Date</th><th>Item</th><th>Vendor</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
-                    <tbody id="rep-in-table"></tbody>
-                </table>
-            </div>
-            
-            <h4 class="section-title red">📤 STOCK OUT</h4>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Date</th><th>Item</th><th>Customer</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
-                    <tbody id="rep-out-table"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== SEARCH RECORDS ===== -->
-    <div id="page-search" class="erp-page" style="display:none;">
-        <div class="search-header">
-            <h3><i class="fas fa-search"></i> Master Search</h3>
-            <div class="search-controls">
-                <input type="date" id="master-from" class="form-input">
-                <input type="date" id="master-to" class="form-input">
-                <button onclick="generateMasterSearch()"><i class="fas fa-search"></i> Search</button>
-            </div>
-        </div>
-        
-        <h4 class="section-title green">📥 STOCK IN RECORDS</h4>
-        <div class="table-wrap">
-            <table>
-                <thead><tr><th>Date</th><th>Item</th><th>Vendor</th><th>Qty</th><th>Price</th><th>Total</th><th>Actions</th></tr></thead>
-                <tbody id="master-in-table"></tbody>
-            </table>
-        </div>
-        
-        <h4 class="section-title red">📤 STOCK OUT RECORDS</h4>
-        <div class="table-wrap">
-            <table>
-                <thead><tr><th>Date</th><th>Item</th><th>Customer</th><th>Qty</th><th>Price</th><th>Total</th><th>Actions</th></tr></thead>
-                <tbody id="master-out-table"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- ===== CUSTOMER LEDGERS ===== -->
-    <div id="page-customer-ledgers" class="erp-page" style="display:none;">
-        <div class="card">
-            <h3 class="card-title"><i class="fas fa-address-book"></i> Customer Ledger System</h3>
-            
-            <div class="ledger-selector">
-                <div>
-                    <label>Select/Type Customer:</label>
-                    <input type="text" id="ledger-cust-name" list="customer-list" placeholder="Enter customer name" oninput="showLedger()" class="form-input">
-                    <datalist id="customer-list"></datalist>
-                </div>
-                <div>
-                    <label>Opening Balance:</label>
-                    <input type="number" id="opening-bal" value="0" onchange="updateOpeningBal()" class="form-input">
-                </div>
-            </div>
-            
-            <div class="ledger-entry-form">
-                <input type="date" id="led-date" placeholder="Date" class="form-input">
-                <input type="text" id="led-item" placeholder="Item Detail" class="form-input">
-                <input type="number" id="led-ctn" value="0" placeholder="CTN" class="form-input">
-                <input type="number" id="led-debit" value="0" placeholder="Debit" class="form-input">
-                <input type="number" id="led-credit" value="0" placeholder="Credit" class="form-input">
-                <select id="led-method" class="form-input">
-                    <option value="Cash">Cash</option>
-                    <option value="Bank">Bank</option>
-                    <option value="Cheque">Cheque</option>
-                </select>
-                <button class="btn-info" onclick="saveLedgerEntry()"><i class="fas fa-save"></i> Save</button>
-            </div>
-            
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>#</th><th>Date</th><th>Item</th><th>CTN</th><th>Debit</th><th>Credit</th><th>Method</th><th>Action</th></tr></thead>
-                    <tbody id="ledger-table-body"></tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="3" style="text-align:right;">Grand Total:</td>
-                            <td id="total-ctn">0</td>
-                            <td id="total-debit">0</td>
-                            <td id="total-credit">0</td>
-                            <td colspan="2" id="final-balance">Balance: 0</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== RENT BOOK ===== -->
-    <div id="page-rent-book" class="erp-page" style="display:none;">
-        <div class="card">
-            <h3 class="card-title"><i class="fas fa-building"></i> Market Rent Book</h3>
-            
-            <div class="rent-selector">
-                <div>
-                    <label>Shopkeeper Name:</label>
-                    <input type="text" id="rent-name" placeholder="Enter name" oninput="renderRentTable()" class="form-input">
-                </div>
-                <div>
-                    <label>Shop No:</label>
-                    <input type="text" id="rent-shop-no" placeholder="0" class="form-input">
-                </div>
-            </div>
-            
-            <div class="rent-entry-form">
-                <input type="date" id="rent-date" placeholder="Date" class="form-input">
-                <input type="text" id="rent-month" placeholder="Month" class="form-input">
-                <input type="number" id="rent-debit" value="0" placeholder="Rent" class="form-input">
-                <input type="number" id="rent-credit" value="0" placeholder="Payment" class="form-input">
-                <select id="rent-method" class="form-input">
-                    <option value="Cash">Cash</option>
-                    <option value="Bank">Bank Transfer</option>
-                    <option value="Cheque">Cheque</option>
-                </select>
-                <button class="btn-danger" onclick="addRentEntry()"><i class="fas fa-save"></i> Save</button>
-            </div>
-            
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Shop</th><th>Date</th><th>Month</th><th>Debit</th><th>Credit</th><th>Method</th><th>Action</th></tr></thead>
-                    <tbody id="rent-main-rows"></tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="3" style="text-align:right;">Grand Total:</td>
-                            <td id="rent-total-debit">0</td>
-                            <td id="rent-total-credit">0</td>
-                            <td>Balance:</td>
-                            <td id="rent-final-balance">0</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== SETTINGS ===== -->
-    <div id="page-settings" class="erp-page" style="display:none;">
-        <div class="card">
-            <h3 class="card-title"><i class="fas fa-users-cog"></i> Multi-User Settings</h3>
-            
-            <div class="settings-box">
-                <h4>Create New User</h4>
-                <div class="form-grid">
-                    <input type="text" id="new-username" placeholder="Full Name" class="form-input">
-                    <input type="text" id="new-userid" placeholder="User ID" class="form-input">
-                    <input type="password" id="new-password" placeholder="Password" class="form-input">
-                </div>
-                <div class="perm-grid">
-                    <label><input type="checkbox" class="perm" value="page-stock-in"> Stock In</label>
-                    <label><input type="checkbox" class="perm" value="page-stock-out"> Stock Out</label>
-                    <label><input type="checkbox" class="perm" value="page-Report"> Reports</label>
-                    <label><input type="checkbox" class="perm" value="page-balance"> Balance</label>
-                    <label><input type="checkbox" class="perm" value="page-search"> Search</label>
-                    <label><input type="checkbox" class="perm" value="page-customer-ledgers"> Ledgers</label>
-                    <label><input type="checkbox" class="perm" value="page-rent-book"> Rent Book</label>
-                    <button class="btn-primary" onclick="createNewUser()"><i class="fas fa-user-plus"></i> Create</button>
-                </div>
-            </div>
-            
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>User ID</th><th>Name</th><th>Permissions</th><th>Action</th></tr></thead>
-                    <tbody id="user-table-body"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- FOOTER -->
-    <div class="footer">
-        <p>KRT ERP v5.0 | <i class="fas fa-code"></i> Developed by Bilal Suleman | <i class="fas fa-cloud-upload-alt"></i> Cloud Sync Enabled</p>
-    </div>
+    <div class="footer">KRT ERP v5.0 | <i class="fas fa-code"></i> Bilal Suleman | <i class="fas fa-cloud"></i> Cloud Sync</div>
 </div>
 
-<!-- =========================================== -->
-<!-- SCRIPTS -->
-<!-- =========================================== -->
 <script src="script.js"></script>
-
 <script>
-// Service Worker
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('✅ SW Ready'))
-            .catch(err => console.log('❌ SW Failed:', err));
-    });
-}
-
-// Live Clock
+// Clock
 function updateClock() {
     const now = new Date();
-    document.getElementById('live-clock').textContent = 
-        now.toLocaleDateString('en-PK', { weekday:'short', day:'numeric', month:'short', year:'numeric' }) + 
-        ' | ' + now.toLocaleTimeString('en-PK', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    document.getElementById('clock').textContent = now.toLocaleDateString('en-PK') + ' | ' + now.toLocaleTimeString('en-PK', {hour:'2-digit', minute:'2-digit'});
 }
 setInterval(updateClock, 1000);
 updateClock();
 
-// Welcome Animation
-(function startWelcome() {
-    const canvas = document.getElementById('welcome-canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    
-    const particles = [];
-    for (let i = 0; i < 100; i++) {
-        particles.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            radius: Math.random() * 2 + 1,
-            dx: (Math.random() - 0.5) * 0.5,
-            dy: (Math.random() - 0.5) * 0.5,
-            color: `rgba(6, 182, 212, ${Math.random() * 0.3 + 0.05})`
-        });
-    }
-    
-    function animateParticles() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        particles.forEach(p => {
-            p.x += p.dx;
-            p.y += p.dy;
-            if (p.x < 0 || p.x > canvas.width) p.dx *= -1;
-            if (p.y < 0 || p.y > canvas.height) p.dy *= -1;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            ctx.fillStyle = p.color;
-            ctx.fill();
-        });
-        requestAnimationFrame(animateParticles);
-    }
-    animateParticles();
-    
-    const welcomeText = document.getElementById('welcome-text');
-    const fullMessage = "✦ KRT ERP ✦\nEnterprise Resource Planning";
-    let charIndex = 0;
-    let currentLine = 0;
-    const lines = fullMessage.split('\n');
-    
-    function typeText() {
-        if (currentLine < lines.length) {
-            if (charIndex < lines[currentLine].length) {
-                welcomeText.textContent = lines[currentLine].substring(0, charIndex + 1);
-                charIndex++;
-                setTimeout(typeText, 40);
-            } else {
-                currentLine++;
-                charIndex = 0;
-                if (currentLine < lines.length) {
-                    welcomeText.textContent += '\n';
-                    setTimeout(typeText, 300);
-                } else {
-                    welcomeText.style.borderRight = 'none';
-                    document.getElementById('creator-text').style.opacity = '1';
-                    
-                    let progress = 0;
-                    const bar = document.getElementById('loading-bar');
-                    const interval = setInterval(() => {
-                        progress += Math.random() * 3 + 0.5;
-                        if (progress >= 100) {
-                            progress = 100;
-                            clearInterval(interval);
-                            setTimeout(() => {
-                                const overlay = document.getElementById('welcome-overlay');
-                                overlay.style.opacity = '0';
-                                overlay.style.transition = 'opacity 0.8s ease';
-                                setTimeout(() => {
-                                    overlay.style.display = 'none';
-                                    document.getElementById('login-screen').style.display = 'flex';
-                                }, 800);
-                            }, 500);
-                        }
-                        bar.style.width = progress + '%';
-                    }, 60);
-                }
-            }
-        }
-    }
-    setTimeout(typeText, 800);
-})();
+// Check login
+if (localStorage.getItem('loggedIn') === 'true') {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('sidebar').style.display = 'block';
+    document.getElementById('mainContent').style.display = 'block';
+    document.getElementById('toggleBtn').style.display = 'block';
+}
 </script>
-
 </body>
 </html>
