@@ -1,5 +1,5 @@
 // ==========================================
-// KRT TRADERS ERP - COMPLETE SCRIPT
+// KRT TRADERS ERP - COMPLETE SCRIPT (FIXED)
 // Developed by Bilal Suleman
 // Version: 5.0
 // ==========================================
@@ -17,7 +17,6 @@ const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 let db = JSON.parse(localStorage.getItem('krt_erp_data')) || { in: [], out: [], ledgers: {}, opening_balances: {} };
 let dbRent = JSON.parse(localStorage.getItem('krt_rent_data')) || [];
 let extraUsers = JSON.parse(localStorage.getItem('krt_extra_users')) || [];
-let isDataLoaded = false;
 
 // ==========================================
 // IDLE SCREEN SYSTEM
@@ -200,9 +199,11 @@ function applyDynamicPermissions(user) {
 // ==========================================
 async function fetchCloudData() {
     try {
+        console.log("🔄 Fetching data from Supabase...");
         const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
+        
         if (error) { 
-            console.error("Supabase Error:", error.message); 
+            console.error("❌ Supabase Error:", error.message); 
             return false; 
         }
         
@@ -213,6 +214,7 @@ async function fetchCloudData() {
         
         console.log("📦 Data received:", data.length, "records");
         
+        // Clear existing data
         db.in = [];
         db.out = [];
         
@@ -250,7 +252,7 @@ async function fetchCloudData() {
         });
         
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
-        console.log("✅ Data loaded:", db.in.length, "IN,", db.out.length, "OUT");
+        console.log("✅ Data loaded:", db.in.length, "IN entries,", db.out.length, "OUT entries");
         return true;
     } catch (err) { 
         console.error("❌ Fetch Error:", err); 
@@ -262,7 +264,7 @@ async function fetchCloudRentData() {
     try {
         const { data, error } = await _supabase.from('KRT_RENT').select('*').order('id', { ascending: true });
         if (error) { console.error("Rent Fetch Error:", error); return false; }
-        if (!data) return false;
+        if (!data || data.length === 0) return false;
         
         dbRent = data.map(row => ({ 
             id: row.id, 
@@ -302,9 +304,9 @@ async function syncAllCloudData() {
             updateCustomerDropdown();
             loadUserTable();
             renderRentTable();
-            showNotification("✅ Sync complete!", "success");
+            showNotification("✅ Sync complete! Data loaded.", "success");
         } else {
-            showNotification("⚠️ No new data found.", "warning");
+            showNotification("ℹ️ No new data found.", "info");
         }
     } catch (err) {
         showNotification("❌ Sync failed: " + err.message, "error");
@@ -327,18 +329,27 @@ function showNotification(message, type = "info") {
 }
 
 // ==========================================
-// STOCK IN
+// STOCK IN - FIXED (Only Item, Date, Qty required)
 // ==========================================
 async function addIn() {
     const date = document.getElementById('in-date').value;
-    const vendor = document.getElementById('in-vendor').value;
+    const vendor = document.getElementById('in-vendor').value || 'factory';
     const item = document.getElementById('in-item').value.trim();
-    const barcode = document.getElementById('in-barcode').value;
+    const barcode = document.getElementById('in-barcode').value || '';
     const qty = Number(document.getElementById('in-qty').value);
-    const price = Number(document.getElementById('in-price').value);
+    const price = Number(document.getElementById('in-price').value) || 0;
     
-    if (!date || !item || qty <= 0 || price <= 0) { 
-        showNotification("⚠️ Please fill all fields!", "warning"); 
+    // ONLY validate: date, item, qty
+    if (!date) { 
+        showNotification("⚠️ Please select Date!", "warning"); 
+        return; 
+    }
+    if (!item) { 
+        showNotification("⚠️ Please enter Item Name!", "warning"); 
+        return; 
+    }
+    if (!qty || qty <= 0) { 
+        showNotification("⚠️ Please enter valid Quantity!", "warning"); 
         return; 
     }
     
@@ -349,8 +360,8 @@ async function addIn() {
             stock_in: qty, 
             stock_out: 0, 
             price: price, 
-            vendor_name: vendor || 'factory',
-            barcode: barcode || ''
+            vendor_name: vendor,
+            barcode: barcode
         }]).select();
         
         if (error) { 
@@ -362,9 +373,9 @@ async function addIn() {
             db.in.push({ 
                 id: data[0].id, 
                 date: date, 
-                vendor: vendor || 'factory', 
+                vendor: vendor, 
                 item: item, 
-                barcode: barcode || '', 
+                barcode: barcode, 
                 qty: qty, 
                 price: price, 
                 total: qty * price 
@@ -372,10 +383,9 @@ async function addIn() {
             
             saveAndRefresh();
             
+            // Clear only item and qty fields
             document.getElementById('in-item').value = "";
             document.getElementById('in-qty').value = "";
-            document.getElementById('in-price').value = "";
-            document.getElementById('in-barcode').value = "";
             
             showNotification("✅ Stock IN saved!", "success");
         }
@@ -385,28 +395,39 @@ async function addIn() {
 }
 
 // ==========================================
-// STOCK OUT
+// STOCK OUT - FIXED (Only Item, Date, Qty required)
 // ==========================================
 async function addOut() {
-    const item = document.getElementById('out-item').value.trim();
-    const qty = Number(document.getElementById('out-qty').value);
     const date = document.getElementById('out-date').value;
-    const price = Number(document.getElementById('out-price')?.value || 0);
-    const custName = document.getElementById('out-customer')?.value || "General Sale";
-    const barcode = document.getElementById('out-barcode')?.value || "";
+    const custName = document.getElementById('out-customer').value || "General Sale";
+    const item = document.getElementById('out-item').value.trim();
+    const barcode = document.getElementById('out-barcode').value || "";
+    const qty = Number(document.getElementById('out-qty').value);
+    const price = Number(document.getElementById('out-price').value) || 0;
     
-    if (!item || qty <= 0 || !date || price <= 0) { 
-        showNotification("⚠️ Please fill all fields!", "warning"); 
+    // ONLY validate: date, item, qty
+    if (!date) { 
+        showNotification("⚠️ Please select Date!", "warning"); 
+        return; 
+    }
+    if (!item) { 
+        showNotification("⚠️ Please enter Item Name!", "warning"); 
+        return; 
+    }
+    if (!qty || qty <= 0) { 
+        showNotification("⚠️ Please enter valid Quantity!", "warning"); 
         return; 
     }
     
+    // Check stock availability (warning only, not blocking)
     const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const available = tin - tout;
     
-    if (qty > available) { 
-        showNotification(`⚠️ Only ${available} available!`, "warning"); 
-        return; 
+    if (qty > available && available > 0) {
+        if (!confirm(`⚠️ Only ${available} available. Still continue?`)) {
+            return;
+        }
     }
     
     try {
@@ -417,7 +438,7 @@ async function addOut() {
             stock_out: qty, 
             price: price, 
             customer_name: custName,
-            barcode: barcode || ''
+            barcode: barcode
         }]).select();
         
         if (error) { 
@@ -432,16 +453,15 @@ async function addOut() {
                 qty: qty, 
                 date: date, 
                 cust: custName, 
-                barcode: barcode || '', 
+                barcode: barcode, 
                 price: price, 
                 total: qty * price 
             });
             
             saveAndRefresh();
             
+            document.getElementById('out-item').value = "";
             document.getElementById('out-qty').value = "";
-            document.getElementById('out-customer').value = "";
-            document.getElementById('out-barcode').value = "";
             document.getElementById('stock-status').innerHTML = "";
             
             showNotification("✅ Stock OUT saved!", "success");
@@ -648,7 +668,7 @@ async function editEntry(type, index) {
         const { error } = await _supabase.from('KRT').update({
             stock_in: type === 'in' ? Number(newQty) : 0,
             stock_out: type === 'out' ? Number(newQty) : 0,
-            price: Number(newPrice)
+            price: Number(newPrice) || 0
         }).eq('id', data.id);
         
         if (error) { 
@@ -657,8 +677,8 @@ async function editEntry(type, index) {
         }
         
         db[type][index].qty = Number(newQty);
-        db[type][index].price = Number(newPrice);
-        db[type][index].total = Number(newQty) * Number(newPrice);
+        db[type][index].price = Number(newPrice) || 0;
+        db[type][index].total = Number(newQty) * (Number(newPrice) || 0);
         
         saveAndRefresh();
         generateMasterSearch();
@@ -830,14 +850,18 @@ function updateCustomerDropdown() {
 function saveLedgerEntry() {
     const name = document.getElementById('ledger-cust-name').value.trim();
     const date = document.getElementById('led-date').value;
-    const item = document.getElementById('led-item').value;
+    const item = document.getElementById('led-item').value || '-';
     const ctn = parseFloat(document.getElementById('led-ctn').value) || 0;
     const debit = parseFloat(document.getElementById('led-debit').value) || 0;
     const credit = parseFloat(document.getElementById('led-credit').value) || 0;
     const method = document.getElementById('led-method').value;
     
-    if (!name || !date) { 
-        showNotification("⚠️ Name and Date required!", "warning"); 
+    if (!name) { 
+        showNotification("⚠️ Customer Name required!", "warning"); 
+        return; 
+    }
+    if (!date) { 
+        showNotification("⚠️ Date required!", "warning"); 
         return; 
     }
     
@@ -951,15 +975,19 @@ function editLedger(custName, index) {
 // ==========================================
 function addRentEntry() {
     const name = document.getElementById('rent-name').value.trim();
-    const shop = document.getElementById('rent-shop-no').value;
+    const shop = document.getElementById('rent-shop-no').value || '-';
     const date = document.getElementById('rent-date').value;
-    const month = document.getElementById('rent-month').value;
+    const month = document.getElementById('rent-month').value || '-';
     const debit = parseFloat(document.getElementById('rent-debit').value) || 0;
     const credit = parseFloat(document.getElementById('rent-credit').value) || 0;
     const method = document.getElementById('rent-method').value;
     
-    if (!name || !date) { 
-        showNotification("⚠️ Name and Date required!", "warning"); 
+    if (!name) { 
+        showNotification("⚠️ Name required!", "warning"); 
+        return; 
+    }
+    if (!date) { 
+        showNotification("⚠️ Date required!", "warning"); 
         return; 
     }
     
@@ -1087,7 +1115,6 @@ function switchPage(pageId, title) {
     document.getElementById(pageId).style.display = 'block';
     document.getElementById('page-title').innerHTML = `<i class="fas fa-chart-line"></i> KRT ERP - ${title}`;
     
-    // Update active sidebar item
     document.querySelectorAll('#sidebar ul li').forEach(li => li.classList.remove('active'));
     document.querySelectorAll('#sidebar ul li').forEach(li => {
         if (li.getAttribute('onclick') && li.getAttribute('onclick').includes(pageId)) {
