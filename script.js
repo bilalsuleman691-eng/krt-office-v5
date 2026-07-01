@@ -1,5 +1,5 @@
 // ==========================================
-// KRT TRADERS ERP - COMPLETE FIXED
+// KRT TRADERS ERP - COMPLETE SCRIPT
 // Developed by Bilal Suleman
 // Version: 5.0
 // ==========================================
@@ -14,54 +14,20 @@ const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 // ==========================================
 // GLOBAL DATABASE OBJECTS
 // ==========================================
-let db = { in: [], out: [], ledgers: {}, opening_balances: {} };
-let dbRent = [];
-let extraUsers = [];
+let db = JSON.parse(localStorage.getItem('krt_erp_data')) || { in: [], out: [], ledgers: {}, opening_balances: {} };
+let dbRent = JSON.parse(localStorage.getItem('krt_rent_data')) || [];
+let extraUsers = JSON.parse(localStorage.getItem('krt_extra_users')) || [];
 
 // ==========================================
-// LOAD DATA FROM LOCALSTORAGE ON STARTUP
+// GET TODAY'S DATE (Pakistan Timezone)
 // ==========================================
-function loadLocalData() {
-    const saved = localStorage.getItem('krt_erp_data');
-    if (saved) {
-        try {
-            db = JSON.parse(saved);
-            console.log("📦 Local data loaded:", db.in.length, "IN,", db.out.length, "OUT");
-        } catch(e) {
-            console.error("Local data parse error:", e);
-            db = { in: [], out: [], ledgers: {}, opening_balances: {} };
-        }
-    } else {
-        db = { in: [], out: [], ledgers: {}, opening_balances: {} };
-    }
-    
-    const rentSaved = localStorage.getItem('krt_rent_data');
-    if (rentSaved) {
-        try {
-            dbRent = JSON.parse(rentSaved);
-        } catch(e) {
-            dbRent = [];
-        }
-    } else {
-        dbRent = [];
-    }
-    
-    const usersSaved = localStorage.getItem('krt_extra_users');
-    if (usersSaved) {
-        try {
-            extraUsers = JSON.parse(usersSaved);
-        } catch(e) {
-            extraUsers = [];
-        }
-    } else {
-        extraUsers = [];
-    }
+function getTodayDate() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
-
-// ==========================================
-// CALL ON STARTUP
-// ==========================================
-loadLocalData();
 
 // ==========================================
 // IDLE SCREEN SYSTEM
@@ -259,7 +225,6 @@ async function fetchCloudData() {
         
         console.log("📦 Data received:", data.length, "records");
         
-        // Clear existing
         db.in = [];
         db.out = [];
         
@@ -294,9 +259,8 @@ async function fetchCloudData() {
             }
         });
         
-        // SAVE TO LOCALSTORAGE
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
-        console.log("✅ Data saved to localStorage:", db.in.length, "IN,", db.out.length, "OUT");
+        console.log("✅ Data loaded:", db.in.length, "IN,", db.out.length, "OUT");
         return true;
     } catch (err) { 
         console.error("❌ Fetch Error:", err); 
@@ -338,16 +302,20 @@ async function syncAllCloudData() {
     showNotification("☁️ Syncing...", "info");
     
     try {
-        await fetchCloudData();
-        await fetchCloudRentData();
+        const stockSynced = await fetchCloudData();
+        const rentSynced = await fetchCloudRentData();
         
-        renderAll();
-        updateDashboardStats();
-        updateItemLists();
-        updateCustomerDropdown();
-        loadUserTable();
-        renderRentTable();
-        showNotification("✅ Sync complete!", "success");
+        if (stockSynced || rentSynced) {
+            renderAll();
+            updateDashboardStats();
+            updateItemLists();
+            updateCustomerDropdown();
+            loadUserTable();
+            renderRentTable();
+            showNotification("✅ Sync complete!", "success");
+        } else {
+            showNotification("ℹ️ No new data found.", "info");
+        }
     } catch (err) {
         showNotification("❌ Sync failed: " + err.message, "error");
     }
@@ -408,9 +376,7 @@ async function addIn() {
                 total: qty * price 
             });
             
-            // IMMEDIATELY SAVE TO LOCALSTORAGE
             localStorage.setItem('krt_erp_data', JSON.stringify(db));
-            
             renderAll();
             updateDashboardStats();
             updateItemLists();
@@ -475,9 +441,7 @@ async function addOut() {
                 total: qty * price 
             });
             
-            // IMMEDIATELY SAVE TO LOCALSTORAGE
             localStorage.setItem('krt_erp_data', JSON.stringify(db));
-            
             renderAll();
             updateDashboardStats();
             updateItemLists();
@@ -523,7 +487,7 @@ function showLiveStock(itemName) {
 // RENDER ALL - FIXED
 // ==========================================
 function renderAll() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayDate();
     
     // Today's IN
     const inBody = document.getElementById('today-list-in');
@@ -1184,31 +1148,25 @@ function updateItemLists() {
 }
 
 // ==========================================
-// APP STARTUP - FIXED
+// APP STARTUP
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("🚀 KRT ERP v5.0 Loading...");
     console.log("📦 Developed by Bilal Suleman");
     
-    // LOAD LOCAL DATA FIRST
-    loadLocalData();
-    
-    // RENDER IMMEDIATELY
     renderAll();
     renderRentTable();
     loadUserTable();
     updateCustomerDropdown();
     updateItemLists();
-    updateDashboardStats();
     
-    // THEN SYNC WITH CLOUD
     if (navigator.onLine) {
-        await syncAllCloudData();
+        await fetchCloudData();
+        renderAll();
     } else {
         showNotification("⚠️ Offline mode", "warning");
     }
     
-    // CHECK LOGIN STATUS
     const loggedIn = localStorage.getItem('isLoggedIn');
     const role = localStorage.getItem('userRole');
     
