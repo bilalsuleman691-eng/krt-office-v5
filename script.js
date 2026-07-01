@@ -1,5 +1,5 @@
 // ==========================================
-// KRT TRADERS ERP - COMPLETE SCRIPT
+// KRT TRADERS ERP - COMPLETE SCRIPT (FIXED)
 // Developed by Bilal Suleman
 // Version: 5.0
 // ==========================================
@@ -232,23 +232,34 @@ function applyDynamicPermissions(user) {
 }
 
 // ==========================================
-// CLOUD DATA - FIXED
+// CLOUD DATA - FIXED (Capital D issue resolved)
 // ==========================================
 async function fetchCloudData() {
     try {
         const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
-        if (error) { console.error("Supabase Error:", error.message); return false; }
-        if (!data || data.length === 0) return false;
+        if (error) { 
+            console.error("Supabase Error:", error.message); 
+            showNotification("❌ Supabase Error: " + error.message, "error");
+            return false; 
+        }
+        
+        if (!data || data.length === 0) {
+            console.log("⚠️ No data found in Supabase");
+            return false;
+        }
+        
+        console.log("📦 Data received from Supabase:", data.length, "records");
         
         // Clear existing data
         db.in = [];
         db.out = [];
         
-        data.forEach(row => {
+        data.forEach((row, index) => {
             const inQty = Number(row.stock_in || 0);
             const outQty = Number(row.stock_out || 0);
             const price = Number(row.price || 0);
-            const date = (row.Date || row.date || row.created_at || '').split('T')[0] || new Date().toISOString().split('T')[0];
+            // FIXED: Use row.Date (capital D) instead of row.date
+            const date = row.Date ? row.Date.split('T')[0] : new Date().toISOString().split('T')[0];
             
             if (inQty > 0) {
                 db.in.push({ 
@@ -278,9 +289,11 @@ async function fetchCloudData() {
         });
         
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
+        console.log("✅ Data loaded from Supabase:", db.in.length, "IN entries,", db.out.length, "OUT entries");
         return true;
     } catch (err) { 
         console.error("❌ Fetch Error:", err); 
+        showNotification("❌ Fetch Error: " + err.message, "error");
         return false;
     }
 }
@@ -355,7 +368,7 @@ function showNotification(message, type = "info") {
 }
 
 // ==========================================
-// STOCK IN - FIXED
+// STOCK IN - FIXED (Capital D)
 // ==========================================
 async function addIn() {
     const date = document.getElementById('in-date').value;
@@ -413,7 +426,7 @@ async function addIn() {
 }
 
 // ==========================================
-// STOCK OUT - FIXED
+// STOCK OUT - FIXED (Capital D)
 // ==========================================
 async function addOut() {
     const item = document.getElementById('out-item').value.trim();
@@ -506,7 +519,7 @@ function showLiveStock(itemName) {
 }
 
 // ==========================================
-// RENDER ALL - FIXED
+// RENDER ALL
 // ==========================================
 function renderAll() {
     const today = new Date().toISOString().split('T')[0];
@@ -613,7 +626,6 @@ function updateDashboardStats() {
     document.getElementById('dash-unique-items').textContent = [...new Set([...db.in.map(x=>x.item),...db.out.map(x=>x.item)])].length;
     document.getElementById('dash-revenue').textContent = 'PKR ' + db.out.reduce((s,x)=>s+x.total,0).toLocaleString();
     
-    // Recent Activity
     const act = document.getElementById('recent-activity');
     if (act) {
         const all = [...db.in.map(x=>({...x,type:'IN'})), ...db.out.map(x=>({...x,type:'OUT'}))];
@@ -639,7 +651,7 @@ function updateDashboardStats() {
 }
 
 // ==========================================
-// DELETE ENTRY - FIXED
+// DELETE ENTRY
 // ==========================================
 async function deleteEntry(type, index) {
     if (!confirm("⚠️ Bilal Bhai, kya aap waqai ye record delete karna chahte hain?")) return;
@@ -664,7 +676,7 @@ async function deleteEntry(type, index) {
 }
 
 // ==========================================
-// EDIT ENTRY - FIXED
+// EDIT ENTRY
 // ==========================================
 async function editEntry(type, index) {
     const data = db[type][index];
@@ -699,7 +711,7 @@ async function editEntry(type, index) {
 }
 
 // ==========================================
-// MASTER SEARCH - FIXED
+// MASTER SEARCH
 // ==========================================
 function generateMasterSearch() {
     const from = document.getElementById('master-from').value;
@@ -763,7 +775,7 @@ function generateMasterSearch() {
 }
 
 // ==========================================
-// GENERATE REPORT - FIXED
+// GENERATE REPORT
 // ==========================================
 function generateCustomReport() {
     const from = document.getElementById('rep-from-date').value;
@@ -779,7 +791,6 @@ function generateCustomReport() {
     const fIn = db.in.filter(x => x.date >= from && x.date <= to);
     const fOut = db.out.filter(x => x.date >= from && x.date <= to);
     
-    // IN Table
     const inTable = document.querySelector("#rep-in-table");
     if (inTable) {
         if (fIn.length === 0) {
@@ -798,7 +809,6 @@ function generateCustomReport() {
         }
     }
     
-    // OUT Table
     const outTable = document.querySelector("#rep-out-table");
     if (outTable) {
         if (fOut.length === 0) {
@@ -821,7 +831,6 @@ function generateCustomReport() {
     const tOut = fOut.reduce((s,x)=>s+x.total,0);
     const profit = tOut - tIn;
     
-    // Remove old summary
     document.querySelectorAll('.report-summary').forEach(el => el.remove());
     
     const summary = document.createElement('div');
@@ -978,7 +987,7 @@ function editLedger(custName, index) {
 }
 
 // ==========================================
-// RENT BOOK - FIXED
+// RENT BOOK
 // ==========================================
 function addRentEntry() {
     const name = document.getElementById('rent-name').value.trim();
@@ -1174,7 +1183,7 @@ function updateItemLists() {
 }
 
 // ==========================================
-// APP STARTUP - FIXED
+// APP STARTUP
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("🚀 KRT TRADERS ERP v5.0 Loading...");
