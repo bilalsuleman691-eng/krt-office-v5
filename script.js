@@ -1,6 +1,7 @@
 // ==========================================
 // KRT TRADERS ERP - COMPLETE SCRIPT
 // Developed by Bilal Suleman
+// Version: 5.0
 // ==========================================
 
 // ==========================================
@@ -16,6 +17,7 @@ const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 let db = JSON.parse(localStorage.getItem('krt_erp_data')) || { in: [], out: [], ledgers: {}, opening_balances: {} };
 let dbRent = JSON.parse(localStorage.getItem('krt_rent_data')) || [];
 let extraUsers = JSON.parse(localStorage.getItem('krt_extra_users')) || [];
+let isDataLoaded = false;
 
 // ==========================================
 // IDLE SCREEN SYSTEM
@@ -26,7 +28,6 @@ let isIdle = false;
 let idleSeconds = 0;
 let idleInterval = null;
 
-// Create Idle Overlay
 function createIdleOverlay() {
     const overlay = document.createElement('div');
     overlay.id = 'idle-overlay';
@@ -231,15 +232,18 @@ function applyDynamicPermissions(user) {
 }
 
 // ==========================================
-// CLOUD DATA
+// CLOUD DATA - FIXED
 // ==========================================
 async function fetchCloudData() {
     try {
         const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
-        if (error) { console.error("Supabase Error:", error.message); return; }
-        if (!data || data.length === 0) return;
+        if (error) { console.error("Supabase Error:", error.message); return false; }
+        if (!data || data.length === 0) return false;
         
-        db.in = []; db.out = [];
+        // Clear existing data
+        db.in = [];
+        db.out = [];
+        
         data.forEach(row => {
             const inQty = Number(row.stock_in || 0);
             const outQty = Number(row.stock_out || 0);
@@ -247,40 +251,88 @@ async function fetchCloudData() {
             const date = (row.Date || row.date || row.created_at || '').split('T')[0] || new Date().toISOString().split('T')[0];
             
             if (inQty > 0) {
-                db.in.push({ id: row.id, date, vendor: row.vendor_name || 'factory', item: row.item_name || 'Unknown', qty: inQty, price, total: inQty * price });
-            } else if (outQty > 0) {
-                db.out.push({ id: row.id, date, cust: row.customer_name || 'General Sale', item: row.item_name || 'Unknown', qty: outQty, price, total: outQty * price });
+                db.in.push({ 
+                    id: row.id, 
+                    date: date, 
+                    vendor: row.vendor_name || 'factory', 
+                    item: row.item_name || 'Unknown', 
+                    qty: inQty, 
+                    price: price, 
+                    total: inQty * price,
+                    barcode: row.barcode || ''
+                });
+            }
+            
+            if (outQty > 0) {
+                db.out.push({ 
+                    id: row.id, 
+                    date: date, 
+                    cust: row.customer_name || 'General Sale', 
+                    item: row.item_name || 'Unknown', 
+                    qty: outQty, 
+                    price: price, 
+                    total: outQty * price,
+                    barcode: row.barcode || ''
+                });
             }
         });
+        
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
-        renderAll();
-        updateDashboardStats();
-        console.log("✅ Cloud sync complete!");
-    } catch (err) { console.error("❌ Fetch Error:", err); }
+        return true;
+    } catch (err) { 
+        console.error("❌ Fetch Error:", err); 
+        return false;
+    }
 }
 
 async function fetchCloudRentData() {
     try {
         const { data, error } = await _supabase.from('KRT_RENT').select('*').order('id', { ascending: true });
-        if (error) { console.error("Rent Fetch Error:", error); return; }
-        if (!data) return;
-        dbRent = data.map(row => ({ id: row.id, name: row.name, shop: row.shop, date: row.date, month: row.month, debit: Number(row.debit||0), credit: Number(row.credit||0), method: row.method }));
+        if (error) { console.error("Rent Fetch Error:", error); return false; }
+        if (!data) return false;
+        
+        dbRent = data.map(row => ({ 
+            id: row.id, 
+            name: row.name, 
+            shop: row.shop, 
+            date: row.date, 
+            month: row.month, 
+            debit: Number(row.debit||0), 
+            credit: Number(row.credit||0), 
+            method: row.method 
+        }));
+        
         localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
-        renderRentTable();
-        console.log("✅ Rent cloud sync done!");
-    } catch (err) { console.error("❌ Rent Sync Error:", err); }
+        return true;
+    } catch (err) { 
+        console.error("❌ Rent Sync Error:", err); 
+        return false;
+    }
 }
 
 async function syncAllCloudData() {
-    if (!navigator.onLine) { showNotification("⚠️ Internet nahi hai! Offline mode.", "warning"); return; }
+    if (!navigator.onLine) { 
+        showNotification("⚠️ Internet nahi hai! Offline mode.", "warning"); 
+        return; 
+    }
+    
     showNotification("☁️ Cloud sync shuru...", "info");
+    
     try {
-        await fetchCloudData();
-        await fetchCloudRentData();
-        updateItemLists();
-        updateCustomerDropdown();
-        loadUserTable();
-        showNotification("✅ Cloud sync complete!", "success");
+        const stockSynced = await fetchCloudData();
+        const rentSynced = await fetchCloudRentData();
+        
+        if (stockSynced || rentSynced) {
+            renderAll();
+            updateDashboardStats();
+            updateItemLists();
+            updateCustomerDropdown();
+            loadUserTable();
+            renderRentTable();
+            showNotification("✅ Cloud sync complete! Data updated.", "success");
+        } else {
+            showNotification("⚠️ No new data found on cloud.", "warning");
+        }
     } catch (err) {
         showNotification("❌ Sync failed: " + err.message, "error");
     }
@@ -303,7 +355,7 @@ function showNotification(message, type = "info") {
 }
 
 // ==========================================
-// STOCK IN
+// STOCK IN - FIXED
 // ==========================================
 async function addIn() {
     const date = document.getElementById('in-date').value;
@@ -313,25 +365,55 @@ async function addIn() {
     const qty = Number(document.getElementById('in-qty').value);
     const price = Number(document.getElementById('in-price').value);
     
-    if (!date || !item || qty <= 0) { showNotification("⚠️ Bilal Bhai, details lazmi likhain!", "warning"); return; }
+    if (!date || !item || qty <= 0 || price <= 0) { 
+        showNotification("⚠️ Bilal Bhai, details lazmi likhain!", "warning"); 
+        return; 
+    }
     
     try {
-        const { data, error } = await _supabase.from('KRT').insert([{ Date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor }]).select();
-        if (error) { showNotification("❌ Cloud sync fail: " + error.message, "error"); return; }
+        const { data, error } = await _supabase.from('KRT').insert([{ 
+            Date: date, 
+            item_name: item, 
+            stock_in: qty, 
+            stock_out: 0, 
+            price: price, 
+            vendor_name: vendor || 'factory',
+            barcode: barcode || ''
+        }]).select();
+        
+        if (error) { 
+            showNotification("❌ Cloud sync fail: " + error.message, "error"); 
+            return; 
+        }
+        
         if (data && data.length > 0) {
-            db.in.push({ id: data[0].id, date, vendor: vendor || 'factory', item, barcode, qty, price, total: qty * price });
+            db.in.push({ 
+                id: data[0].id, 
+                date: date, 
+                vendor: vendor || 'factory', 
+                item: item, 
+                barcode: barcode || '', 
+                qty: qty, 
+                price: price, 
+                total: qty * price 
+            });
+            
             saveAndRefresh();
+            
             document.getElementById('in-item').value = "";
             document.getElementById('in-qty').value = "";
             document.getElementById('in-price').value = "";
             document.getElementById('in-barcode').value = "";
+            
             showNotification("✅ Stock IN saved to cloud!", "success");
         }
-    } catch (err) { showNotification("❌ Internet ka masla hai!", "error"); }
+    } catch (err) { 
+        showNotification("❌ Internet ka masla hai!", "error"); 
+    }
 }
 
 // ==========================================
-// STOCK OUT
+// STOCK OUT - FIXED
 // ==========================================
 async function addOut() {
     const item = document.getElementById('out-item').value.trim();
@@ -341,26 +423,60 @@ async function addOut() {
     const custName = document.getElementById('out-customer')?.value || "General Sale";
     const barcode = document.getElementById('out-barcode')?.value || "";
     
-    if (!item || qty <= 0 || !date) { showNotification("⚠️ Bilal Bhai, saari details bharein!", "warning"); return; }
+    if (!item || qty <= 0 || !date || price <= 0) { 
+        showNotification("⚠️ Bilal Bhai, saari details bharein!", "warning"); 
+        return; 
+    }
     
     const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const available = tin - tout;
-    if (qty > available) { showNotification(`⚠️ Stock kam hai! Sirf ${available} mojud hain.`, "warning"); return; }
+    
+    if (qty > available) { 
+        showNotification(`⚠️ Stock kam hai! Sirf ${available} mojud hain.`, "warning"); 
+        return; 
+    }
     
     try {
-        const { data, error } = await _supabase.from('KRT').insert([{ Date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: custName }]).select();
-        if (error) { showNotification("❌ Cloud sync fail: " + error.message, "error"); return; }
+        const { data, error } = await _supabase.from('KRT').insert([{ 
+            Date: date, 
+            item_name: item, 
+            stock_in: 0, 
+            stock_out: qty, 
+            price: price, 
+            customer_name: custName,
+            barcode: barcode || ''
+        }]).select();
+        
+        if (error) { 
+            showNotification("❌ Cloud sync fail: " + error.message, "error"); 
+            return; 
+        }
+        
         if (data && data.length > 0) {
-            db.out.push({ id: data[0].id, item, qty, date, cust: custName, barcode, price, total: qty * price });
+            db.out.push({ 
+                id: data[0].id, 
+                item: item, 
+                qty: qty, 
+                date: date, 
+                cust: custName, 
+                barcode: barcode || '', 
+                price: price, 
+                total: qty * price 
+            });
+            
             saveAndRefresh();
+            
             document.getElementById('out-qty').value = "";
             document.getElementById('out-customer').value = "";
             document.getElementById('out-barcode').value = "";
-            document.getElementById('stock-status').innerText = "";
+            document.getElementById('stock-status').innerHTML = "";
+            
             showNotification("✅ Stock OUT saved to cloud!", "success");
         }
-    } catch (err) { showNotification("❌ Internet ka masla hai!", "error"); }
+    } catch (err) { 
+        showNotification("❌ Internet ka masla hai!", "error"); 
+    }
 }
 
 // ==========================================
@@ -368,10 +484,15 @@ async function addOut() {
 // ==========================================
 function showLiveStock(itemName) {
     const status = document.getElementById('stock-status');
-    if (!itemName || !itemName.trim()) { status.innerHTML = ""; return; }
+    if (!itemName || !itemName.trim()) { 
+        status.innerHTML = ""; 
+        return; 
+    }
+    
     const totalIn = db.in.filter(x => x.item === itemName).reduce((s, x) => s + x.qty, 0);
     const totalOut = db.out.filter(x => x.item === itemName).reduce((s, x) => s + x.qty, 0);
     const balance = totalIn - totalOut;
+    
     if (balance > 0) {
         status.style.color = "#27ae60";
         status.innerHTML = `✅ Available Stock: <strong>${balance}</strong>`;
@@ -385,7 +506,7 @@ function showLiveStock(itemName) {
 }
 
 // ==========================================
-// RENDER ALL
+// RENDER ALL - FIXED
 // ==========================================
 function renderAll() {
     const today = new Date().toISOString().split('T')[0];
@@ -393,40 +514,90 @@ function renderAll() {
     // Today's IN
     const inBody = document.getElementById('today-list-in');
     if (inBody) {
-        let html = ""; let c = 1;
-        db.in.forEach((x, i) => {
-            if (x.date === today) {
-                html += `<tr><td>${c++}</td><td>${x.item}</td><td>${x.vendor}</td><td>${x.qty}</td><td>${x.price.toLocaleString()}</td><td>${x.total.toLocaleString()}</td><td><button class="btn-action btn-delete" onclick="deleteEntry('in',${i})">Del</button></td></tr>`;
-            }
-        });
-        inBody.innerHTML = html || `<tr><td colspan="7" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Aaj ki koi entry nahi hai...</td></tr>`;
+        let html = ""; 
+        let c = 1;
+        const todayIn = db.in.filter(x => x.date === today);
+        
+        if (todayIn.length === 0) {
+            inBody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Aaj ki koi entry nahi hai...</td></tr>`;
+        } else {
+            todayIn.forEach((x, i) => {
+                const idx = db.in.indexOf(x);
+                html += `<tr>
+                    <td>${c++}</td>
+                    <td>${x.item}</td>
+                    <td>${x.vendor}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price.toLocaleString()}</td>
+                    <td>${x.total.toLocaleString()}</td>
+                    <td>
+                        <button class="btn-action btn-edit" onclick="editEntry('in',${idx})">Edit</button>
+                        <button class="btn-action btn-delete" onclick="deleteEntry('in',${idx})">Del</button>
+                    </td>
+                </tr>`;
+            });
+            inBody.innerHTML = html;
+        }
     }
     
     // Today's OUT
     const outBody = document.getElementById('today-list-out');
     if (outBody) {
-        let html = ""; let c = 1;
-        db.out.forEach((x, i) => {
-            if (x.date === today) {
-                html += `<tr><td>${c++}</td><td>${x.date}</td><td>${x.cust}</td><td>${x.item}</td><td>${x.barcode||'N/A'}</td><td>${x.qty}</td><td>${x.price.toLocaleString()}</td><td>${x.total.toLocaleString()}</td><td><button class="btn-action btn-delete" onclick="deleteEntry('out',${i})">Del</button></td></tr>`;
-            }
-        });
-        outBody.innerHTML = html || `<tr><td colspan="9" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Aaj ki koi sale nahi hai...</td></tr>`;
+        let html = ""; 
+        let c = 1;
+        const todayOut = db.out.filter(x => x.date === today);
+        
+        if (todayOut.length === 0) {
+            outBody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Aaj ki koi sale nahi hai...</td></tr>`;
+        } else {
+            todayOut.forEach((x, i) => {
+                const idx = db.out.indexOf(x);
+                html += `<tr>
+                    <td>${c++}</td>
+                    <td>${x.date}</td>
+                    <td>${x.cust}</td>
+                    <td>${x.item}</td>
+                    <td>${x.barcode||'N/A'}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price.toLocaleString()}</td>
+                    <td>${x.total.toLocaleString()}</td>
+                    <td>
+                        <button class="btn-action btn-edit" onclick="editEntry('out',${idx})">Edit</button>
+                        <button class="btn-action btn-delete" onclick="deleteEntry('out',${idx})">Del</button>
+                    </td>
+                </tr>`;
+            });
+            outBody.innerHTML = html;
+        }
     }
     
     // Balance
     const balBody = document.getElementById('table-balance-body');
     if (balBody) {
         const items = [...new Set([...db.in.map(x=>x.item), ...db.out.map(x=>x.item)])];
-        balBody.innerHTML = items.map(name => {
-            if (!name) return "";
-            const tin = db.in.filter(x=>x.item===name).reduce((s,x)=>s+x.qty,0);
-            const tout = db.out.filter(x=>x.item===name).reduce((s,x)=>s+x.qty,0);
-            const pPrice = db.in.find(x=>x.item===name)?.price || 0;
-            const sPrice = db.out.find(x=>x.item===name)?.price || 0;
-            const bal = tin - tout;
-            return `<tr><td>${db.in.find(x=>x.item===name)?.barcode||'N/A'}</td><td style="font-weight:600;">${name}</td><td style="color:#2980b9;">${tin}</td><td style="color:#e67e22;">${tout}</td><td style="font-weight:bold;color:${bal<5?'#e74c3c':'#27ae60'};">${bal}</td><td style="color:#27ae60;font-weight:bold;">PKR ${((sPrice-pPrice)*tout).toLocaleString()}</td></tr>`;
-        }).join('') || `<tr><td colspan="6" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Koi item nahi hai</td></tr>`;
+        
+        if (items.length === 0) {
+            balBody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Koi item nahi hai</td></tr>`;
+        } else {
+            balBody.innerHTML = items.map(name => {
+                if (!name) return "";
+                const tin = db.in.filter(x=>x.item===name).reduce((s,x)=>s+x.qty,0);
+                const tout = db.out.filter(x=>x.item===name).reduce((s,x)=>s+x.qty,0);
+                const inPrice = db.in.find(x=>x.item===name)?.price || 0;
+                const outPrice = db.out.find(x=>x.item===name)?.price || 0;
+                const bal = tin - tout;
+                const profit = (outPrice - inPrice) * tout;
+                
+                return `<tr>
+                    <td>${db.in.find(x=>x.item===name)?.barcode || 'N/A'}</td>
+                    <td style="font-weight:600;">${name}</td>
+                    <td style="color:#2980b9;">${tin}</td>
+                    <td style="color:#e67e22;">${tout}</td>
+                    <td style="font-weight:bold;color:${bal<5?'#e74c3c':'#27ae60'};">${bal}</td>
+                    <td style="color:${profit>=0?'#27ae60':'#e74c3c'};font-weight:bold;">PKR ${profit.toLocaleString()}</td>
+                </tr>`;
+            }).join('');
+        }
     }
     
     updateItemLists();
@@ -448,111 +619,233 @@ function updateDashboardStats() {
         const all = [...db.in.map(x=>({...x,type:'IN'})), ...db.out.map(x=>({...x,type:'OUT'}))];
         all.sort((a,b)=>new Date(b.date)-new Date(a.date));
         const recent = all.slice(0,10);
-        act.innerHTML = recent.length ? recent.map(x => `
-            <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;">
-                <span><span style="font-weight:600;">${x.item}</span> <span style="color:${x.type==='IN'?'#27ae60':'#e74c3c'};font-weight:bold;">${x.type==='IN'?'📥 +':'📤 -'}${x.qty}</span></span>
-                <span style="color:#7f8c8d;font-size:12px;">${x.date}</span>
-            </div>
-        `).join('') : `<p style="color:#7f8c8d;text-align:center;padding:20px;">No activity yet</p>`;
+        
+        if (recent.length === 0) {
+            act.innerHTML = `<p style="color:#7f8c8d;text-align:center;padding:20px;">No activity yet</p>`;
+        } else {
+            act.innerHTML = recent.map(x => `
+                <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;">
+                    <span>
+                        <span style="font-weight:600;">${x.item}</span> 
+                        <span style="color:${x.type==='IN'?'#27ae60':'#e74c3c'};font-weight:bold;">
+                            ${x.type==='IN'?'📥 +':'📤 -'}${x.qty}
+                        </span>
+                    </span>
+                    <span style="color:#7f8c8d;font-size:12px;">${x.date}</span>
+                </div>
+            `).join('');
+        }
     }
 }
 
 // ==========================================
-// DELETE ENTRY
+// DELETE ENTRY - FIXED
 // ==========================================
 async function deleteEntry(type, index) {
     if (!confirm("⚠️ Bilal Bhai, kya aap waqai ye record delete karna chahte hain?")) return;
+    
     const record = db[type][index];
     if (record && record.id) {
         try {
             const { error } = await _supabase.from('KRT').delete().eq('id', record.id);
-            if (error) { showNotification("❌ Cloud delete fail: " + error.message, "error"); return; }
-        } catch (err) { showNotification("❌ Internet ka masla hai!", "error"); return; }
+            if (error) { 
+                showNotification("❌ Cloud delete fail: " + error.message, "error"); 
+                return; 
+            }
+        } catch (err) { 
+            showNotification("❌ Internet ka masla hai!", "error"); 
+            return; 
+        }
     }
+    
     db[type].splice(index, 1);
     saveAndRefresh();
     showNotification("✅ Record deleted from cloud & local!", "success");
 }
 
 // ==========================================
-// EDIT ENTRY
+// EDIT ENTRY - FIXED
 // ==========================================
 async function editEntry(type, index) {
     const data = db[type][index];
     const newQty = prompt("New Qty:", data.qty);
     if (newQty === null) return;
+    
     const newPrice = prompt("New Price:", data.price);
     if (newPrice === null) return;
+    
     try {
         const { error } = await _supabase.from('KRT').update({
             stock_in: type === 'in' ? Number(newQty) : 0,
             stock_out: type === 'out' ? Number(newQty) : 0,
             price: Number(newPrice)
         }).eq('id', data.id);
-        if (error) { showNotification("❌ Update failed: " + error.message, "error"); return; }
+        
+        if (error) { 
+            showNotification("❌ Update failed: " + error.message, "error"); 
+            return; 
+        }
+        
         db[type][index].qty = Number(newQty);
         db[type][index].price = Number(newPrice);
         db[type][index].total = Number(newQty) * Number(newPrice);
+        
         saveAndRefresh();
         generateMasterSearch();
         showNotification("✅ Updated successfully!", "success");
-    } catch (err) { showNotification("❌ Internet issue!", "error"); }
+    } catch (err) { 
+        showNotification("❌ Internet issue!", "error"); 
+    }
 }
 
 // ==========================================
-// MASTER SEARCH
+// MASTER SEARCH - FIXED
 // ==========================================
 function generateMasterSearch() {
     const from = document.getElementById('master-from').value;
     const to = document.getElementById('master-to').value;
-    if (!from || !to) { showNotification("⚠️ Pehle Dates select karein!", "warning"); return; }
+    
+    if (!from || !to) { 
+        showNotification("⚠️ Pehle Dates select karein!", "warning"); 
+        return; 
+    }
     
     const fIn = db.in.filter(x => x.date >= from && x.date <= to);
     const fOut = db.out.filter(x => x.date >= from && x.date <= to);
     
     const inTable = document.querySelector("#master-in-table");
     if (inTable) {
-        inTable.innerHTML = fIn.map((x) => {
-            const idx = db.in.indexOf(x);
-            return `<tr><td>${x.date}</td><td>${x.item}</td><td>${x.vendor}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td><td><button class="btn-action btn-edit" onclick="editEntry('in',${idx})">Edit</button><button class="btn-action btn-delete" onclick="deleteEntry('in',${idx})">Del</button></td></tr>`;
-        }).join('') || `<tr><td colspan="7" style="text-align:center;padding:20px;color:#7f8c8d;">No records found</td></tr>`;
+        if (fIn.length === 0) {
+            inTable.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#7f8c8d;">No records found</td></tr>`;
+        } else {
+            inTable.innerHTML = fIn.map((x) => {
+                const idx = db.in.indexOf(x);
+                return `<tr>
+                    <td>${x.date}</td>
+                    <td>${x.item}</td>
+                    <td>${x.vendor}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price}</td>
+                    <td>${x.total}</td>
+                    <td>
+                        <button class="btn-action btn-edit" onclick="editEntry('in',${idx})">Edit</button>
+                        <button class="btn-action btn-delete" onclick="deleteEntry('in',${idx})">Del</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
     }
     
     const outTable = document.querySelector("#master-out-table");
     if (outTable) {
-        outTable.innerHTML = fOut.map((x) => {
-            const idx = db.out.indexOf(x);
-            return `<tr><td>${x.date}</td><td>${x.item}</td><td>${x.cust}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td><td><button class="btn-action btn-edit" onclick="editEntry('out',${idx})">Edit</button><button class="btn-action btn-delete" onclick="deleteEntry('out',${idx})">Del</button></td></tr>`;
-        }).join('') || `<tr><td colspan="7" style="text-align:center;padding:20px;color:#7f8c8d;">No records found</td></tr>`;
+        if (fOut.length === 0) {
+            outTable.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#7f8c8d;">No records found</td></tr>`;
+        } else {
+            outTable.innerHTML = fOut.map((x) => {
+                const idx = db.out.indexOf(x);
+                return `<tr>
+                    <td>${x.date}</td>
+                    <td>${x.item}</td>
+                    <td>${x.cust}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price}</td>
+                    <td>${x.total}</td>
+                    <td>
+                        <button class="btn-action btn-edit" onclick="editEntry('out',${idx})">Edit</button>
+                        <button class="btn-action btn-delete" onclick="deleteEntry('out',${idx})">Del</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
     }
+    
     showNotification(`✅ Found ${fIn.length + fOut.length} records`, "success");
 }
 
 // ==========================================
-// GENERATE REPORT
+// GENERATE REPORT - FIXED
 // ==========================================
 function generateCustomReport() {
     const from = document.getElementById('rep-from-date').value;
     const to = document.getElementById('rep-to-date').value;
-    if (!from || !to) { showNotification("⚠️ Dono dates select karein!", "warning"); return; }
     
-    document.getElementById('report-period').innerText = `📅 Period: ${from} to ${to}`;
+    if (!from || !to) { 
+        showNotification("⚠️ Dono dates select karein!", "warning"); 
+        return; 
+    }
+    
+    document.getElementById('report-period').innerHTML = `📅 Period: ${from} to ${to}`;
+    
     const fIn = db.in.filter(x => x.date >= from && x.date <= to);
     const fOut = db.out.filter(x => x.date >= from && x.date <= to);
     
-    document.querySelector("#rep-in-table").innerHTML = fIn.map(x => `<tr><td>${x.date}</td><td>${x.item}</td><td>${x.vendor}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total.toLocaleString()}</td></tr>`).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#7f8c8d;">No records</td></tr>`;
-    document.querySelector("#rep-out-table").innerHTML = fOut.map(x => `<tr><td>${x.date}</td><td>${x.item}</td><td>${x.cust}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total.toLocaleString()}</td></tr>`).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#7f8c8d;">No records</td></tr>`;
+    // IN Table
+    const inTable = document.querySelector("#rep-in-table");
+    if (inTable) {
+        if (fIn.length === 0) {
+            inTable.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#7f8c8d;">No records</td></tr>`;
+        } else {
+            inTable.innerHTML = fIn.map(x => `
+                <tr>
+                    <td>${x.date}</td>
+                    <td>${x.item}</td>
+                    <td>${x.vendor}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price}</td>
+                    <td>${x.total.toLocaleString()}</td>
+                </tr>
+            `).join('');
+        }
+    }
+    
+    // OUT Table
+    const outTable = document.querySelector("#rep-out-table");
+    if (outTable) {
+        if (fOut.length === 0) {
+            outTable.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#7f8c8d;">No records</td></tr>`;
+        } else {
+            outTable.innerHTML = fOut.map(x => `
+                <tr>
+                    <td>${x.date}</td>
+                    <td>${x.item}</td>
+                    <td>${x.cust}</td>
+                    <td>${x.qty}</td>
+                    <td>${x.price}</td>
+                    <td>${x.total.toLocaleString()}</td>
+                </tr>
+            `).join('');
+        }
+    }
     
     const tIn = fIn.reduce((s,x)=>s+x.total,0);
     const tOut = fOut.reduce((s,x)=>s+x.total,0);
+    const profit = tOut - tIn;
     
     // Remove old summary
     document.querySelectorAll('.report-summary').forEach(el => el.remove());
+    
     const summary = document.createElement('div');
     summary.className = 'report-summary';
-    summary.style.cssText = 'display:flex;justify-content:space-around;background:#2c3e50;color:white;padding:15px;border-radius:8px;margin-top:20px;flex-wrap:wrap;gap:10px;';
-    summary.innerHTML = `<span>📥 Total IN: PKR ${tIn.toLocaleString()}</span><span>📤 Total OUT: PKR ${tOut.toLocaleString()}</span><span style="color:${tOut-tIn>=0?'#2ecc71':'#e74c3c'};font-weight:bold;">💰 Profit: PKR ${(tOut-tIn).toLocaleString()}</span>`;
+    summary.style.cssText = `
+        display:flex; 
+        justify-content:space-around; 
+        background:#2c3e50; 
+        color:white; 
+        padding:15px; 
+        border-radius:8px; 
+        margin-top:20px; 
+        flex-wrap:wrap; 
+        gap:10px;
+    `;
+    summary.innerHTML = `
+        <span>📥 Total IN: PKR ${tIn.toLocaleString()}</span>
+        <span>📤 Total OUT: PKR ${tOut.toLocaleString()}</span>
+        <span style="color:${profit>=0?'#2ecc71':'#e74c3c'};font-weight:bold;">
+            💰 ${profit>=0?'Profit':'Loss'}: PKR ${Math.abs(profit).toLocaleString()}
+        </span>
+    `;
     document.getElementById('print-area').appendChild(summary);
+    
     showNotification("✅ Report generated!", "success");
 }
 
@@ -562,7 +855,9 @@ function generateCustomReport() {
 function updateCustomerDropdown() {
     const list = document.getElementById('customer-list');
     if (!list) return;
-    list.innerHTML = Object.keys(db.ledgers).map(name => `<option value="${name}">`).join('');
+    
+    const customers = Object.keys(db.ledgers);
+    list.innerHTML = customers.map(name => `<option value="${name}">`).join('');
 }
 
 function saveLedgerEntry() {
@@ -573,48 +868,91 @@ function saveLedgerEntry() {
     const debit = parseFloat(document.getElementById('led-debit').value) || 0;
     const credit = parseFloat(document.getElementById('led-credit').value) || 0;
     const method = document.getElementById('led-method').value;
-    if (!name || !date) { showNotification("⚠️ Customer Name aur Date lazmi hai!", "warning"); return; }
-    if (!db.ledgers[name]) { db.ledgers[name] = []; db.opening_balances[name] = 0; }
+    
+    if (!name || !date) { 
+        showNotification("⚠️ Customer Name aur Date lazmi hai!", "warning"); 
+        return; 
+    }
+    
+    if (!db.ledgers[name]) { 
+        db.ledgers[name] = []; 
+        db.opening_balances[name] = 0; 
+    }
+    
     db.ledgers[name].push({ date, item, ctn, debit, credit, method });
     saveAndRefresh();
     updateCustomerDropdown();
     showLedger();
+    
     document.getElementById('led-item').value = "";
     document.getElementById('led-ctn').value = "0";
     document.getElementById('led-debit').value = "0";
     document.getElementById('led-credit').value = "0";
+    
     showNotification(`✅ Entry saved for ${name}!`, "success");
 }
 
 function updateOpeningBal() {
     const name = document.getElementById('ledger-cust-name').value.trim();
     const val = parseFloat(document.getElementById('opening-bal').value) || 0;
-    if (name) { db.opening_balances[name] = val; saveAndRefresh(); showLedger(); }
+    
+    if (name) { 
+        db.opening_balances[name] = val; 
+        saveAndRefresh(); 
+        showLedger(); 
+    }
 }
 
 function showLedger() {
     const name = document.getElementById('ledger-cust-name').value.trim();
     const tbody = document.getElementById('ledger-table-body');
     if (!tbody) return;
+    
     const opening = parseFloat(db.opening_balances[name]) || 0;
     document.getElementById('opening-bal').value = opening;
-    tbody.innerHTML = "";
+    
     if (!name || !db.ledgers[name]) {
         document.getElementById('total-ctn').textContent = "0";
         document.getElementById('total-debit').textContent = "0";
         document.getElementById('total-credit').textContent = "0";
         document.getElementById('final-balance').textContent = "💰 Balance: 0";
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:#7f8c8d;">No entries for this customer</td></tr>`;
         return;
     }
-    let tCtn=0, tDebit=0, tCredit=0;
+    
+    let tCtn = 0, tDebit = 0, tCredit = 0;
+    let html = "";
+    
     db.ledgers[name].forEach((x, i) => {
-        tCtn += Number(x.ctn||0); tDebit += Number(x.debit||0); tCredit += Number(x.credit||0);
-        tbody.innerHTML += `<tr><td>${i+1}</td><td>${x.date}</td><td>${x.item}</td><td>${x.ctn}</td><td>${x.debit.toLocaleString()}</td><td>${x.credit.toLocaleString()}</td><td>${x.method}</td><td><button class="btn-action btn-edit" onclick="editLedger('${name}',${i})">Edit</button><button class="btn-action btn-delete" onclick="delLedger('${name}',${i})">Del</button></td></tr>`;
+        tCtn += Number(x.ctn||0); 
+        tDebit += Number(x.debit||0); 
+        tCredit += Number(x.credit||0);
+        
+        html += `<tr>
+            <td>${i+1}</td>
+            <td>${x.date}</td>
+            <td>${x.item}</td>
+            <td>${x.ctn}</td>
+            <td>${x.debit.toLocaleString()}</td>
+            <td>${x.credit.toLocaleString()}</td>
+            <td>${x.method}</td>
+            <td>
+                <button class="btn-action btn-edit" onclick="editLedger('${name}',${i})">Edit</button>
+                <button class="btn-action btn-delete" onclick="delLedger('${name}',${i})">Del</button>
+            </td>
+        </tr>`;
     });
+    
+    tbody.innerHTML = html;
     document.getElementById('total-ctn').textContent = tCtn;
     document.getElementById('total-debit').textContent = tDebit.toLocaleString();
     document.getElementById('total-credit').textContent = tCredit.toLocaleString();
-    document.getElementById('final-balance').textContent = `💰 Balance: ${((opening+tDebit)-tCredit).toLocaleString()}`;
+    
+    const balance = (opening + tDebit) - tCredit;
+    const balanceEl = document.getElementById('final-balance');
+    balanceEl.textContent = `💰 Balance: ${balance.toLocaleString()}`;
+    balanceEl.style.background = balance >= 0 ? '#27ae60' : '#e74c3c';
+    balanceEl.style.color = 'white';
 }
 
 function delLedger(custName, index) {
@@ -629,6 +967,7 @@ function editLedger(custName, index) {
     const entry = db.ledgers[custName][index];
     const nDebit = prompt("Naya Debit (Udhaar):", entry.debit);
     const nCredit = prompt("Naya Credit (Wasuli):", entry.credit);
+    
     if (nDebit !== null && nCredit !== null) {
         db.ledgers[custName][index].debit = Number(nDebit);
         db.ledgers[custName][index].credit = Number(nCredit);
@@ -639,7 +978,7 @@ function editLedger(custName, index) {
 }
 
 // ==========================================
-// RENT BOOK
+// RENT BOOK - FIXED
 // ==========================================
 function addRentEntry() {
     const name = document.getElementById('rent-name').value.trim();
@@ -649,7 +988,12 @@ function addRentEntry() {
     const debit = parseFloat(document.getElementById('rent-debit').value) || 0;
     const credit = parseFloat(document.getElementById('rent-credit').value) || 0;
     const method = document.getElementById('rent-method').value;
-    if (!name || !date) { showNotification("⚠️ Customer Name aur Date lazmi likhain!", "warning"); return; }
+    
+    if (!name || !date) { 
+        showNotification("⚠️ Customer Name aur Date lazmi likhain!", "warning"); 
+        return; 
+    }
+    
     dbRent.push({ name, shop, date, month, debit, credit, method });
     localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
     renderRentTable();
@@ -660,17 +1004,32 @@ function renderRentTable() {
     const tbody = document.getElementById('rent-main-rows');
     const searchName = document.getElementById('rent-name').value.trim();
     if (!tbody) return;
-    tbody.innerHTML = "";
-    let tDebit=0, tCredit=0;
+    
+    let tDebit = 0, tCredit = 0;
     const filtered = dbRent.filter(x => x.name.toLowerCase() === searchName.toLowerCase());
-    if (filtered.length > 0) {
-        filtered.forEach((r, i) => {
-            tDebit += r.debit; tCredit += r.credit;
-            tbody.innerHTML += `<tr><td>${r.shop||'N/A'}</td><td>${r.date}</td><td>${r.month}</td><td style="color:#e74c3c;font-weight:600;">${r.debit.toLocaleString()}</td><td style="color:#27ae60;font-weight:600;">${r.credit.toLocaleString()}</td><td>${r.method}</td><td><button class="btn-action btn-delete" onclick="deleteRentEntry(${i})">Del</button></td></tr>`;
-        });
-    } else {
+    
+    if (filtered.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Naya Customer hai ya naam sahi nahi likha...</td></tr>`;
+    } else {
+        let html = "";
+        filtered.forEach((r, i) => {
+            const idx = dbRent.indexOf(r);
+            tDebit += r.debit; 
+            tCredit += r.credit;
+            
+            html += `<tr>
+                <td>${r.shop||'N/A'}</td>
+                <td>${r.date}</td>
+                <td>${r.month}</td>
+                <td style="color:#e74c3c;font-weight:600;">${r.debit.toLocaleString()}</td>
+                <td style="color:#27ae60;font-weight:600;">${r.credit.toLocaleString()}</td>
+                <td>${r.method}</td>
+                <td><button class="btn-action btn-delete" onclick="deleteRentEntry(${idx})">Del</button></td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
     }
+    
     document.getElementById('rent-total-debit').textContent = tDebit.toLocaleString();
     document.getElementById('rent-total-credit').textContent = tCredit.toLocaleString();
     document.getElementById('rent-final-balance').textContent = (tDebit - tCredit).toLocaleString();
@@ -693,23 +1052,40 @@ function createNewUser() {
     const pass = document.getElementById('new-password').value;
     const perms = [];
     document.querySelectorAll('.perm:checked').forEach(cb => perms.push(cb.value));
-    if (!name || !id || !pass) { showNotification("⚠️ Bilal Bhai, saari details bharein!", "warning"); return; }
+    
+    if (!name || !id || !pass) { 
+        showNotification("⚠️ Bilal Bhai, saari details bharein!", "warning"); 
+        return; 
+    }
+    
     extraUsers.push({ id, pass, name, perms });
     localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
     loadUserTable();
+    
     document.getElementById('new-username').value = '';
     document.getElementById('new-userid').value = '';
     document.getElementById('new-password').value = '';
     document.querySelectorAll('.perm').forEach(cb => cb.checked = false);
+    
     showNotification(`✅ New user "${name}" created!`, "success");
 }
 
 function loadUserTable() {
     const tbody = document.getElementById('user-table-body');
     if (!tbody) return;
-    tbody.innerHTML = extraUsers.map((u, i) => `
-        <tr><td>${u.id}</td><td>${u.name}</td><td><small>${u.perms.join(', ')}</small></td><td><button class="btn-action btn-delete" onclick="deleteExtraUser(${i})">Del</button></td></tr>
-    `).join('') || `<tr><td colspan="4" style="text-align:center;padding:20px;color:#7f8c8d;">No users created yet</td></tr>`;
+    
+    if (extraUsers.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:20px;color:#7f8c8d;">No users created yet</td></tr>`;
+    } else {
+        tbody.innerHTML = extraUsers.map((u, i) => `
+            <tr>
+                <td>${u.id}</td>
+                <td>${u.name}</td>
+                <td><small>${u.perms.join(', ')}</small></td>
+                <td><button class="btn-action btn-delete" onclick="deleteExtraUser(${i})">Del</button></td>
+            </tr>
+        `).join('');
+    }
 }
 
 function deleteExtraUser(index) {
@@ -725,13 +1101,12 @@ function deleteExtraUser(index) {
 // ==========================================
 function toggleSidebar() {
     const sb = document.getElementById('sidebar');
-    const mc = document.getElementById('main-content');
     if (sb.style.left === "0px" || sb.style.left === "") {
         sb.style.left = "-260px";
-        mc.style.marginLeft = "0";
+        document.getElementById('main-content').style.marginLeft = "0";
     } else {
         sb.style.left = "0px";
-        mc.style.marginLeft = "260px";
+        document.getElementById('main-content').style.marginLeft = "260px";
     }
 }
 
@@ -742,10 +1117,12 @@ function switchPage(pageId, title) {
     document.querySelectorAll('.erp-page').forEach(p => p.style.display = 'none');
     document.getElementById(pageId).style.display = 'block';
     document.getElementById('page-title').innerHTML = `<i class="fas fa-chart-line" style="color:#f1c40f; margin-right:12px;"></i>KRT TRADERS ERP - ${title}`;
+    
     if (window.innerWidth <= 768) {
         document.getElementById('sidebar').style.left = "-260px";
         document.getElementById('main-content').style.marginLeft = "0";
     }
+    
     resetIdleTimer();
 }
 
@@ -754,10 +1131,13 @@ function switchPage(pageId, title) {
 // ==========================================
 function logout() {
     if (!confirm("🚪 Bilal Bhai, kya aap waqai logout karna chahte hain?")) return;
+    
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('userRole');
+    
     if (idleTimer) clearTimeout(idleTimer);
     if (idleInterval) clearInterval(idleInterval);
+    
     document.getElementById('idle-overlay').style.display = 'none';
     isIdle = false;
     location.reload();
@@ -767,7 +1147,10 @@ function logout() {
 // PRINT SECTION
 // ==========================================
 function printSection() {
-    if (!db || !db.in) { showNotification("⚠️ Pehle data mukammal load hone dein!", "warning"); return; }
+    if (!db || !db.in) { 
+        showNotification("⚠️ Pehle data mukammal load hone dein!", "warning"); 
+        return; 
+    }
     window.print();
 }
 
@@ -785,24 +1168,37 @@ function saveAndRefresh() {
 function updateItemLists() {
     const list = document.getElementById('items-list');
     if (!list) return;
+    
     const items = [...new Set([...db.in.map(x=>x.item), ...db.out.map(x=>x.item)])];
     list.innerHTML = items.map(name => `<option value="${name}">`).join('');
 }
 
 // ==========================================
-// APP STARTUP
+// APP STARTUP - FIXED
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log("🚀 KRT TRADERS ERP v5.0 Loading...");
+    console.log("📦 Developed by Bilal Suleman");
+    console.log("🐘 Elephant Never Forgets!");
+    
+    // First load local data
     renderAll();
     renderRentTable();
     loadUserTable();
     updateCustomerDropdown();
     updateItemLists();
     
-    if (navigator.onLine) await syncAllCloudData();
+    // Then sync with cloud
+    if (navigator.onLine) {
+        await syncAllCloudData();
+    } else {
+        showNotification("⚠️ Offline mode - Data from local storage", "warning");
+    }
     
+    // Check login status
     const loggedIn = localStorage.getItem('isLoggedIn');
     const role = localStorage.getItem('userRole');
+    
     if (loggedIn === 'true') {
         if (role === 'admin') showSystem('admin');
         else if (role === 'staff') showSystem('staff');
@@ -818,10 +1214,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key === 's') { e.preventDefault(); syncAllCloudData(); }
-    if (e.key === 'Escape') { const sb = document.getElementById('sidebar'); if (sb && sb.style.left === "0px") toggleSidebar(); }
+    if (e.ctrlKey && e.key === 's') { 
+        e.preventDefault(); 
+        syncAllCloudData(); 
+    }
+    
+    if (e.key === 'Escape') { 
+        const sb = document.getElementById('sidebar'); 
+        if (sb && sb.style.left === "0px") toggleSidebar(); 
+    }
 });
 
-console.log("🚀 KRT TRADERS ERP v5.0 Loaded!");
-console.log("📦 Developed by Bilal Suleman");
-console.log("🐘 Elephant Never Forgets!");
+console.log("✅ KRT TRADERS ERP v5.0 Loaded Successfully!");
