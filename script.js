@@ -23,7 +23,7 @@ window.addEventListener('unhandledrejection', function(e) {
 // ==========================================
 // SUPABASE INITIALIZATION
 // ==========================================
-const supabaseUrl = 'https://zeadgtkzqooiswyyuozl.supabase.co';
+const supabaseUrl = 'https://jsxcmlpjdxgloofdrugz.supabase.co/rest/v1/';
 const supabaseKey = 'sb_secret_fpd976V4-WWT4_dTdyhcxw_Kf3Vstjw';
 let _supabase = null;
 let isSupabaseConnected = false;
