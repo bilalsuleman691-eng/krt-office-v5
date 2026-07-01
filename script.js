@@ -65,13 +65,14 @@ function generateIdleParticles() {
         p.className = 'idle-particle';
         const size = Math.random() * 10 + 4;
         p.style.cssText = `
-            width:${size}px; height:${size}px;
-            left:${Math.random()*100}%;
-            background:${colors[Math.floor(Math.random()*colors.length)]};
-            opacity:${Math.random()*0.15+0.05};
-            animation-duration:${Math.random()*20+15}s;
-            animation-delay:${Math.random()*20}s;
-            border-radius:${Math.random()>0.5?'50%':'4px'};
+            width: ${size}px; 
+            height: ${size}px;
+            left: ${Math.random() * 100}%;
+            background: ${colors[Math.floor(Math.random() * colors.length)]};
+            opacity: ${Math.random() * 0.15 + 0.05};
+            animation-duration: ${Math.random() * 20 + 15}s;
+            animation-delay: ${Math.random() * 20}s;
+            border-radius: ${Math.random() > 0.5 ? '50%' : '4px'};
         `;
         container.appendChild(p);
     }
@@ -81,17 +82,17 @@ function generateIdleEmojis() {
     const overlay = document.getElementById('idle-overlay');
     if (!overlay) return;
     document.querySelectorAll('.floating-emoji').forEach(el => el.remove());
-    const emojis = ['🐘','🌟','✨','💎','⚡','🔥','💫','🎯','🏆','👑','🦋','🌈'];
+    const emojis = ['🐘', '🌟', '✨', '💎', '⚡', '🔥', '💫', '🎯', '🏆', '👑', '🦋', '🌈'];
     for (let i = 0; i < 20; i++) {
         const e = document.createElement('div');
         e.className = 'floating-emoji';
-        e.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+        e.textContent = emojis[Math.floor(Math.random() * emojis.length)];
         e.style.cssText = `
-            left:${Math.random()*100}%;
-            font-size:${Math.random()*30+20}px;
-            animation-duration:${Math.random()*30+20}s;
-            animation-delay:${Math.random()*30}s;
-            opacity:${Math.random()*0.05+0.03};
+            left: ${Math.random() * 100}%;
+            font-size: ${Math.random() * 30 + 20}px;
+            animation-duration: ${Math.random() * 30 + 20}s;
+            animation-delay: ${Math.random() * 30}s;
+            opacity: ${Math.random() * 0.05 + 0.03};
         `;
         overlay.appendChild(e);
     }
@@ -104,7 +105,10 @@ function showIdleScreen() {
     
     isIdle = true;
     const overlay = document.getElementById('idle-overlay');
-    if (!overlay) { createIdleOverlay(); return showIdleScreen(); }
+    if (!overlay) { 
+        createIdleOverlay(); 
+        return showIdleScreen(); 
+    }
     
     idleSeconds = 0;
     document.getElementById('idle-timer').textContent = '00:00';
@@ -118,8 +122,8 @@ function showIdleScreen() {
     if (idleInterval) clearInterval(idleInterval);
     idleInterval = setInterval(() => {
         idleSeconds++;
-        const m = String(Math.floor(idleSeconds/60)).padStart(2,'0');
-        const s = String(idleSeconds%60).padStart(2,'0');
+        const m = String(Math.floor(idleSeconds / 60)).padStart(2, '0');
+        const s = String(idleSeconds % 60).padStart(2, '0');
         document.getElementById('idle-timer').textContent = `${m}:${s}`;
     }, 1000);
 }
@@ -130,9 +134,15 @@ function dismissIdleScreen() {
     const overlay = document.getElementById('idle-overlay');
     if (overlay) {
         overlay.style.animation = 'idleOut 0.5s ease forwards';
-        setTimeout(() => { overlay.style.display = 'none'; overlay.style.animation = ''; }, 500);
+        setTimeout(() => { 
+            overlay.style.display = 'none'; 
+            overlay.style.animation = ''; 
+        }, 500);
     }
-    if (idleInterval) { clearInterval(idleInterval); idleInterval = null; }
+    if (idleInterval) { 
+        clearInterval(idleInterval); 
+        idleInterval = null; 
+    }
     document.getElementById('idle-status').textContent = '🟢 ACTIVE';
     resetIdleTimer();
 }
@@ -145,9 +155,11 @@ function resetIdleTimer() {
 
 function setupIdleDetection() {
     createIdleOverlay();
-    const events = ['mousedown','mousemove','keypress','scroll','touchstart','click','wheel','touchmove'];
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'wheel', 'touchmove'];
     events.forEach(e => document.addEventListener(e, resetIdleTimer));
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) resetIdleTimer(); });
+    document.addEventListener('visibilitychange', () => { 
+        if (!document.hidden) resetIdleTimer(); 
+    });
     resetIdleTimer();
 }
 document.addEventListener('DOMContentLoaded', setupIdleDetection);
@@ -160,18 +172,22 @@ function login() {
     const p = document.getElementById('pass').value.trim();
     
     if (u === "admin" && p === "123") {
-        localStorage.setItem('isLoggedIn','true'); localStorage.setItem('userRole','admin');
+        localStorage.setItem('isLoggedIn', 'true'); 
+        localStorage.setItem('userRole', 'admin');
         showSystem("admin");
     } else if (u === "ali" && p === "123") {
-        localStorage.setItem('isLoggedIn','true'); localStorage.setItem('userRole','staff');
+        localStorage.setItem('isLoggedIn', 'true'); 
+        localStorage.setItem('userRole', 'staff');
         showSystem("staff");
     } else if (u === "sattar" && p === "123") {
-        localStorage.setItem('isLoggedIn','true'); localStorage.setItem('userRole','manager');
+        localStorage.setItem('isLoggedIn', 'true'); 
+        localStorage.setItem('userRole', 'manager');
         showSystem("manager");
     } else {
         const found = extraUsers.find(user => user.id === u && user.pass === p);
         if (found) {
-            localStorage.setItem('isLoggedIn','true'); localStorage.setItem('userRole','extra');
+            localStorage.setItem('isLoggedIn', 'true'); 
+            localStorage.setItem('userRole', 'extra');
             showSystem(found);
             document.getElementById('toggle-btn').style.display = "block";
         } else {
@@ -203,7 +219,7 @@ function showSystem(roleOrUser) {
                     item.style.display = "none";
                 }
             });
-            switchPage('page-Report','DAILY REPORT');
+            switchPage('page-Report', 'DAILY REPORT');
         } else if (roleOrUser === "manager") {
             items.forEach(item => {
                 const t = item.innerText;
@@ -211,7 +227,7 @@ function showSystem(roleOrUser) {
                     item.style.display = "none";
                 }
             });
-            switchPage('page-customer-ledgers','CUSTOMER LEDGERS');
+            switchPage('page-customer-ledgers', 'CUSTOMER LEDGERS');
         }
     }
     renderAll();
@@ -224,7 +240,10 @@ function applyDynamicPermissions(user) {
     const items = document.querySelectorAll('#sidebar ul li');
     items.forEach(item => {
         const onclick = item.getAttribute('onclick') || "";
-        if (onclick.includes('page-dashboard') || onclick.includes('logout')) { item.style.display = "flex"; return; }
+        if (onclick.includes('page-dashboard') || onclick.includes('logout')) { 
+            item.style.display = "flex"; 
+            return; 
+        }
         item.style.display = user.perms.some(p => onclick.includes(p)) ? "flex" : "none";
     });
     renderAll();
@@ -309,8 +328,8 @@ async function fetchCloudRentData() {
             shop: row.shop, 
             date: row.date, 
             month: row.month, 
-            debit: Number(row.debit||0), 
-            credit: Number(row.credit||0), 
+            debit: Number(row.debit || 0), 
+            credit: Number(row.credit || 0), 
             method: row.method 
         }));
         localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
@@ -454,7 +473,7 @@ async function addOut() {
             return; 
         }
         
-        // Check if data exists and has length
+        // FIXED: Properly handle the response
         if (data && data.length > 0) {
             const newEntry = {
                 id: data[0].id,
@@ -524,7 +543,8 @@ function renderAll() {
     // Today's IN
     const inBody = document.getElementById('today-list-in');
     if (inBody) {
-        let html = ""; let c = 1;
+        let html = ""; 
+        let c = 1;
         db.in.forEach((x, i) => {
             if (x.date === today) {
                 html += `<tr><td>${c++}</td><td>${x.item}</td><td>${x.vendor}</td><td>${x.qty}</td><td>${x.price.toLocaleString()}</td><td>${x.total.toLocaleString()}</td><td><button class="btn-action btn-delete" onclick="deleteEntry('in',${i})">Del</button></td></tr>`;
@@ -536,10 +556,11 @@ function renderAll() {
     // Today's OUT
     const outBody = document.getElementById('today-list-out');
     if (outBody) {
-        let html = ""; let c = 1;
+        let html = ""; 
+        let c = 1;
         db.out.forEach((x, i) => {
             if (x.date === today) {
-                html += `<tr><td>${c++}</td><td>${x.date}</td><td>${x.cust}</td><td>${x.item}</td><td>${x.barcode||'N/A'}</td><td>${x.qty}</td><td>${x.price.toLocaleString()}</td><td>${x.total.toLocaleString()}</td><td><button class="btn-action btn-delete" onclick="deleteEntry('out',${i})">Del</button></td></tr>`;
+                html += `<tr><td>${c++}</td><td>${x.date}</td><td>${x.cust}</td><td>${x.item}</td><td>${x.barcode || 'N/A'}</td><td>${x.qty}</td><td>${x.price.toLocaleString()}</td><td>${x.total.toLocaleString()}</td><td><button class="btn-action btn-delete" onclick="deleteEntry('out',${i})">Del</button></td></tr>`;
             }
         });
         outBody.innerHTML = html || `<tr><td colspan="9" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Aaj ki koi sale nahi hai...</td></tr>`;
@@ -548,15 +569,15 @@ function renderAll() {
     // Balance
     const balBody = document.getElementById('table-balance-body');
     if (balBody) {
-        const items = [...new Set([...db.in.map(x=>x.item), ...db.out.map(x=>x.item)])];
+        const items = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
         balBody.innerHTML = items.map(name => {
             if (!name) return "";
-            const tin = db.in.filter(x=>x.item===name).reduce((s,x)=>s+x.qty,0);
-            const tout = db.out.filter(x=>x.item===name).reduce((s,x)=>s+x.qty,0);
-            const pPrice = db.in.find(x=>x.item===name)?.price || 0;
-            const sPrice = db.out.find(x=>x.item===name)?.price || 0;
+            const tin = db.in.filter(x => x.item === name).reduce((s, x) => s + x.qty, 0);
+            const tout = db.out.filter(x => x.item === name).reduce((s, x) => s + x.qty, 0);
+            const pPrice = db.in.find(x => x.item === name)?.price || 0;
+            const sPrice = db.out.find(x => x.item === name)?.price || 0;
             const bal = tin - tout;
-            return `<tr><td>${db.in.find(x=>x.item===name)?.barcode||'N/A'}</td><td style="font-weight:600;">${name}</td><td style="color:#2980b9;">${tin}</td><td style="color:#e67e22;">${tout}</td><td style="font-weight:bold;color:${bal<5?'#e74c3c':'#27ae60'};">${bal}</td><td style="color:#27ae60;font-weight:bold;">PKR ${((sPrice-pPrice)*tout).toLocaleString()}</td></tr>`;
+            return `<tr><td>${db.in.find(x => x.item === name)?.barcode || 'N/A'}</td><td style="font-weight:600;">${name}</td><td style="color:#2980b9;">${tin}</td><td style="color:#e67e22;">${tout}</td><td style="font-weight:bold;color:${bal < 5 ? '#e74c3c' : '#27ae60'};">${bal}</td><td style="color:#27ae60;font-weight:bold;">PKR ${((sPrice - pPrice) * tout).toLocaleString()}</td></tr>`;
         }).join('') || `<tr><td colspan="6" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Koi item nahi hai</td></tr>`;
     }
     
@@ -568,20 +589,20 @@ function renderAll() {
 // DASHBOARD STATS
 // ==========================================
 function updateDashboardStats() {
-    document.getElementById('dash-total-in').textContent = db.in.reduce((s,x)=>s+x.qty,0);
-    document.getElementById('dash-total-out').textContent = db.out.reduce((s,x)=>s+x.qty,0);
-    document.getElementById('dash-unique-items').textContent = [...new Set([...db.in.map(x=>x.item),...db.out.map(x=>x.item)])].length;
-    document.getElementById('dash-revenue').textContent = 'PKR ' + db.out.reduce((s,x)=>s+x.total,0).toLocaleString();
+    document.getElementById('dash-total-in').textContent = db.in.reduce((s, x) => s + x.qty, 0);
+    document.getElementById('dash-total-out').textContent = db.out.reduce((s, x) => s + x.qty, 0);
+    document.getElementById('dash-unique-items').textContent = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])].length;
+    document.getElementById('dash-revenue').textContent = 'PKR ' + db.out.reduce((s, x) => s + x.total, 0).toLocaleString();
     
     // Recent Activity
     const act = document.getElementById('recent-activity');
     if (act) {
-        const all = [...db.in.map(x=>({...x,type:'IN'})), ...db.out.map(x=>({...x,type:'OUT'}))];
-        all.sort((a,b)=>new Date(b.date)-new Date(a.date));
-        const recent = all.slice(0,10);
+        const all = [...db.in.map(x => ({ ...x, type: 'IN' })), ...db.out.map(x => ({ ...x, type: 'OUT' }))];
+        all.sort((a, b) => new Date(b.date) - new Date(a.date));
+        const recent = all.slice(0, 10);
         act.innerHTML = recent.length ? recent.map(x => `
             <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;">
-                <span><span style="font-weight:600;">${x.item}</span> <span style="color:${x.type==='IN'?'#27ae60':'#e74c3c'};font-weight:bold;">${x.type==='IN'?'📥 +':'📤 -'}${x.qty}</span></span>
+                <span><span style="font-weight:600;">${x.item}</span> <span style="color:${x.type === 'IN' ? '#27ae60' : '#e74c3c'};font-weight:bold;">${x.type === 'IN' ? '📥 +' : '📤 -'}${x.qty}</span></span>
                 <span style="color:#7f8c8d;font-size:12px;">${x.date}</span>
             </div>
         `).join('') : `<p style="color:#7f8c8d;text-align:center;padding:20px;">No activity yet</p>`;
@@ -691,15 +712,15 @@ function generateCustomReport() {
     document.querySelector("#rep-in-table").innerHTML = fIn.map(x => `<tr><td>${x.date}</td><td>${x.item}</td><td>${x.vendor}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total.toLocaleString()}</td></tr>`).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#7f8c8d;">No records</td></tr>`;
     document.querySelector("#rep-out-table").innerHTML = fOut.map(x => `<tr><td>${x.date}</td><td>${x.item}</td><td>${x.cust}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total.toLocaleString()}</td></tr>`).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#7f8c8d;">No records</td></tr>`;
     
-    const tIn = fIn.reduce((s,x)=>s+x.total,0);
-    const tOut = fOut.reduce((s,x)=>s+x.total,0);
+    const tIn = fIn.reduce((s, x) => s + x.total, 0);
+    const tOut = fOut.reduce((s, x) => s + x.total, 0);
     
     // Remove old summary
     document.querySelectorAll('.report-summary').forEach(el => el.remove());
     const summary = document.createElement('div');
     summary.className = 'report-summary';
     summary.style.cssText = 'display:flex;justify-content:space-around;background:#2c3e50;color:white;padding:15px;border-radius:8px;margin-top:20px;flex-wrap:wrap;gap:10px;';
-    summary.innerHTML = `<span>📥 Total IN: PKR ${tIn.toLocaleString()}</span><span>📤 Total OUT: PKR ${tOut.toLocaleString()}</span><span style="color:${tOut-tIn>=0?'#2ecc71':'#e74c3c'};font-weight:bold;">💰 Profit: PKR ${(tOut-tIn).toLocaleString()}</span>`;
+    summary.innerHTML = `<span>📥 Total IN: PKR ${tIn.toLocaleString()}</span><span>📤 Total OUT: PKR ${tOut.toLocaleString()}</span><span style="color:${tOut - tIn >= 0 ? '#2ecc71' : '#e74c3c'};font-weight:bold;">💰 Profit: PKR ${(tOut - tIn).toLocaleString()}</span>`;
     document.getElementById('print-area').appendChild(summary);
     showNotification("✅ Report generated!", "success");
 }
@@ -764,17 +785,17 @@ function showLedger() {
         document.getElementById('final-balance').textContent = "💰 Balance: 0";
         return;
     }
-    let tCtn=0, tDebit=0, tCredit=0;
+    let tCtn = 0, tDebit = 0, tCredit = 0;
     db.ledgers[name].forEach((x, i) => {
-        tCtn += Number(x.ctn||0); 
-        tDebit += Number(x.debit||0); 
-        tCredit += Number(x.credit||0);
-        tbody.innerHTML += `<tr><td>${i+1}</td><td>${x.date}</td><td>${x.item}</td><td>${x.ctn}</td><td>${x.debit.toLocaleString()}</td><td>${x.credit.toLocaleString()}</td><td>${x.method}</td><td><button class="btn-action btn-edit" onclick="editLedger('${name}',${i})">Edit</button><button class="btn-action btn-delete" onclick="delLedger('${name}',${i})">Del</button></td></tr>`;
+        tCtn += Number(x.ctn || 0); 
+        tDebit += Number(x.debit || 0); 
+        tCredit += Number(x.credit || 0);
+        tbody.innerHTML += `<tr><td>${i + 1}</td><td>${x.date}</td><td>${x.item}</td><td>${x.ctn}</td><td>${x.debit.toLocaleString()}</td><td>${x.credit.toLocaleString()}</td><td>${x.method}</td><td><button class="btn-action btn-edit" onclick="editLedger('${name}',${i})">Edit</button><button class="btn-action btn-delete" onclick="delLedger('${name}',${i})">Del</button></td></tr>`;
     });
     document.getElementById('total-ctn').textContent = tCtn;
     document.getElementById('total-debit').textContent = tDebit.toLocaleString();
     document.getElementById('total-credit').textContent = tCredit.toLocaleString();
-    document.getElementById('final-balance').textContent = `💰 Balance: ${((opening+tDebit)-tCredit).toLocaleString()}`;
+    document.getElementById('final-balance').textContent = `💰 Balance: ${((opening + tDebit) - tCredit).toLocaleString()}`;
 }
 
 function delLedger(custName, index) {
@@ -824,13 +845,13 @@ function renderRentTable() {
     const searchName = document.getElementById('rent-name').value.trim();
     if (!tbody) return;
     tbody.innerHTML = "";
-    let tDebit=0, tCredit=0;
+    let tDebit = 0, tCredit = 0;
     const filtered = dbRent.filter(x => x.name.toLowerCase() === searchName.toLowerCase());
     if (filtered.length > 0) {
         filtered.forEach((r, i) => {
             tDebit += r.debit; 
             tCredit += r.credit;
-            tbody.innerHTML += `<tr><td>${r.shop||'N/A'}</td><td>${r.date}</td><td>${r.month}</td><td style="color:#e74c3c;font-weight:600;">${r.debit.toLocaleString()}</td><td style="color:#27ae60;font-weight:600;">${r.credit.toLocaleString()}</td><td>${r.method}</td><td><button class="btn-action btn-delete" onclick="deleteRentEntry(${i})">Del</button></td></tr>`;
+            tbody.innerHTML += `<tr><td>${r.shop || 'N/A'}</td><td>${r.date}</td><td>${r.month}</td><td style="color:#e74c3c;font-weight:600;">${r.debit.toLocaleString()}</td><td style="color:#27ae60;font-weight:600;">${r.credit.toLocaleString()}</td><td>${r.method}</td><td><button class="btn-action btn-delete" onclick="deleteRentEntry(${i})">Del</button></td></tr>`;
         });
     } else {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Naya Customer hai ya naam sahi nahi likha...</td></tr>`;
@@ -955,7 +976,7 @@ function saveAndRefresh() {
 function updateItemLists() {
     const list = document.getElementById('items-list');
     if (!list) return;
-    const items = [...new Set([...db.in.map(x=>x.item), ...db.out.map(x=>x.item)])];
+    const items = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
     list.innerHTML = items.map(name => `<option value="${name}">`).join('');
 }
 
