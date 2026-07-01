@@ -18,7 +18,7 @@ let rentData = [];
 let users = [];
 
 // ================================================================
-// LOAD DATA FROM LOCALSTORAGE
+// LOAD DATA
 // ================================================================
 function loadData() {
     try {
@@ -73,7 +73,7 @@ function notify(msg, type) {
 }
 
 // ================================================================
-// SYNC FROM SUPABASE - FIXED
+// SYNC FROM SUPABASE
 // ================================================================
 async function syncData() {
     if (!navigator.onLine) { 
@@ -703,35 +703,42 @@ function delUser(index) {
 }
 
 // ================================================================
-// LOGIN
+// LOGIN - FIXED
 // ================================================================
 function loginUser() {
     const u = document.getElementById('username').value.trim().toLowerCase();
     const p = document.getElementById('password').value.trim();
     
+    console.log('🔑 Login attempt:', u);
+    
+    // Default admin
     if (u === 'admin' && p === '123') {
         localStorage.setItem('loggedIn', 'true');
+        localStorage.setItem('userRole', 'admin');
         showApp();
         return;
     }
     
+    // Check extra users
     const found = users.find(x => x.id === u && x.pass === p);
     if (found) {
         localStorage.setItem('loggedIn', 'true');
+        localStorage.setItem('userRole', 'user');
         showApp();
         return;
     }
     
-    alert('❌ Invalid credentials!');
+    alert('❌ Invalid credentials! Use admin / 123');
+    console.log('❌ Login failed for:', u);
 }
 
 function showApp() {
+    console.log('✅ Login successful!');
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('sidebar').style.display = 'block';
     document.getElementById('mainContent').style.display = 'block';
     document.getElementById('toggleBtn').style.display = 'block';
     renderAll();
-    // Auto sync on login
     if (navigator.onLine) {
         setTimeout(syncData, 500);
     }
@@ -779,10 +786,27 @@ function showPage(page) {
 }
 
 // ================================================================
-// STARTUP - FIXED
+// FORCE LOGIN - EMERGENCY
+// ================================================================
+function forceLogin() {
+    localStorage.setItem('loggedIn', 'true');
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('sidebar').style.display = 'block';
+    document.getElementById('mainContent').style.display = 'block';
+    document.getElementById('toggleBtn').style.display = 'block';
+    renderAll();
+    if (navigator.onLine) {
+        setTimeout(syncData, 500);
+    }
+    notify('✅ Force login successful!', 'success');
+    console.log('✅ Force login successful!');
+}
+
+// ================================================================
+// STARTUP
 // ================================================================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 KRT ERP Starting...');
+    console.log('🚀 KRT ERP v5.0 Starting...');
     
     // Load local data
     loadData();
@@ -794,10 +818,10 @@ document.addEventListener('DOMContentLoaded', function() {
     updateCustomerList();
     updateItemsList();
     
-    // ✅ FORCE SYNC FROM SUPABASE ON EVERY REFRESH
+    // Force sync from Supabase on every refresh
     if (navigator.onLine) {
         console.log('🔄 Syncing from Supabase...');
-        setTimeout(syncData, 300);
+        setTimeout(syncData, 500);
     } else {
         notify('⚠️ Offline mode', 'warning');
     }
@@ -809,6 +833,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('mainContent').style.display = 'block';
         document.getElementById('toggleBtn').style.display = 'block';
         renderAll();
+        console.log('✅ Already logged in');
+    } else {
+        console.log('🔑 Please login');
     }
 });
 
@@ -816,3 +843,4 @@ document.addEventListener('DOMContentLoaded', function() {
 document.getElementById('rentName')?.addEventListener('input', showRent);
 
 console.log('✅ KRT ERP v5.0 Ready!');
+console.log('🔑 Login: admin / 123');
