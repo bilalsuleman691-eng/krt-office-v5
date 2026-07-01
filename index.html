@@ -863,10 +863,14 @@
 // SERVICE WORKER
 // ==========================================
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
+    window.addEventListener('load', function() {
         navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('✅ KRT App Service Worker Ready!'))
-            .catch(err => console.log('❌ Service Worker Failed:', err));
+            .then(function(reg) {
+                console.log('✅ KRT App Service Worker Ready!');
+            })
+            .catch(function(err) {
+                console.log('❌ Service Worker Failed:', err);
+            });
     });
 }
 
@@ -874,10 +878,17 @@ if ('serviceWorker' in navigator) {
 // LIVE CLOCK
 // ==========================================
 function updateClock() {
-    const now = new Date();
-    document.getElementById('live-clock').textContent = 
-        now.toLocaleDateString('en-PK', { weekday:'short', day:'numeric', month:'short', year:'numeric' }) + 
-        ' | ' + now.toLocaleTimeString('en-PK', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    try {
+        const now = new Date();
+        const clockEl = document.getElementById('live-clock');
+        if (clockEl) {
+            clockEl.textContent = 
+                now.toLocaleDateString('en-PK', { weekday:'short', day:'numeric', month:'short', year:'numeric' }) + 
+                ' | ' + now.toLocaleTimeString('en-PK', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+        }
+    } catch (err) {
+        console.error('❌ Clock update error:', err);
+    }
 }
 setInterval(updateClock, 1000);
 updateClock();
@@ -886,90 +897,133 @@ updateClock();
 // WELCOME ANIMATION
 // ==========================================
 (function startWelcome() {
-    const canvas = document.getElementById('welcome-canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    
-    // Particles
-    const particles = [];
-    for (let i = 0; i < 150; i++) {
-        particles.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            radius: Math.random() * 2 + 1,
-            dx: (Math.random() - 0.5) * 0.6,
-            dy: (Math.random() - 0.5) * 0.6,
-            color: `rgba(241, 196, 15, ${Math.random() * 0.3 + 0.05})`
-        });
-    }
-    
-    function animateParticles() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        particles.forEach(p => {
-            p.x += p.dx;
-            p.y += p.dy;
-            if (p.x < 0 || p.x > canvas.width) p.dx *= -1;
-            if (p.y < 0 || p.y > canvas.height) p.dy *= -1;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            ctx.fillStyle = p.color;
-            ctx.fill();
-        });
-        requestAnimationFrame(animateParticles);
-    }
-    animateParticles();
-    
-    // Typing Effect
-    const welcomeText = document.getElementById('welcome-text');
-    const fullMessage = "✦ BISMILLAH ✦\nWELCOME TO KRT TRADERS ERP";
-    let charIndex = 0;
-    let currentLine = 0;
-    const lines = fullMessage.split('\n');
-    
-    function typeText() {
-        if (currentLine < lines.length) {
-            if (charIndex < lines[currentLine].length) {
-                welcomeText.textContent = lines[currentLine].substring(0, charIndex + 1);
-                charIndex++;
-                setTimeout(typeText, 50);
-            } else {
-                currentLine++;
-                charIndex = 0;
-                if (currentLine < lines.length) {
-                    welcomeText.textContent += '\n';
-                    setTimeout(typeText, 300);
-                } else {
-                    welcomeText.style.borderRight = 'none';
-                    document.getElementById('creator-text').style.opacity = '1';
-                    document.getElementById('creator-text').style.transition = 'opacity 1s ease';
-                    
-                    // Loading bar
-                    let progress = 0;
-                    const bar = document.getElementById('loading-bar');
-                    const interval = setInterval(() => {
-                        progress += Math.random() * 3 + 0.5;
-                        if (progress >= 100) {
-                            progress = 100;
-                            clearInterval(interval);
-                            setTimeout(() => {
-                                const overlay = document.getElementById('welcome-overlay');
-                                overlay.style.opacity = '0';
-                                overlay.style.transition = 'opacity 0.8s ease';
-                                setTimeout(() => {
-                                    overlay.style.display = 'none';
-                                    document.getElementById('login-screen').style.display = 'flex';
-                                }, 800);
-                            }, 500);
-                        }
-                        bar.style.width = progress + '%';
-                    }, 70);
-                }
+    try {
+        const canvas = document.getElementById('welcome-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Particles
+        const particles = [];
+        for (let i = 0; i < 150; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                radius: Math.random() * 2 + 1,
+                dx: (Math.random() - 0.5) * 0.6,
+                dy: (Math.random() - 0.5) * 0.6,
+                color: `rgba(241, 196, 15, ${Math.random() * 0.3 + 0.05})`
+            });
+        }
+        
+        function animateParticles() {
+            try {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                particles.forEach(function(p) {
+                    p.x += p.dx;
+                    p.y += p.dy;
+                    if (p.x < 0 || p.x > canvas.width) p.dx *= -1;
+                    if (p.y < 0 || p.y > canvas.height) p.dy *= -1;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.fill();
+                });
+                requestAnimationFrame(animateParticles);
+            } catch (err) {
+                console.error('❌ Particle animation error:', err);
             }
         }
+        animateParticles();
+        
+        // Typing Effect
+        const welcomeText = document.getElementById('welcome-text');
+        if (!welcomeText) return;
+        const fullMessage = "✦ BISMILLAH ✦\nWELCOME TO KRT TRADERS ERP";
+        let charIndex = 0;
+        let currentLine = 0;
+        const lines = fullMessage.split('\n');
+        
+        function typeText() {
+            try {
+                if (currentLine < lines.length) {
+                    if (charIndex < lines[currentLine].length) {
+                        welcomeText.textContent = lines[currentLine].substring(0, charIndex + 1);
+                        charIndex++;
+                        setTimeout(typeText, 50);
+                    } else {
+                        currentLine++;
+                        charIndex = 0;
+                        if (currentLine < lines.length) {
+                            welcomeText.textContent += '\n';
+                            setTimeout(typeText, 300);
+                        } else {
+                            welcomeText.style.borderRight = 'none';
+                            const creatorText = document.getElementById('creator-text');
+                            if (creatorText) {
+                                creatorText.style.opacity = '1';
+                                creatorText.style.transition = 'opacity 1s ease';
+                            }
+                            
+                            // Loading bar
+                            let progress = 0;
+                            const bar = document.getElementById('loading-bar');
+                            if (!bar) return;
+                            const interval = setInterval(function() {
+                                progress += Math.random() * 3 + 0.5;
+                                if (progress >= 100) {
+                                    progress = 100;
+                                    clearInterval(interval);
+                                    setTimeout(function() {
+                                        const overlay = document.getElementById('welcome-overlay');
+                                        if (overlay) {
+                                            overlay.style.opacity = '0';
+                                            overlay.style.transition = 'opacity 0.8s ease';
+                                            setTimeout(function() {
+                                                overlay.style.display = 'none';
+                                                const loginScreen = document.getElementById('login-screen');
+                                                if (loginScreen) loginScreen.style.display = 'flex';
+                                            }, 800);
+                                        }
+                                    }, 500);
+                                }
+                                bar.style.width = progress + '%';
+                            }, 70);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('❌ Typing animation error:', err);
+            }
+        }
+        setTimeout(typeText, 800);
+    } catch (err) {
+        console.error('❌ Welcome animation error:', err);
+        // Fallback - show login directly
+        document.getElementById('welcome-overlay').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
     }
-    setTimeout(typeText, 800);
 })();
+
+// ==========================================
+// WINDOW RESIZE HANDLER FOR CANVAS
+// ==========================================
+window.addEventListener('resize', function() {
+    try {
+        const canvas = document.getElementById('welcome-canvas');
+        if (canvas) {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+    } catch (err) {
+        console.error('❌ Resize error:', err);
+    }
+});
+
+console.log('✅ KRT TRADERS ERP v5.0 Loaded!');
+console.log('📦 Developed by Bilal Suleman');
+console.log('🐘 Elephant Never Forgets!');
 </script>
 
 </body>
