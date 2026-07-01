@@ -25,7 +25,7 @@ window.addEventListener('unhandledrejection', function(e) {
 // ==========================================
 
 // ✅ CORRECT URL (from your dashboard)
-const supabaseUrl = 'https://jsxcm1pjdxxgloofdrugg.supabase.co';
+const supabaseUrl = 'https://jsxcmlpjdxgloofdrugz.supabase.co';
 
 // ✅ NEW PUBLISHABLE KEY
 const supabaseKey = 'sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb';
