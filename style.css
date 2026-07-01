@@ -96,6 +96,7 @@ body {
     z-index: 99999;
     font-family: var(--font-primary);
     overflow: hidden;
+    transition: opacity 0.8s ease;
 }
 
 #welcome-overlay #particleCanvas {
@@ -827,6 +828,7 @@ table tbody tr:nth-child(even):hover {
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     max-width: 400px;
     font-family: var(--font-primary);
+    pointer-events: none;
 }
 
 .toast-notification.show {
