@@ -1024,6 +1024,52 @@ window.addEventListener('resize', function() {
 console.log('✅ KRT TRADERS ERP v5.0 Loaded!');
 console.log('📦 Developed by Bilal Suleman');
 console.log('🐘 Elephant Never Forgets!');
+
+    
+// Emergency fix - define missing functions
+(function() {
+    console.log('🔧 Emergency fix running...');
+    
+    // Define loadUserTable if missing
+    if (typeof loadUserTable === 'undefined') {
+        window.loadUserTable = function() {
+            try {
+                const tbody = document.getElementById('user-table-body');
+                if (!tbody) return;
+                tbody.innerHTML = extraUsers && extraUsers.length > 0 
+                    ? extraUsers.map(function(u, i) {
+                        return `<tr>
+                            <td>${escapeHtml(u.id)}</td>
+                            <td>${escapeHtml(u.name)}</td>
+                            <td><small>${escapeHtml(u.perms ? u.perms.join(', ') : '')}</small></td>
+                            <td><button class="btn-action btn-delete" onclick="deleteExtraUser(${i})">Del</button></td>
+                        </tr>`;
+                    }).join('')
+                    : `<tr><td colspan="4" style="text-align:center;padding:20px;color:#7f8c8d;">No users created yet</td></tr>`;
+            } catch(e) {
+                console.error('loadUserTable error:', e);
+            }
+        };
+        console.log('✅ loadUserTable defined via emergency fix');
+    }
+    
+    // Define deleteExtraUser if missing
+    if (typeof deleteExtraUser === 'undefined') {
+        window.deleteExtraUser = function(index) {
+            if (!confirm("⚠️ Kya aap is user ko delete karna chahte hain?")) return;
+            if (extraUsers && extraUsers[index]) {
+                extraUsers.splice(index, 1);
+                saveLocalData();
+                loadUserTable();
+                showNotification("✅ User deleted!", "success");
+            }
+        };
+        console.log('✅ deleteExtraUser defined via emergency fix');
+    }
+    
+    console.log('🔧 Emergency fix complete!');
+})();
+
 </script>
 
 </body>
