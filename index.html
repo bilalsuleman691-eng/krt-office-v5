@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KRT ERP v5.0 - Premium</title>
+    <title>KRT TRADERS ERP - Premium v5.0</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -13,7 +13,9 @@
 </head>
 <body>
 
-<!-- ===== WELCOME OVERLAY ===== -->
+<!-- =========================================== -->
+<!-- WELCOME OVERLAY -->
+<!-- =========================================== -->
 <div id="welcome-overlay">
     <canvas id="welcome-canvas"></canvas>
     <div class="welcome-content">
@@ -22,28 +24,31 @@
         <h1 id="welcome-text"></h1>
         <p id="creator-text">✦ CREATED BY BILAL SULEMAN ✦</p>
         <div id="loading-bar-container"><div id="loading-bar"></div></div>
+        <p class="welcome-footer">🔒 SECURE • ENCRYPTED • CLOUD SYNC</p>
     </div>
 </div>
 
-<!-- ===== LOGIN SCREEN ===== -->
+<!-- =========================================== -->
+<!-- LOGIN SCREEN -->
+<!-- =========================================== -->
 <div id="login-screen">
     <div class="login-container">
         <div class="login-box">
             <div class="login-logo"><i class="fas fa-cube"></i></div>
             <h2>KRT ENTERPRISE</h2>
-            <p class="login-subtitle">Resource Planning System</p>
+            <p class="login-subtitle">Resource Planning System v5.0</p>
             
             <div class="login-form">
                 <div class="input-group">
-                    <label><i class="fas fa-user"></i> Username</label>
+                    <label><i class="fas fa-user"></i> USERNAME</label>
                     <input type="text" id="user" placeholder="Enter username">
                 </div>
                 <div class="input-group">
-                    <label><i class="fas fa-lock"></i> Password</label>
+                    <label><i class="fas fa-lock"></i> PASSWORD</label>
                     <input type="password" id="pass" placeholder="Enter password">
                 </div>
                 <button class="login-btn" onclick="login()">
-                    <i class="fas fa-arrow-right"></i> Access System
+                    <i class="fas fa-arrow-right"></i> ACCESS SYSTEM
                 </button>
             </div>
             
@@ -54,7 +59,9 @@
     </div>
 </div>
 
-<!-- ===== IDLE OVERLAY ===== -->
+<!-- =========================================== -->
+<!-- IDLE OVERLAY -->
+<!-- =========================================== -->
 <div id="idle-overlay">
     <div id="idle-status">🟢 ACTIVE</div>
     <div id="idle-particles"></div>
@@ -63,16 +70,20 @@
         <h1 id="idle-title">⚡ <span class="highlight">KRT</span> ERP</h1>
         <div id="idle-timer">00:00</div>
         <p id="idle-message">💫 Your session is paused<br>Touch to continue</p>
-        <button id="idle-touch-btn"><span class="icon">👆</span> Resume Session</button>
+        <button id="idle-touch-btn"><span class="icon">👆</span> RESUME SESSION</button>
     </div>
 </div>
 
-<!-- ===== TOGGLE BUTTON ===== -->
+<!-- =========================================== -->
+<!-- TOGGLE BUTTON -->
+<!-- =========================================== -->
 <button id="toggle-btn" onclick="toggleSidebar()">
     <i class="fas fa-bars"></i>
 </button>
 
-<!-- ===== SIDEBAR ===== -->
+<!-- =========================================== -->
+<!-- SIDEBAR -->
+<!-- =========================================== -->
 <div id="sidebar">
     <div class="sidebar-header">
         <div class="logo-container">
@@ -84,7 +95,7 @@
         </div>
     </div>
     <ul>
-        <li onclick="switchPage('page-dashboard','DASHBOARD')" class="active">
+        <li class="active" onclick="switchPage('page-dashboard','DASHBOARD')">
             <i class="fas fa-chart-pie"></i> <span>Dashboard</span>
         </li>
         <li onclick="switchPage('page-stock-in','STOCK IN')">
@@ -94,19 +105,19 @@
             <i class="fas fa-arrow-up"></i> <span>Stock OUT</span>
         </li>
         <li onclick="switchPage('page-balance','STOCK BALANCE')">
-            <i class="fas fa-balance-scale"></i> <span>Balance</span>
+            <i class="fas fa-balance-scale"></i> <span>Stock Balance</span>
         </li>
         <li onclick="switchPage('page-Report','REPORTS')">
             <i class="fas fa-file-alt"></i> <span>Reports</span>
         </li>
-        <li onclick="switchPage('page-search','SEARCH')">
-            <i class="fas fa-search"></i> <span>Search</span>
+        <li onclick="switchPage('page-search','SEARCH RECORDS')">
+            <i class="fas fa-search"></i> <span>Search Records</span>
         </li>
-        <li onclick="switchPage('page-customer-ledgers','LEDGERS')">
-            <i class="fas fa-address-book"></i> <span>Ledgers</span>
+        <li onclick="switchPage('page-customer-ledgers','CUSTOMER LEDGERS')">
+            <i class="fas fa-address-book"></i> <span>Customer Ledgers</span>
         </li>
-        <li onclick="switchPage('page-rent-book','RENT')">
-            <i class="fas fa-building"></i> <span>Rent Book</span>
+        <li onclick="switchPage('page-rent-book','RENT BOOK')">
+            <i class="fas fa-building"></i> <span>Market Rent Book</span>
         </li>
         <li onclick="switchPage('page-settings','SETTINGS')">
             <i class="fas fa-users-cog"></i> <span>Settings</span>
@@ -117,7 +128,9 @@
     </ul>
 </div>
 
-<!-- ===== MAIN CONTENT ===== -->
+<!-- =========================================== -->
+<!-- MAIN CONTENT -->
+<!-- =========================================== -->
 <div id="main-content">
     
     <!-- HEADER -->
@@ -125,7 +138,7 @@
         <h1 id="page-title"><i class="fas fa-chart-line"></i> KRT ERP - DASHBOARD</h1>
         <div class="header-actions">
             <span class="header-clock"><i class="fas fa-clock"></i> <span id="live-clock"></span></span>
-            <button class="sync-btn" onclick="syncAllCloudData()"><i class="fas fa-sync"></i> Sync</button>
+            <button class="sync-btn" onclick="syncAllCloudData()"><i class="fas fa-sync"></i> Sync Cloud</button>
         </div>
     </div>
 
@@ -176,9 +189,8 @@
                 <input type="date" id="in-date" class="form-input">
                 <input type="text" id="in-vendor" placeholder="Vendor Name" class="form-input">
                 <input type="text" id="in-item" placeholder="Item Name *" class="form-input">
-                <input type="text" id="in-barcode" placeholder="Barcode" class="form-input">
-                <input type="number" id="in-qty" placeholder="Qty *" class="form-input">
-                <input type="number" id="in-price" placeholder="Price *" class="form-input">
+                <input type="number" id="in-qty" placeholder="Quantity *" class="form-input">
+                <input type="number" id="in-price" placeholder="Price" class="form-input">
                 <button class="btn-primary" onclick="addIn()"><i class="fas fa-save"></i> Save Entry</button>
             </div>
         </div>
@@ -203,9 +215,8 @@
                 <input type="text" id="out-customer" placeholder="Customer Name" class="form-input">
                 <input type="text" id="out-item" list="items-list" placeholder="Item Name *" class="form-input" oninput="showLiveStock(this.value)">
                 <datalist id="items-list"></datalist>
-                <input type="text" id="out-barcode" placeholder="Barcode" class="form-input">
-                <input type="number" id="out-qty" placeholder="Qty *" class="form-input">
-                <input type="number" id="out-price" placeholder="Price *" class="form-input">
+                <input type="number" id="out-qty" placeholder="Quantity *" class="form-input">
+                <input type="number" id="out-price" placeholder="Price" class="form-input">
                 <button class="btn-danger" onclick="addOut()"><i class="fas fa-cash-register"></i> Register Sale</button>
             </div>
             <div id="stock-status"></div>
@@ -231,7 +242,7 @@
             </div>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>Barcode</th><th>Item</th><th>Total In</th><th>Total Out</th><th>Available</th><th>Profit</th></tr></thead>
+                    <thead><tr><th>Item Name</th><th>Total In</th><th>Total Out</th><th>Available</th><th>Profit</th></tr></thead>
                     <tbody id="table-balance-body"></tbody>
                 </table>
             </div>
@@ -272,7 +283,7 @@
         </div>
     </div>
 
-    <!-- ===== SEARCH ===== -->
+    <!-- ===== SEARCH RECORDS ===== -->
     <div id="page-search" class="erp-page" style="display:none;">
         <div class="search-header">
             <h3><i class="fas fa-search"></i> Master Search</h3>
@@ -283,7 +294,7 @@
             </div>
         </div>
         
-        <h4 class="section-title green">📥 STOCK IN</h4>
+        <h4 class="section-title green">📥 STOCK IN RECORDS</h4>
         <div class="table-wrap">
             <table>
                 <thead><tr><th>Date</th><th>Item</th><th>Vendor</th><th>Qty</th><th>Price</th><th>Total</th><th>Actions</th></tr></thead>
@@ -291,7 +302,7 @@
             </table>
         </div>
         
-        <h4 class="section-title red">📤 STOCK OUT</h4>
+        <h4 class="section-title red">📤 STOCK OUT RECORDS</h4>
         <div class="table-wrap">
             <table>
                 <thead><tr><th>Date</th><th>Item</th><th>Customer</th><th>Qty</th><th>Price</th><th>Total</th><th>Actions</th></tr></thead>
@@ -300,29 +311,29 @@
         </div>
     </div>
 
-    <!-- ===== LEDGERS ===== -->
+    <!-- ===== CUSTOMER LEDGERS ===== -->
     <div id="page-customer-ledgers" class="erp-page" style="display:none;">
         <div class="card">
-            <h3 class="card-title"><i class="fas fa-address-book"></i> Customer Ledgers</h3>
+            <h3 class="card-title"><i class="fas fa-address-book"></i> Customer Ledger System</h3>
             
-            <div class="flex-wrap">
-                <div class="flex-1">
-                    <label class="label">Customer Name</label>
-                    <input type="text" id="ledger-cust-name" list="customer-list" placeholder="Enter name" oninput="showLedger()" class="form-input">
+            <div class="ledger-selector">
+                <div>
+                    <label>Select/Type Customer:</label>
+                    <input type="text" id="ledger-cust-name" list="customer-list" placeholder="Enter customer name" oninput="showLedger()" class="form-input">
                     <datalist id="customer-list"></datalist>
                 </div>
-                <div class="flex-1">
-                    <label class="label">Opening Balance</label>
+                <div>
+                    <label>Opening Balance:</label>
                     <input type="number" id="opening-bal" value="0" onchange="updateOpeningBal()" class="form-input">
                 </div>
             </div>
             
-            <div class="ledger-form">
-                <input type="date" id="led-date" class="form-input" placeholder="Date">
-                <input type="text" id="led-item" class="form-input" placeholder="Item">
-                <input type="number" id="led-ctn" value="0" class="form-input" placeholder="CTN">
-                <input type="number" id="led-debit" value="0" class="form-input" placeholder="Debit">
-                <input type="number" id="led-credit" value="0" class="form-input" placeholder="Credit">
+            <div class="ledger-entry-form">
+                <input type="date" id="led-date" placeholder="Date" class="form-input">
+                <input type="text" id="led-item" placeholder="Item Detail" class="form-input">
+                <input type="number" id="led-ctn" value="0" placeholder="CTN" class="form-input">
+                <input type="number" id="led-debit" value="0" placeholder="Debit" class="form-input">
+                <input type="number" id="led-credit" value="0" placeholder="Credit" class="form-input">
                 <select id="led-method" class="form-input">
                     <option value="Cash">Cash</option>
                     <option value="Bank">Bank</option>
@@ -352,27 +363,27 @@
     <!-- ===== RENT BOOK ===== -->
     <div id="page-rent-book" class="erp-page" style="display:none;">
         <div class="card">
-            <h3 class="card-title"><i class="fas fa-building"></i> Rent Book</h3>
+            <h3 class="card-title"><i class="fas fa-building"></i> Market Rent Book</h3>
             
-            <div class="flex-wrap">
-                <div class="flex-1">
-                    <label class="label">Shopkeeper</label>
+            <div class="rent-selector">
+                <div>
+                    <label>Shopkeeper Name:</label>
                     <input type="text" id="rent-name" placeholder="Enter name" oninput="renderRentTable()" class="form-input">
                 </div>
-                <div class="flex-1">
-                    <label class="label">Shop No</label>
-                    <input type="text" id="rent-shop-no" placeholder="Shop #" class="form-input">
+                <div>
+                    <label>Shop No:</label>
+                    <input type="text" id="rent-shop-no" placeholder="0" class="form-input">
                 </div>
             </div>
             
-            <div class="rent-form">
-                <input type="date" id="rent-date" class="form-input">
+            <div class="rent-entry-form">
+                <input type="date" id="rent-date" placeholder="Date" class="form-input">
                 <input type="text" id="rent-month" placeholder="Month" class="form-input">
                 <input type="number" id="rent-debit" value="0" placeholder="Rent" class="form-input">
-                <input type="number" id="rent-credit" value="0" placeholder="Paid" class="form-input">
+                <input type="number" id="rent-credit" value="0" placeholder="Payment" class="form-input">
                 <select id="rent-method" class="form-input">
                     <option value="Cash">Cash</option>
-                    <option value="Bank">Bank</option>
+                    <option value="Bank">Bank Transfer</option>
                     <option value="Cheque">Cheque</option>
                 </select>
                 <button class="btn-danger" onclick="addRentEntry()"><i class="fas fa-save"></i> Save</button>
@@ -384,7 +395,7 @@
                     <tbody id="rent-main-rows"></tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="3">Grand Total:</td>
+                            <td colspan="3" style="text-align:right;">Grand Total:</td>
                             <td id="rent-total-debit">0</td>
                             <td id="rent-total-credit">0</td>
                             <td>Balance:</td>
@@ -399,7 +410,7 @@
     <!-- ===== SETTINGS ===== -->
     <div id="page-settings" class="erp-page" style="display:none;">
         <div class="card">
-            <h3 class="card-title"><i class="fas fa-users-cog"></i> User Management</h3>
+            <h3 class="card-title"><i class="fas fa-users-cog"></i> Multi-User Settings</h3>
             
             <div class="settings-box">
                 <h4>Create New User</h4>
@@ -415,7 +426,7 @@
                     <label><input type="checkbox" class="perm" value="page-balance"> Balance</label>
                     <label><input type="checkbox" class="perm" value="page-search"> Search</label>
                     <label><input type="checkbox" class="perm" value="page-customer-ledgers"> Ledgers</label>
-                    <label><input type="checkbox" class="perm" value="page-rent-book"> Rent</label>
+                    <label><input type="checkbox" class="perm" value="page-rent-book"> Rent Book</label>
                     <button class="btn-primary" onclick="createNewUser()"><i class="fas fa-user-plus"></i> Create</button>
                 </div>
             </div>
@@ -431,10 +442,13 @@
 
     <!-- FOOTER -->
     <div class="footer">
-        <p>KRT ERP v5.0 | <i class="fas fa-code"></i> Bilal Suleman | <i class="fas fa-cloud"></i> Cloud Sync</p>
+        <p>KRT ERP v5.0 | <i class="fas fa-code"></i> Developed by Bilal Suleman | <i class="fas fa-cloud-upload-alt"></i> Cloud Sync Enabled</p>
     </div>
 </div>
 
+<!-- =========================================== -->
+<!-- SCRIPTS -->
+<!-- =========================================== -->
 <script src="script.js"></script>
 
 <script>
@@ -451,8 +465,8 @@ if ('serviceWorker' in navigator) {
 function updateClock() {
     const now = new Date();
     document.getElementById('live-clock').textContent = 
-        now.toLocaleDateString('en-PK', { weekday:'short', day:'numeric', month:'short' }) + 
-        ' | ' + now.toLocaleTimeString('en-PK', { hour:'2-digit', minute:'2-digit' });
+        now.toLocaleDateString('en-PK', { weekday:'short', day:'numeric', month:'short', year:'numeric' }) + 
+        ' | ' + now.toLocaleTimeString('en-PK', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
 }
 setInterval(updateClock, 1000);
 updateClock();
@@ -465,7 +479,7 @@ updateClock();
     canvas.height = window.innerHeight;
     
     const particles = [];
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 100; i++) {
         particles.push({
             x: Math.random() * canvas.width,
             y: Math.random() * canvas.height,
