@@ -86,7 +86,7 @@ async function syncData() {
     
     try {
         // Fetch stock data
-        const { data: stock, error: stockErr } = await supabase.from('KRT').select('*').order('id', { ascending: true });
+        const { data: stock, error: stockErr } = await supabaseClient.from('KRT').select('*').order('id', { ascending: true });
         
         if (stockErr) {
             console.error('❌ Stock error:', stockErr);
@@ -136,7 +136,7 @@ async function syncData() {
         
         // Fetch rent data
         try {
-            const { data: rent, error: rentErr } = await supabase.from('KRT_RENT').select('*').order('id', { ascending: true });
+            const { data: rent, error: rentErr } = await supabaseClient.from('KRT_RENT').select('*').order('id', { ascending: true });
             if (!rentErr && rent && rent.length > 0) {
                 rentData = rent.map(r => ({ 
                     id: r.id, 
@@ -180,7 +180,7 @@ async function addIn() {
     if (!qty || qty <= 0) { notify('⚠️ Valid quantity required!', 'warning'); return; }
     
     try {
-        const { data, error } = await supabase.from('KRT').insert([{ 
+        const { data, error } = await supabaseClient.from('KRT').insert([{ 
             Date: date, 
             item_name: item, 
             stock_in: qty, 
@@ -234,7 +234,7 @@ async function addOut() {
     if (!qty || qty <= 0) { notify('⚠️ Valid quantity required!', 'warning'); return; }
     
     try {
-        const { data, error } = await supabase.from('KRT').insert([{ 
+        const { data, error } = await supabaseClient.from('KRT').insert([{ 
             Date: date, 
             item_name: item, 
             stock_in: 0, 
@@ -419,7 +419,7 @@ async function deleteEntry(type, index) {
     const record = db[type][index];
     if (record && record.id) {
         try {
-            await supabase.from('KRT').delete().eq('id', record.id);
+            await supabaseClient.from('KRT').delete().eq('id', record.id);
         } catch(e) {}
     }
     db[type].splice(index, 1);
@@ -439,7 +439,7 @@ async function editEntry(type, index) {
     if (newPrice === null) return;
     
     try {
-        await supabase.from('KRT').update({
+        await supabaseClient.from('KRT').update({
             stock_in: type === 'in' ? Number(newQty) : 0,
             stock_out: type === 'out' ? Number(newQty) : 0,
             price: Number(newPrice) || 0
