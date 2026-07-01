@@ -1,5 +1,5 @@
 // ==========================================
-// KRT TRADERS ERP - COMPLETE SCRIPT (FIXED)
+// KRT TRADERS ERP - COMPLETE SCRIPT
 // Developed by Bilal Suleman
 // Version: 5.0
 // ==========================================
@@ -29,22 +29,8 @@ let idleSeconds = 0;
 let idleInterval = null;
 
 function createIdleOverlay() {
-    const overlay = document.createElement('div');
-    overlay.id = 'idle-overlay';
-    overlay.innerHTML = `
-        <div id="idle-status">🟢 ACTIVE</div>
-        <div id="idle-particles"></div>
-        <div id="idle-content">
-            <span id="idle-icon">🐘</span>
-            <h1 id="idle-title">⚡ <span class="highlight">KRT</span> ERP</h1>
-            <div id="idle-timer">00:00</div>
-            <p id="idle-message">🌟 An <strong>elephant never forgets</strong> —<br>and neither does your KRT ERP!<br>Your session is <strong>paused</strong>, ready to resume.</p>
-            <button id="idle-touch-btn"><span class="icon">👆</span> Touch to Continue</button>
-            <div id="idle-motto">✦ <span>Bilal Suleman</span> • KRT TRADERS ERP v5.0 ✦</div>
-        </div>
-        <div id="idle-version">✦ MEMORY DRIVEN • ELEPHANT NEVER FORGETS ✦</div>
-    `;
-    document.body.appendChild(overlay);
+    const overlay = document.getElementById('idle-overlay');
+    if (!overlay) return;
     
     overlay.addEventListener('click', dismissIdleScreen);
     document.getElementById('idle-touch-btn').addEventListener('click', (e) => {
@@ -53,48 +39,27 @@ function createIdleOverlay() {
     });
     
     generateIdleParticles();
-    generateIdleEmojis();
 }
 
 function generateIdleParticles() {
     const container = document.getElementById('idle-particles');
     if (!container) return;
     container.innerHTML = '';
-    const colors = ['#f1c40f', '#e67e22', '#3498db', '#27ae60', '#e74c3c', '#9b59b6'];
-    for (let i = 0; i < 30; i++) {
+    const colors = ['#06b6d4', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
+    for (let i = 0; i < 25; i++) {
         const p = document.createElement('div');
         p.className = 'idle-particle';
-        const size = Math.random() * 10 + 4;
+        const size = Math.random() * 8 + 3;
         p.style.cssText = `
             width:${size}px; height:${size}px;
             left:${Math.random()*100}%;
             background:${colors[Math.floor(Math.random()*colors.length)]};
-            opacity:${Math.random()*0.15+0.05};
+            opacity:${Math.random()*0.12+0.03};
             animation-duration:${Math.random()*20+15}s;
             animation-delay:${Math.random()*20}s;
             border-radius:${Math.random()>0.5?'50%':'4px'};
         `;
         container.appendChild(p);
-    }
-}
-
-function generateIdleEmojis() {
-    const overlay = document.getElementById('idle-overlay');
-    if (!overlay) return;
-    document.querySelectorAll('.floating-emoji').forEach(el => el.remove());
-    const emojis = ['🐘','🌟','✨','💎','⚡','🔥','💫','🎯','🏆','👑','🦋','🌈'];
-    for (let i = 0; i < 20; i++) {
-        const e = document.createElement('div');
-        e.className = 'floating-emoji';
-        e.textContent = emojis[Math.floor(Math.random()*emojis.length)];
-        e.style.cssText = `
-            left:${Math.random()*100}%;
-            font-size:${Math.random()*30+20}px;
-            animation-duration:${Math.random()*30+20}s;
-            animation-delay:${Math.random()*30}s;
-            opacity:${Math.random()*0.05+0.03};
-        `;
-        overlay.appendChild(e);
     }
 }
 
@@ -105,7 +70,7 @@ function showIdleScreen() {
     
     isIdle = true;
     const overlay = document.getElementById('idle-overlay');
-    if (!overlay) { createIdleOverlay(); return showIdleScreen(); }
+    if (!overlay) return;
     
     idleSeconds = 0;
     document.getElementById('idle-timer').textContent = '00:00';
@@ -114,7 +79,6 @@ function showIdleScreen() {
     document.getElementById('idle-status').textContent = '🔴 IDLE';
     
     generateIdleParticles();
-    generateIdleEmojis();
     
     if (idleInterval) clearInterval(idleInterval);
     idleInterval = setInterval(() => {
@@ -176,9 +140,9 @@ function login() {
             showSystem(found);
             document.getElementById('toggle-btn').style.display = "block";
         } else {
-            alert("❌ Ghalat ID ya Password!");
-            document.querySelector('#login-screen .login-box').style.animation = 'shake 0.5s ease';
-            setTimeout(() => document.querySelector('#login-screen .login-box').style.animation = '', 500);
+            alert("❌ Invalid Credentials!");
+            document.querySelector('.login-box').style.animation = 'shake 0.5s ease';
+            setTimeout(() => document.querySelector('.login-box').style.animation = '', 500);
         }
     }
 }
@@ -200,19 +164,19 @@ function showSystem(roleOrUser) {
         if (roleOrUser === "staff") {
             items.forEach(item => {
                 const t = item.innerText;
-                if (!t.includes("Dashboard") && !t.includes("Daily Report") && !t.includes("Stock Balance") && !t.includes("Logout")) {
+                if (!t.includes("Dashboard") && !t.includes("Reports") && !t.includes("Balance") && !t.includes("Logout")) {
                     item.style.display = "none";
                 }
             });
-            switchPage('page-Report','DAILY REPORT');
+            switchPage('page-Report','REPORTS');
         } else if (roleOrUser === "manager") {
             items.forEach(item => {
                 const t = item.innerText;
-                if (!t.includes("Dashboard") && !t.includes("Customer Ledgers") && !t.includes("Market Rent Book") && !t.includes("Stock Balance") && !t.includes("Logout")) {
+                if (!t.includes("Dashboard") && !t.includes("Ledgers") && !t.includes("Rent") && !t.includes("Balance") && !t.includes("Logout")) {
                     item.style.display = "none";
                 }
             });
-            switchPage('page-customer-ledgers','CUSTOMER LEDGERS');
+            switchPage('page-customer-ledgers','LEDGERS');
         }
     }
     renderAll();
@@ -232,14 +196,13 @@ function applyDynamicPermissions(user) {
 }
 
 // ==========================================
-// CLOUD DATA - FIXED (Capital D issue resolved)
+// CLOUD DATA - FIXED
 // ==========================================
 async function fetchCloudData() {
     try {
         const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
         if (error) { 
             console.error("Supabase Error:", error.message); 
-            showNotification("❌ Supabase Error: " + error.message, "error");
             return false; 
         }
         
@@ -248,17 +211,15 @@ async function fetchCloudData() {
             return false;
         }
         
-        console.log("📦 Data received from Supabase:", data.length, "records");
+        console.log("📦 Data received:", data.length, "records");
         
-        // Clear existing data
         db.in = [];
         db.out = [];
         
-        data.forEach((row, index) => {
+        data.forEach((row) => {
             const inQty = Number(row.stock_in || 0);
             const outQty = Number(row.stock_out || 0);
             const price = Number(row.price || 0);
-            // FIXED: Use row.Date (capital D) instead of row.date
             const date = row.Date ? row.Date.split('T')[0] : new Date().toISOString().split('T')[0];
             
             if (inQty > 0) {
@@ -289,11 +250,10 @@ async function fetchCloudData() {
         });
         
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
-        console.log("✅ Data loaded from Supabase:", db.in.length, "IN entries,", db.out.length, "OUT entries");
+        console.log("✅ Data loaded:", db.in.length, "IN,", db.out.length, "OUT");
         return true;
     } catch (err) { 
         console.error("❌ Fetch Error:", err); 
-        showNotification("❌ Fetch Error: " + err.message, "error");
         return false;
     }
 }
@@ -325,11 +285,11 @@ async function fetchCloudRentData() {
 
 async function syncAllCloudData() {
     if (!navigator.onLine) { 
-        showNotification("⚠️ Internet nahi hai! Offline mode.", "warning"); 
+        showNotification("⚠️ No internet! Offline mode.", "warning"); 
         return; 
     }
     
-    showNotification("☁️ Cloud sync shuru...", "info");
+    showNotification("☁️ Syncing...", "info");
     
     try {
         const stockSynced = await fetchCloudData();
@@ -342,9 +302,9 @@ async function syncAllCloudData() {
             updateCustomerDropdown();
             loadUserTable();
             renderRentTable();
-            showNotification("✅ Cloud sync complete! Data updated.", "success");
+            showNotification("✅ Sync complete!", "success");
         } else {
-            showNotification("⚠️ No new data found on cloud.", "warning");
+            showNotification("⚠️ No new data found.", "warning");
         }
     } catch (err) {
         showNotification("❌ Sync failed: " + err.message, "error");
@@ -355,7 +315,6 @@ async function syncAllCloudData() {
 // NOTIFICATIONS
 // ==========================================
 function showNotification(message, type = "info") {
-    const colors = { success: "#27ae60", error: "#e74c3c", warning: "#f39c12", info: "#3498db" };
     const div = document.createElement('div');
     div.className = `toast-notification ${type}`;
     div.textContent = message;
@@ -364,11 +323,11 @@ function showNotification(message, type = "info") {
     setTimeout(() => {
         div.classList.remove('show');
         setTimeout(() => div.remove(), 500);
-    }, 4000);
+    }, 3500);
 }
 
 // ==========================================
-// STOCK IN - FIXED (Capital D)
+// STOCK IN
 // ==========================================
 async function addIn() {
     const date = document.getElementById('in-date').value;
@@ -379,7 +338,7 @@ async function addIn() {
     const price = Number(document.getElementById('in-price').value);
     
     if (!date || !item || qty <= 0 || price <= 0) { 
-        showNotification("⚠️ Bilal Bhai, details lazmi likhain!", "warning"); 
+        showNotification("⚠️ Please fill all fields!", "warning"); 
         return; 
     }
     
@@ -395,7 +354,7 @@ async function addIn() {
         }]).select();
         
         if (error) { 
-            showNotification("❌ Cloud sync fail: " + error.message, "error"); 
+            showNotification("❌ Cloud error: " + error.message, "error"); 
             return; 
         }
         
@@ -418,15 +377,15 @@ async function addIn() {
             document.getElementById('in-price').value = "";
             document.getElementById('in-barcode').value = "";
             
-            showNotification("✅ Stock IN saved to cloud!", "success");
+            showNotification("✅ Stock IN saved!", "success");
         }
     } catch (err) { 
-        showNotification("❌ Internet ka masla hai!", "error"); 
+        showNotification("❌ Network error!", "error"); 
     }
 }
 
 // ==========================================
-// STOCK OUT - FIXED (Capital D)
+// STOCK OUT
 // ==========================================
 async function addOut() {
     const item = document.getElementById('out-item').value.trim();
@@ -437,7 +396,7 @@ async function addOut() {
     const barcode = document.getElementById('out-barcode')?.value || "";
     
     if (!item || qty <= 0 || !date || price <= 0) { 
-        showNotification("⚠️ Bilal Bhai, saari details bharein!", "warning"); 
+        showNotification("⚠️ Please fill all fields!", "warning"); 
         return; 
     }
     
@@ -446,7 +405,7 @@ async function addOut() {
     const available = tin - tout;
     
     if (qty > available) { 
-        showNotification(`⚠️ Stock kam hai! Sirf ${available} mojud hain.`, "warning"); 
+        showNotification(`⚠️ Only ${available} available!`, "warning"); 
         return; 
     }
     
@@ -462,7 +421,7 @@ async function addOut() {
         }]).select();
         
         if (error) { 
-            showNotification("❌ Cloud sync fail: " + error.message, "error"); 
+            showNotification("❌ Cloud error: " + error.message, "error"); 
             return; 
         }
         
@@ -485,10 +444,10 @@ async function addOut() {
             document.getElementById('out-barcode').value = "";
             document.getElementById('stock-status').innerHTML = "";
             
-            showNotification("✅ Stock OUT saved to cloud!", "success");
+            showNotification("✅ Stock OUT saved!", "success");
         }
     } catch (err) { 
-        showNotification("❌ Internet ka masla hai!", "error"); 
+        showNotification("❌ Network error!", "error"); 
     }
 }
 
@@ -507,14 +466,14 @@ function showLiveStock(itemName) {
     const balance = totalIn - totalOut;
     
     if (balance > 0) {
-        status.style.color = "#27ae60";
-        status.innerHTML = `✅ Available Stock: <strong>${balance}</strong>`;
+        status.style.color = "#10b981";
+        status.innerHTML = `✅ Available: <strong>${balance}</strong>`;
     } else if (balance <= 0 && totalIn > 0) {
-        status.style.color = "#e74c3c";
+        status.style.color = "#ef4444";
         status.innerHTML = `⚠️ Out of Stock! (Balance: ${balance})`;
     } else {
-        status.style.color = "#7f8c8d";
-        status.innerHTML = "ℹ️ No record found for this item.";
+        status.style.color = "#94a3b8";
+        status.innerHTML = "ℹ️ No record found.";
     }
 }
 
@@ -532,13 +491,13 @@ function renderAll() {
         const todayIn = db.in.filter(x => x.date === today);
         
         if (todayIn.length === 0) {
-            inBody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Aaj ki koi entry nahi hai...</td></tr>`;
+            inBody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:25px;color:#94a3b8;">📭 No entries today</td></tr>`;
         } else {
-            todayIn.forEach((x, i) => {
+            todayIn.forEach((x) => {
                 const idx = db.in.indexOf(x);
                 html += `<tr>
                     <td>${c++}</td>
-                    <td>${x.item}</td>
+                    <td><strong>${x.item}</strong></td>
                     <td>${x.vendor}</td>
                     <td>${x.qty}</td>
                     <td>${x.price.toLocaleString()}</td>
@@ -561,16 +520,15 @@ function renderAll() {
         const todayOut = db.out.filter(x => x.date === today);
         
         if (todayOut.length === 0) {
-            outBody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Aaj ki koi sale nahi hai...</td></tr>`;
+            outBody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:25px;color:#94a3b8;">📭 No sales today</td></tr>`;
         } else {
-            todayOut.forEach((x, i) => {
+            todayOut.forEach((x) => {
                 const idx = db.out.indexOf(x);
                 html += `<tr>
                     <td>${c++}</td>
                     <td>${x.date}</td>
                     <td>${x.cust}</td>
-                    <td>${x.item}</td>
-                    <td>${x.barcode||'N/A'}</td>
+                    <td><strong>${x.item}</strong></td>
                     <td>${x.qty}</td>
                     <td>${x.price.toLocaleString()}</td>
                     <td>${x.total.toLocaleString()}</td>
@@ -590,7 +548,7 @@ function renderAll() {
         const items = [...new Set([...db.in.map(x=>x.item), ...db.out.map(x=>x.item)])];
         
         if (items.length === 0) {
-            balBody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Koi item nahi hai</td></tr>`;
+            balBody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:25px;color:#94a3b8;">📭 No items</td></tr>`;
         } else {
             balBody.innerHTML = items.map(name => {
                 if (!name) return "";
@@ -603,11 +561,11 @@ function renderAll() {
                 
                 return `<tr>
                     <td>${db.in.find(x=>x.item===name)?.barcode || 'N/A'}</td>
-                    <td style="font-weight:600;">${name}</td>
-                    <td style="color:#2980b9;">${tin}</td>
-                    <td style="color:#e67e22;">${tout}</td>
-                    <td style="font-weight:bold;color:${bal<5?'#e74c3c':'#27ae60'};">${bal}</td>
-                    <td style="color:${profit>=0?'#27ae60':'#e74c3c'};font-weight:bold;">PKR ${profit.toLocaleString()}</td>
+                    <td><strong>${name}</strong></td>
+                    <td style="color:#06b6d4;">${tin}</td>
+                    <td style="color:#f59e0b;">${tout}</td>
+                    <td style="font-weight:bold;color:${bal<5?'#ef4444':'#10b981'};">${bal}</td>
+                    <td style="color:${profit>=0?'#10b981':'#ef4444'};font-weight:bold;">PKR ${profit.toLocaleString()}</td>
                 </tr>`;
             }).join('');
         }
@@ -633,17 +591,17 @@ function updateDashboardStats() {
         const recent = all.slice(0,10);
         
         if (recent.length === 0) {
-            act.innerHTML = `<p style="color:#7f8c8d;text-align:center;padding:20px;">No activity yet</p>`;
+            act.innerHTML = `<p style="color:#94a3b8;text-align:center;padding:20px;">No activity yet</p>`;
         } else {
             act.innerHTML = recent.map(x => `
-                <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;">
+                <div class="activity-item">
                     <span>
-                        <span style="font-weight:600;">${x.item}</span> 
-                        <span style="color:${x.type==='IN'?'#27ae60':'#e74c3c'};font-weight:bold;">
+                        <strong>${x.item}</strong> 
+                        <span style="color:${x.type==='IN'?'#10b981':'#ef4444'};font-weight:bold;">
                             ${x.type==='IN'?'📥 +':'📤 -'}${x.qty}
                         </span>
                     </span>
-                    <span style="color:#7f8c8d;font-size:12px;">${x.date}</span>
+                    <span style="color:#94a3b8;font-size:12px;">${x.date}</span>
                 </div>
             `).join('');
         }
@@ -654,25 +612,25 @@ function updateDashboardStats() {
 // DELETE ENTRY
 // ==========================================
 async function deleteEntry(type, index) {
-    if (!confirm("⚠️ Bilal Bhai, kya aap waqai ye record delete karna chahte hain?")) return;
+    if (!confirm("⚠️ Delete this record?")) return;
     
     const record = db[type][index];
     if (record && record.id) {
         try {
             const { error } = await _supabase.from('KRT').delete().eq('id', record.id);
             if (error) { 
-                showNotification("❌ Cloud delete fail: " + error.message, "error"); 
+                showNotification("❌ Delete failed: " + error.message, "error"); 
                 return; 
             }
         } catch (err) { 
-            showNotification("❌ Internet ka masla hai!", "error"); 
+            showNotification("❌ Network error!", "error"); 
             return; 
         }
     }
     
     db[type].splice(index, 1);
     saveAndRefresh();
-    showNotification("✅ Record deleted from cloud & local!", "success");
+    showNotification("✅ Deleted!", "success");
 }
 
 // ==========================================
@@ -694,7 +652,7 @@ async function editEntry(type, index) {
         }).eq('id', data.id);
         
         if (error) { 
-            showNotification("❌ Update failed: " + error.message, "error"); 
+            showNotification("❌ Update failed!", "error"); 
             return; 
         }
         
@@ -704,9 +662,9 @@ async function editEntry(type, index) {
         
         saveAndRefresh();
         generateMasterSearch();
-        showNotification("✅ Updated successfully!", "success");
+        showNotification("✅ Updated!", "success");
     } catch (err) { 
-        showNotification("❌ Internet issue!", "error"); 
+        showNotification("❌ Network error!", "error"); 
     }
 }
 
@@ -718,7 +676,7 @@ function generateMasterSearch() {
     const to = document.getElementById('master-to').value;
     
     if (!from || !to) { 
-        showNotification("⚠️ Pehle Dates select karein!", "warning"); 
+        showNotification("⚠️ Select both dates!", "warning"); 
         return; 
     }
     
@@ -728,13 +686,13 @@ function generateMasterSearch() {
     const inTable = document.querySelector("#master-in-table");
     if (inTable) {
         if (fIn.length === 0) {
-            inTable.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#7f8c8d;">No records found</td></tr>`;
+            inTable.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">No records</td></tr>`;
         } else {
             inTable.innerHTML = fIn.map((x) => {
                 const idx = db.in.indexOf(x);
                 return `<tr>
                     <td>${x.date}</td>
-                    <td>${x.item}</td>
+                    <td><strong>${x.item}</strong></td>
                     <td>${x.vendor}</td>
                     <td>${x.qty}</td>
                     <td>${x.price}</td>
@@ -751,13 +709,13 @@ function generateMasterSearch() {
     const outTable = document.querySelector("#master-out-table");
     if (outTable) {
         if (fOut.length === 0) {
-            outTable.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#7f8c8d;">No records found</td></tr>`;
+            outTable.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">No records</td></tr>`;
         } else {
             outTable.innerHTML = fOut.map((x) => {
                 const idx = db.out.indexOf(x);
                 return `<tr>
                     <td>${x.date}</td>
-                    <td>${x.item}</td>
+                    <td><strong>${x.item}</strong></td>
                     <td>${x.cust}</td>
                     <td>${x.qty}</td>
                     <td>${x.price}</td>
@@ -782,11 +740,11 @@ function generateCustomReport() {
     const to = document.getElementById('rep-to-date').value;
     
     if (!from || !to) { 
-        showNotification("⚠️ Dono dates select karein!", "warning"); 
+        showNotification("⚠️ Select both dates!", "warning"); 
         return; 
     }
     
-    document.getElementById('report-period').innerHTML = `📅 Period: ${from} to ${to}`;
+    document.getElementById('report-period').innerHTML = `📅 ${from} to ${to}`;
     
     const fIn = db.in.filter(x => x.date >= from && x.date <= to);
     const fOut = db.out.filter(x => x.date >= from && x.date <= to);
@@ -794,12 +752,12 @@ function generateCustomReport() {
     const inTable = document.querySelector("#rep-in-table");
     if (inTable) {
         if (fIn.length === 0) {
-            inTable.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#7f8c8d;">No records</td></tr>`;
+            inTable.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#94a3b8;">No records</td></tr>`;
         } else {
             inTable.innerHTML = fIn.map(x => `
                 <tr>
                     <td>${x.date}</td>
-                    <td>${x.item}</td>
+                    <td><strong>${x.item}</strong></td>
                     <td>${x.vendor}</td>
                     <td>${x.qty}</td>
                     <td>${x.price}</td>
@@ -812,12 +770,12 @@ function generateCustomReport() {
     const outTable = document.querySelector("#rep-out-table");
     if (outTable) {
         if (fOut.length === 0) {
-            outTable.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#7f8c8d;">No records</td></tr>`;
+            outTable.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#94a3b8;">No records</td></tr>`;
         } else {
             outTable.innerHTML = fOut.map(x => `
                 <tr>
                     <td>${x.date}</td>
-                    <td>${x.item}</td>
+                    <td><strong>${x.item}</strong></td>
                     <td>${x.cust}</td>
                     <td>${x.qty}</td>
                     <td>${x.price}</td>
@@ -838,7 +796,7 @@ function generateCustomReport() {
     summary.style.cssText = `
         display:flex; 
         justify-content:space-around; 
-        background:#2c3e50; 
+        background:#0f172a; 
         color:white; 
         padding:15px; 
         border-radius:8px; 
@@ -849,7 +807,7 @@ function generateCustomReport() {
     summary.innerHTML = `
         <span>📥 Total IN: PKR ${tIn.toLocaleString()}</span>
         <span>📤 Total OUT: PKR ${tOut.toLocaleString()}</span>
-        <span style="color:${profit>=0?'#2ecc71':'#e74c3c'};font-weight:bold;">
+        <span style="color:${profit>=0?'#10b981':'#ef4444'};font-weight:bold;">
             💰 ${profit>=0?'Profit':'Loss'}: PKR ${Math.abs(profit).toLocaleString()}
         </span>
     `;
@@ -879,7 +837,7 @@ function saveLedgerEntry() {
     const method = document.getElementById('led-method').value;
     
     if (!name || !date) { 
-        showNotification("⚠️ Customer Name aur Date lazmi hai!", "warning"); 
+        showNotification("⚠️ Name and Date required!", "warning"); 
         return; 
     }
     
@@ -925,7 +883,7 @@ function showLedger() {
         document.getElementById('total-debit').textContent = "0";
         document.getElementById('total-credit').textContent = "0";
         document.getElementById('final-balance').textContent = "💰 Balance: 0";
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:#7f8c8d;">No entries for this customer</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:#94a3b8;">No entries</td></tr>`;
         return;
     }
     
@@ -942,8 +900,8 @@ function showLedger() {
             <td>${x.date}</td>
             <td>${x.item}</td>
             <td>${x.ctn}</td>
-            <td>${x.debit.toLocaleString()}</td>
-            <td>${x.credit.toLocaleString()}</td>
+            <td style="color:#ef4444;">${x.debit.toLocaleString()}</td>
+            <td style="color:#10b981;">${x.credit.toLocaleString()}</td>
             <td>${x.method}</td>
             <td>
                 <button class="btn-action btn-edit" onclick="editLedger('${name}',${i})">Edit</button>
@@ -960,22 +918,24 @@ function showLedger() {
     const balance = (opening + tDebit) - tCredit;
     const balanceEl = document.getElementById('final-balance');
     balanceEl.textContent = `💰 Balance: ${balance.toLocaleString()}`;
-    balanceEl.style.background = balance >= 0 ? '#27ae60' : '#e74c3c';
+    balanceEl.style.background = balance >= 0 ? '#10b981' : '#ef4444';
     balanceEl.style.color = 'white';
+    balanceEl.style.padding = '6px 12px';
+    balanceEl.style.borderRadius = '6px';
 }
 
 function delLedger(custName, index) {
-    if (!confirm("⚠️ Kya ye entry delete kar dein?")) return;
+    if (!confirm("⚠️ Delete this entry?")) return;
     db.ledgers[custName].splice(index, 1);
     saveAndRefresh();
     showLedger();
-    showNotification("✅ Entry deleted!", "success");
+    showNotification("✅ Deleted!", "success");
 }
 
 function editLedger(custName, index) {
     const entry = db.ledgers[custName][index];
-    const nDebit = prompt("Naya Debit (Udhaar):", entry.debit);
-    const nCredit = prompt("Naya Credit (Wasuli):", entry.credit);
+    const nDebit = prompt("New Debit:", entry.debit);
+    const nCredit = prompt("New Credit:", entry.credit);
     
     if (nDebit !== null && nCredit !== null) {
         db.ledgers[custName][index].debit = Number(nDebit);
@@ -999,14 +959,14 @@ function addRentEntry() {
     const method = document.getElementById('rent-method').value;
     
     if (!name || !date) { 
-        showNotification("⚠️ Customer Name aur Date lazmi likhain!", "warning"); 
+        showNotification("⚠️ Name and Date required!", "warning"); 
         return; 
     }
     
     dbRent.push({ name, shop, date, month, debit, credit, method });
     localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
     renderRentTable();
-    showNotification(`✅ ${name} ki entry save ho gayi!`, "success");
+    showNotification(`✅ Entry saved for ${name}!`, "success");
 }
 
 function renderRentTable() {
@@ -1018,10 +978,10 @@ function renderRentTable() {
     const filtered = dbRent.filter(x => x.name.toLowerCase() === searchName.toLowerCase());
     
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:#7f8c8d;">📭 Naya Customer hai ya naam sahi nahi likha...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:25px;color:#94a3b8;">📭 No records</td></tr>`;
     } else {
         let html = "";
-        filtered.forEach((r, i) => {
+        filtered.forEach((r) => {
             const idx = dbRent.indexOf(r);
             tDebit += r.debit; 
             tCredit += r.credit;
@@ -1030,8 +990,8 @@ function renderRentTable() {
                 <td>${r.shop||'N/A'}</td>
                 <td>${r.date}</td>
                 <td>${r.month}</td>
-                <td style="color:#e74c3c;font-weight:600;">${r.debit.toLocaleString()}</td>
-                <td style="color:#27ae60;font-weight:600;">${r.credit.toLocaleString()}</td>
+                <td style="color:#ef4444;font-weight:600;">${r.debit.toLocaleString()}</td>
+                <td style="color:#10b981;font-weight:600;">${r.credit.toLocaleString()}</td>
                 <td>${r.method}</td>
                 <td><button class="btn-action btn-delete" onclick="deleteRentEntry(${idx})">Del</button></td>
             </tr>`;
@@ -1045,11 +1005,11 @@ function renderRentTable() {
 }
 
 function deleteRentEntry(index) {
-    if (!confirm("⚠️ Kya ye entry delete kar dein?")) return;
+    if (!confirm("⚠️ Delete this entry?")) return;
     dbRent.splice(index, 1);
     localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
     renderRentTable();
-    showNotification("✅ Rent entry deleted!", "success");
+    showNotification("✅ Deleted!", "success");
 }
 
 // ==========================================
@@ -1063,7 +1023,7 @@ function createNewUser() {
     document.querySelectorAll('.perm:checked').forEach(cb => perms.push(cb.value));
     
     if (!name || !id || !pass) { 
-        showNotification("⚠️ Bilal Bhai, saari details bharein!", "warning"); 
+        showNotification("⚠️ Fill all fields!", "warning"); 
         return; 
     }
     
@@ -1076,7 +1036,7 @@ function createNewUser() {
     document.getElementById('new-password').value = '';
     document.querySelectorAll('.perm').forEach(cb => cb.checked = false);
     
-    showNotification(`✅ New user "${name}" created!`, "success");
+    showNotification(`✅ User "${name}" created!`, "success");
 }
 
 function loadUserTable() {
@@ -1084,11 +1044,11 @@ function loadUserTable() {
     if (!tbody) return;
     
     if (extraUsers.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:20px;color:#7f8c8d;">No users created yet</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:20px;color:#94a3b8;">No users</td></tr>`;
     } else {
         tbody.innerHTML = extraUsers.map((u, i) => `
             <tr>
-                <td>${u.id}</td>
+                <td><strong>${u.id}</strong></td>
                 <td>${u.name}</td>
                 <td><small>${u.perms.join(', ')}</small></td>
                 <td><button class="btn-action btn-delete" onclick="deleteExtraUser(${i})">Del</button></td>
@@ -1098,7 +1058,7 @@ function loadUserTable() {
 }
 
 function deleteExtraUser(index) {
-    if (!confirm("⚠️ Kya aap is user ko delete karna chahte hain?")) return;
+    if (!confirm("⚠️ Delete this user?")) return;
     extraUsers.splice(index, 1);
     localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
     loadUserTable();
@@ -1111,11 +1071,11 @@ function deleteExtraUser(index) {
 function toggleSidebar() {
     const sb = document.getElementById('sidebar');
     if (sb.style.left === "0px" || sb.style.left === "") {
-        sb.style.left = "-260px";
+        sb.style.left = "-250px";
         document.getElementById('main-content').style.marginLeft = "0";
     } else {
         sb.style.left = "0px";
-        document.getElementById('main-content').style.marginLeft = "260px";
+        document.getElementById('main-content').style.marginLeft = "250px";
     }
 }
 
@@ -1125,10 +1085,18 @@ function toggleSidebar() {
 function switchPage(pageId, title) {
     document.querySelectorAll('.erp-page').forEach(p => p.style.display = 'none');
     document.getElementById(pageId).style.display = 'block';
-    document.getElementById('page-title').innerHTML = `<i class="fas fa-chart-line" style="color:#f1c40f; margin-right:12px;"></i>KRT TRADERS ERP - ${title}`;
+    document.getElementById('page-title').innerHTML = `<i class="fas fa-chart-line"></i> KRT ERP - ${title}`;
+    
+    // Update active sidebar item
+    document.querySelectorAll('#sidebar ul li').forEach(li => li.classList.remove('active'));
+    document.querySelectorAll('#sidebar ul li').forEach(li => {
+        if (li.getAttribute('onclick') && li.getAttribute('onclick').includes(pageId)) {
+            li.classList.add('active');
+        }
+    });
     
     if (window.innerWidth <= 768) {
-        document.getElementById('sidebar').style.left = "-260px";
+        document.getElementById('sidebar').style.left = "-250px";
         document.getElementById('main-content').style.marginLeft = "0";
     }
     
@@ -1139,7 +1107,7 @@ function switchPage(pageId, title) {
 // LOGOUT
 // ==========================================
 function logout() {
-    if (!confirm("🚪 Bilal Bhai, kya aap waqai logout karna chahte hain?")) return;
+    if (!confirm("🚪 Logout?")) return;
     
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('userRole');
@@ -1157,7 +1125,7 @@ function logout() {
 // ==========================================
 function printSection() {
     if (!db || !db.in) { 
-        showNotification("⚠️ Pehle data mukammal load hone dein!", "warning"); 
+        showNotification("⚠️ Data not loaded!", "warning"); 
         return; 
     }
     window.print();
@@ -1186,22 +1154,21 @@ function updateItemLists() {
 // APP STARTUP
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("🚀 KRT TRADERS ERP v5.0 Loading...");
+    console.log("🚀 KRT ERP v5.0 Loading...");
     console.log("📦 Developed by Bilal Suleman");
-    console.log("🐘 Elephant Never Forgets!");
     
-    // First load local data
+    // Load local data first
     renderAll();
     renderRentTable();
     loadUserTable();
     updateCustomerDropdown();
     updateItemLists();
     
-    // Then sync with cloud
+    // Sync with cloud
     if (navigator.onLine) {
         await syncAllCloudData();
     } else {
-        showNotification("⚠️ Offline mode - Data from local storage", "warning");
+        showNotification("⚠️ Offline mode", "warning");
     }
     
     // Check login status
@@ -1215,7 +1182,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Rent name live search
+// Rent live search
 document.addEventListener('DOMContentLoaded', () => {
     const rentName = document.getElementById('rent-name');
     if (rentName) rentName.addEventListener('input', renderRentTable);
@@ -1234,4 +1201,4 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-console.log("✅ KRT TRADERS ERP v5.0 Loaded Successfully!");
+console.log("✅ KRT ERP v5.0 Loaded!");
