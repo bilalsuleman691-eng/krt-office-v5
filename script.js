@@ -231,48 +231,102 @@ function applyDynamicPermissions(user) {
 }
 
 // ==========================================
-// CLOUD DATA
+// CLOUD DATA - FIXED VERSION
 // ==========================================
 async function fetchCloudData() {
     try {
         const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
-        if (error) { console.error("Supabase Error:", error.message); return; }
-        if (!data || data.length === 0) return;
+        if (error) { 
+            console.error("Supabase Error:", error.message); 
+            showNotification("❌ Error fetching data: " + error.message, "error");
+            return; 
+        }
+        if (!data || data.length === 0) {
+            console.log("No data found in Supabase");
+            return;
+        }
         
-        db.in = []; db.out = [];
+        // Clear existing arrays
+        db.in = [];
+        db.out = [];
+        
+        // Process each row
         data.forEach(row => {
             const inQty = Number(row.stock_in || 0);
             const outQty = Number(row.stock_out || 0);
             const price = Number(row.price || 0);
             const date = (row.Date || row.date || row.created_at || '').split('T')[0] || new Date().toISOString().split('T')[0];
             
+            // Handle Stock IN entries
             if (inQty > 0) {
-                db.in.push({ id: row.id, date, vendor: row.vendor_name || 'factory', item: row.item_name || 'Unknown', qty: inQty, price, total: inQty * price });
-            } else if (outQty > 0) {
-                db.out.push({ id: row.id, date, cust: row.customer_name || 'General Sale', item: row.item_name || 'Unknown', qty: outQty, price, total: outQty * price });
+                db.in.push({ 
+                    id: row.id, 
+                    date, 
+                    vendor: row.vendor_name || 'factory', 
+                    item: row.item_name || 'Unknown', 
+                    qty: inQty, 
+                    price, 
+                    total: inQty * price 
+                });
+            }
+            
+            // Handle Stock OUT entries - FIXED: Use separate if instead of else if
+            if (outQty > 0) {
+                db.out.push({ 
+                    id: row.id, 
+                    date, 
+                    cust: row.customer_name || 'General Sale', 
+                    item: row.item_name || 'Unknown', 
+                    qty: outQty, 
+                    price, 
+                    total: outQty * price 
+                });
             }
         });
+        
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
         renderAll();
         updateDashboardStats();
-        console.log("✅ Cloud sync complete!");
-    } catch (err) { console.error("❌ Fetch Error:", err); }
+        console.log("✅ Cloud sync complete! Loaded:", db.in.length, "IN entries,", db.out.length, "OUT entries");
+    } catch (err) { 
+        console.error("❌ Fetch Error:", err); 
+        showNotification("❌ Error fetching data from cloud: " + err.message, "error");
+    }
 }
 
 async function fetchCloudRentData() {
     try {
         const { data, error } = await _supabase.from('KRT_RENT').select('*').order('id', { ascending: true });
-        if (error) { console.error("Rent Fetch Error:", error); return; }
+        if (error) { 
+            console.error("Rent Fetch Error:", error); 
+            showNotification("❌ Error fetching rent data: " + error.message, "error");
+            return; 
+        }
         if (!data) return;
-        dbRent = data.map(row => ({ id: row.id, name: row.name, shop: row.shop, date: row.date, month: row.month, debit: Number(row.debit||0), credit: Number(row.credit||0), method: row.method }));
+        dbRent = data.map(row => ({ 
+            id: row.id, 
+            name: row.name, 
+            shop: row.shop, 
+            date: row.date, 
+            month: row.month, 
+            debit: Number(row.debit||0), 
+            credit: Number(row.credit||0), 
+            method: row.method 
+        }));
         localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
         renderRentTable();
-        console.log("✅ Rent cloud sync done!");
-    } catch (err) { console.error("❌ Rent Sync Error:", err); }
+        console.log("✅ Rent cloud sync done! Loaded:", dbRent.length, "entries");
+    } catch (err) { 
+        console.error("❌ Rent Sync Error:", err); 
+        showNotification("❌ Error fetching rent data: " + err.message, "error");
+    }
 }
 
 async function syncAllCloudData() {
-    if (!navigator.onLine) { showNotification("⚠️ Internet nahi hai! Offline mode.", "warning"); return; }
+    if (!navigator.onLine) { 
+        showNotification("⚠️ Internet nahi hai! Offline mode.", "warning"); 
+        return; 
+    }
     showNotification("☁️ Cloud sync shuru...", "info");
     try {
         await fetchCloudData();
@@ -313,13 +367,39 @@ async function addIn() {
     const qty = Number(document.getElementById('in-qty').value);
     const price = Number(document.getElementById('in-price').value);
     
-    if (!date || !item || qty <= 0) { showNotification("⚠️ Bilal Bhai, details lazmi likhain!", "warning"); return; }
+    if (!date || !item || qty <= 0) { 
+        showNotification("⚠️ Bilal Bhai, details lazmi likhain!", "warning"); 
+        return; 
+    }
     
     try {
-        const { data, error } = await _supabase.from('KRT').insert([{ Date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor }]).select();
-        if (error) { showNotification("❌ Cloud sync fail: " + error.message, "error"); return; }
+        const { data, error } = await _supabase.from('KRT').insert([
+            { 
+                Date: date, 
+                item_name: item, 
+                stock_in: qty, 
+                stock_out: 0, 
+                price, 
+                vendor_name: vendor || 'factory' 
+            }
+        ]).select();
+        
+        if (error) { 
+            showNotification("❌ Cloud sync fail: " + error.message, "error"); 
+            return; 
+        }
+        
         if (data && data.length > 0) {
-            db.in.push({ id: data[0].id, date, vendor: vendor || 'factory', item, barcode, qty, price, total: qty * price });
+            db.in.push({ 
+                id: data[0].id, 
+                date, 
+                vendor: vendor || 'factory', 
+                item, 
+                barcode, 
+                qty, 
+                price, 
+                total: qty * price 
+            });
             saveAndRefresh();
             document.getElementById('in-item').value = "";
             document.getElementById('in-qty').value = "";
@@ -327,11 +407,14 @@ async function addIn() {
             document.getElementById('in-barcode').value = "";
             showNotification("✅ Stock IN saved to cloud!", "success");
         }
-    } catch (err) { showNotification("❌ Internet ka masla hai!", "error"); }
+    } catch (err) { 
+        console.error("Stock IN Error:", err);
+        showNotification("❌ Internet ka masla hai!", "error"); 
+    }
 }
 
 // ==========================================
-// STOCK OUT
+// STOCK OUT - FIXED VERSION
 // ==========================================
 async function addOut() {
     const item = document.getElementById('out-item').value.trim();
@@ -341,26 +424,71 @@ async function addOut() {
     const custName = document.getElementById('out-customer')?.value || "General Sale";
     const barcode = document.getElementById('out-barcode')?.value || "";
     
-    if (!item || qty <= 0 || !date) { showNotification("⚠️ Bilal Bhai, saari details bharein!", "warning"); return; }
+    if (!item || qty <= 0 || !date) { 
+        showNotification("⚠️ Bilal Bhai, saari details bharein!", "warning"); 
+        return; 
+    }
     
     const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const available = tin - tout;
-    if (qty > available) { showNotification(`⚠️ Stock kam hai! Sirf ${available} mojud hain.`, "warning"); return; }
+    if (qty > available) { 
+        showNotification(`⚠️ Stock kam hai! Sirf ${available} mojud hain.`, "warning"); 
+        return; 
+    }
     
     try {
-        const { data, error } = await _supabase.from('KRT').insert([{ Date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: custName }]).select();
-        if (error) { showNotification("❌ Cloud sync fail: " + error.message, "error"); return; }
+        const { data, error } = await _supabase.from('KRT').insert([
+            { 
+                Date: date, 
+                item_name: item, 
+                stock_in: 0, 
+                stock_out: qty, 
+                price, 
+                customer_name: custName 
+            }
+        ]).select();
+        
+        if (error) { 
+            showNotification("❌ Cloud sync fail: " + error.message, "error"); 
+            return; 
+        }
+        
+        // Check if data exists and has length
         if (data && data.length > 0) {
-            db.out.push({ id: data[0].id, item, qty, date, cust: custName, barcode, price, total: qty * price });
-            saveAndRefresh();
+            const newEntry = {
+                id: data[0].id,
+                item,
+                qty,
+                date,
+                cust: custName,
+                barcode,
+                price,
+                total: qty * price
+            };
+            db.out.push(newEntry);
+            
+            // Save to localStorage immediately
+            localStorage.setItem('krt_erp_data', JSON.stringify(db));
+            
+            // Clear form fields
             document.getElementById('out-qty').value = "";
             document.getElementById('out-customer').value = "";
             document.getElementById('out-barcode').value = "";
             document.getElementById('stock-status').innerText = "";
+            
+            // Refresh UI
+            renderAll();
+            updateDashboardStats();
+            
             showNotification("✅ Stock OUT saved to cloud!", "success");
+        } else {
+            showNotification("❌ No data returned from Supabase", "error");
         }
-    } catch (err) { showNotification("❌ Internet ka masla hai!", "error"); }
+    } catch (err) { 
+        console.error("Stock Out Error:", err);
+        showNotification("❌ Internet ka masla hai!", "error"); 
+    }
 }
 
 // ==========================================
@@ -368,7 +496,10 @@ async function addOut() {
 // ==========================================
 function showLiveStock(itemName) {
     const status = document.getElementById('stock-status');
-    if (!itemName || !itemName.trim()) { status.innerHTML = ""; return; }
+    if (!itemName || !itemName.trim()) { 
+        status.innerHTML = ""; 
+        return; 
+    }
     const totalIn = db.in.filter(x => x.item === itemName).reduce((s, x) => s + x.qty, 0);
     const totalOut = db.out.filter(x => x.item === itemName).reduce((s, x) => s + x.qty, 0);
     const balance = totalIn - totalOut;
@@ -466,8 +597,14 @@ async function deleteEntry(type, index) {
     if (record && record.id) {
         try {
             const { error } = await _supabase.from('KRT').delete().eq('id', record.id);
-            if (error) { showNotification("❌ Cloud delete fail: " + error.message, "error"); return; }
-        } catch (err) { showNotification("❌ Internet ka masla hai!", "error"); return; }
+            if (error) { 
+                showNotification("❌ Cloud delete fail: " + error.message, "error"); 
+                return; 
+            }
+        } catch (err) { 
+            showNotification("❌ Internet ka masla hai!", "error"); 
+            return; 
+        }
     }
     db[type].splice(index, 1);
     saveAndRefresh();
@@ -489,14 +626,19 @@ async function editEntry(type, index) {
             stock_out: type === 'out' ? Number(newQty) : 0,
             price: Number(newPrice)
         }).eq('id', data.id);
-        if (error) { showNotification("❌ Update failed: " + error.message, "error"); return; }
+        if (error) { 
+            showNotification("❌ Update failed: " + error.message, "error"); 
+            return; 
+        }
         db[type][index].qty = Number(newQty);
         db[type][index].price = Number(newPrice);
         db[type][index].total = Number(newQty) * Number(newPrice);
         saveAndRefresh();
         generateMasterSearch();
         showNotification("✅ Updated successfully!", "success");
-    } catch (err) { showNotification("❌ Internet issue!", "error"); }
+    } catch (err) { 
+        showNotification("❌ Internet issue!", "error"); 
+    }
 }
 
 // ==========================================
@@ -505,7 +647,10 @@ async function editEntry(type, index) {
 function generateMasterSearch() {
     const from = document.getElementById('master-from').value;
     const to = document.getElementById('master-to').value;
-    if (!from || !to) { showNotification("⚠️ Pehle Dates select karein!", "warning"); return; }
+    if (!from || !to) { 
+        showNotification("⚠️ Pehle Dates select karein!", "warning"); 
+        return; 
+    }
     
     const fIn = db.in.filter(x => x.date >= from && x.date <= to);
     const fOut = db.out.filter(x => x.date >= from && x.date <= to);
@@ -534,7 +679,10 @@ function generateMasterSearch() {
 function generateCustomReport() {
     const from = document.getElementById('rep-from-date').value;
     const to = document.getElementById('rep-to-date').value;
-    if (!from || !to) { showNotification("⚠️ Dono dates select karein!", "warning"); return; }
+    if (!from || !to) { 
+        showNotification("⚠️ Dono dates select karein!", "warning"); 
+        return; 
+    }
     
     document.getElementById('report-period').innerText = `📅 Period: ${from} to ${to}`;
     const fIn = db.in.filter(x => x.date >= from && x.date <= to);
@@ -573,8 +721,14 @@ function saveLedgerEntry() {
     const debit = parseFloat(document.getElementById('led-debit').value) || 0;
     const credit = parseFloat(document.getElementById('led-credit').value) || 0;
     const method = document.getElementById('led-method').value;
-    if (!name || !date) { showNotification("⚠️ Customer Name aur Date lazmi hai!", "warning"); return; }
-    if (!db.ledgers[name]) { db.ledgers[name] = []; db.opening_balances[name] = 0; }
+    if (!name || !date) { 
+        showNotification("⚠️ Customer Name aur Date lazmi hai!", "warning"); 
+        return; 
+    }
+    if (!db.ledgers[name]) { 
+        db.ledgers[name] = []; 
+        db.opening_balances[name] = 0; 
+    }
     db.ledgers[name].push({ date, item, ctn, debit, credit, method });
     saveAndRefresh();
     updateCustomerDropdown();
@@ -589,7 +743,11 @@ function saveLedgerEntry() {
 function updateOpeningBal() {
     const name = document.getElementById('ledger-cust-name').value.trim();
     const val = parseFloat(document.getElementById('opening-bal').value) || 0;
-    if (name) { db.opening_balances[name] = val; saveAndRefresh(); showLedger(); }
+    if (name) { 
+        db.opening_balances[name] = val; 
+        saveAndRefresh(); 
+        showLedger(); 
+    }
 }
 
 function showLedger() {
@@ -608,7 +766,9 @@ function showLedger() {
     }
     let tCtn=0, tDebit=0, tCredit=0;
     db.ledgers[name].forEach((x, i) => {
-        tCtn += Number(x.ctn||0); tDebit += Number(x.debit||0); tCredit += Number(x.credit||0);
+        tCtn += Number(x.ctn||0); 
+        tDebit += Number(x.debit||0); 
+        tCredit += Number(x.credit||0);
         tbody.innerHTML += `<tr><td>${i+1}</td><td>${x.date}</td><td>${x.item}</td><td>${x.ctn}</td><td>${x.debit.toLocaleString()}</td><td>${x.credit.toLocaleString()}</td><td>${x.method}</td><td><button class="btn-action btn-edit" onclick="editLedger('${name}',${i})">Edit</button><button class="btn-action btn-delete" onclick="delLedger('${name}',${i})">Del</button></td></tr>`;
     });
     document.getElementById('total-ctn').textContent = tCtn;
@@ -649,7 +809,10 @@ function addRentEntry() {
     const debit = parseFloat(document.getElementById('rent-debit').value) || 0;
     const credit = parseFloat(document.getElementById('rent-credit').value) || 0;
     const method = document.getElementById('rent-method').value;
-    if (!name || !date) { showNotification("⚠️ Customer Name aur Date lazmi likhain!", "warning"); return; }
+    if (!name || !date) { 
+        showNotification("⚠️ Customer Name aur Date lazmi likhain!", "warning"); 
+        return; 
+    }
     dbRent.push({ name, shop, date, month, debit, credit, method });
     localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
     renderRentTable();
@@ -665,7 +828,8 @@ function renderRentTable() {
     const filtered = dbRent.filter(x => x.name.toLowerCase() === searchName.toLowerCase());
     if (filtered.length > 0) {
         filtered.forEach((r, i) => {
-            tDebit += r.debit; tCredit += r.credit;
+            tDebit += r.debit; 
+            tCredit += r.credit;
             tbody.innerHTML += `<tr><td>${r.shop||'N/A'}</td><td>${r.date}</td><td>${r.month}</td><td style="color:#e74c3c;font-weight:600;">${r.debit.toLocaleString()}</td><td style="color:#27ae60;font-weight:600;">${r.credit.toLocaleString()}</td><td>${r.method}</td><td><button class="btn-action btn-delete" onclick="deleteRentEntry(${i})">Del</button></td></tr>`;
         });
     } else {
@@ -693,7 +857,10 @@ function createNewUser() {
     const pass = document.getElementById('new-password').value;
     const perms = [];
     document.querySelectorAll('.perm:checked').forEach(cb => perms.push(cb.value));
-    if (!name || !id || !pass) { showNotification("⚠️ Bilal Bhai, saari details bharein!", "warning"); return; }
+    if (!name || !id || !pass) { 
+        showNotification("⚠️ Bilal Bhai, saari details bharein!", "warning"); 
+        return; 
+    }
     extraUsers.push({ id, pass, name, perms });
     localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
     loadUserTable();
@@ -767,7 +934,10 @@ function logout() {
 // PRINT SECTION
 // ==========================================
 function printSection() {
-    if (!db || !db.in) { showNotification("⚠️ Pehle data mukammal load hone dein!", "warning"); return; }
+    if (!db || !db.in) { 
+        showNotification("⚠️ Pehle data mukammal load hone dein!", "warning"); 
+        return; 
+    }
     window.print();
 }
 
@@ -818,8 +988,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key === 's') { e.preventDefault(); syncAllCloudData(); }
-    if (e.key === 'Escape') { const sb = document.getElementById('sidebar'); if (sb && sb.style.left === "0px") toggleSidebar(); }
+    if (e.ctrlKey && e.key === 's') { 
+        e.preventDefault(); 
+        syncAllCloudData(); 
+    }
+    if (e.key === 'Escape') { 
+        const sb = document.getElementById('sidebar'); 
+        if (sb && sb.style.left === "0px") toggleSidebar(); 
+    }
 });
 
 console.log("🚀 KRT TRADERS ERP v5.0 Loaded!");
