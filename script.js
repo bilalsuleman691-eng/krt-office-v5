@@ -1,6 +1,6 @@
 // ==========================================
 // KRT TRADERS ERP - COMPLETE SCRIPT
-// 100% SUPABASE - NO LOCALSTORAGE
+// 100% LOCALSTORAGE - NO SUPABASE
 // Developed by Bilal Suleman
 // ==========================================
 
@@ -21,21 +21,6 @@ window.addEventListener('unhandledrejection', function(e) {
 });
 
 // ==========================================
-// SUPABASE INITIALIZATION
-// ==========================================
-const supabaseUrl = 'https://zeadgtkzqooiswyyuozl.supabase.co';
-const supabaseKey = 'sb_publishable_b4jLu7Bx2dsGtLR72i8dMA_OeGcOu79';
-let _supabase = null;
-
-try {
-    _supabase = supabase.createClient(supabaseUrl, supabaseKey);
-    console.log('✅ Supabase initialized');
-} catch (err) {
-    console.error('❌ Supabase init failed:', err);
-    showNotification('⚠️ Database connection failed!', 'error');
-}
-
-// ==========================================
 // GLOBAL DATABASE OBJECTS
 // ==========================================
 let db = { in: [], out: [], ledgers: {}, opening_balances: {} };
@@ -43,108 +28,75 @@ let dbRent = [];
 let extraUsers = [];
 
 // ==========================================
-// LOAD DATA FROM SUPABASE (NO LOCALSTORAGE)
+// LOAD DATA FROM LOCALSTORAGE
 // ==========================================
-async function loadDataFromSupabase() {
+function loadLocalData() {
     try {
-        if (!_supabase) {
-            showNotification('⚠️ Database not available!', 'error');
-            return false;
+        // Load main data
+        const stored = localStorage.getItem('krt_erp_data');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            db.in = parsed.in || [];
+            db.out = parsed.out || [];
+            db.ledgers = parsed.ledgers || {};
+            db.opening_balances = parsed.opening_balances || {};
+            console.log('✅ Local data loaded: IN=' + db.in.length + ', OUT=' + db.out.length);
+        } else {
+            db = { in: [], out: [], ledgers: {}, opening_balances: {} };
+            console.log('ℹ️ No local data found, starting fresh');
         }
         
-        if (!navigator.onLine) {
-            showNotification('⚠️ Internet connection required!', 'error');
-            return false;
+        // Load rent data
+        const rentStored = localStorage.getItem('krt_rent_data');
+        dbRent = rentStored ? JSON.parse(rentStored) : [];
+        
+        // Load users
+        const usersStored = localStorage.getItem('krt_extra_users');
+        extraUsers = usersStored ? JSON.parse(usersStored) : [];
+        
+        // Load ledgers separately
+        const ledgersStored = localStorage.getItem('krt_ledgers_data');
+        if (ledgersStored) {
+            db.ledgers = JSON.parse(ledgersStored);
+        }
+        const openingStored = localStorage.getItem('krt_opening_balances');
+        if (openingStored) {
+            db.opening_balances = JSON.parse(openingStored);
         }
         
-        console.log('📥 Loading data from Supabase...');
-        showNotification('📥 Loading data...', 'info');
-        
-        // Fetch main data
-        const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
-        if (error) {
-            console.error('❌ Supabase Error:', error.message);
-            showNotification('❌ Failed to load data: ' + error.message, 'error');
-            return false;
-        }
-        
-        // Reset local arrays
-        db.in = [];
-        db.out = [];
-        
-        if (data && data.length > 0) {
-            data.forEach(function(row) {
-                try {
-                    const inQty = Number(row.stock_in || 0);
-                    const outQty = Number(row.stock_out || 0);
-                    const price = Number(row.price || 0);
-                    const date = (row.Date || row.date || row.created_at || '').split('T')[0] || new Date().toISOString().split('T')[0];
-                    
-                    if (inQty > 0) {
-                        db.in.push({
-                            id: row.id,
-                            date: date,
-                            vendor: row.vendor_name || 'factory',
-                            item: row.item_name || 'Unknown',
-                            qty: inQty,
-                            price: price,
-                            total: inQty * price
-                        });
-                    } else if (outQty > 0) {
-                        db.out.push({
-                            id: row.id,
-                            date: date,
-                            cust: row.customer_name || 'General Sale',
-                            item: row.item_name || 'Unknown',
-                            qty: outQty,
-                            price: price,
-                            total: outQty * price
-                        });
-                    }
-                } catch (rowErr) {
-                    console.warn('⚠️ Error processing row:', rowErr);
-                }
-            });
-        }
-        
-        // Fetch rent data
-        const rentResult = await _supabase.from('KRT_RENT').select('*').order('id', { ascending: true });
-        if (rentResult.error) {
-            console.error('❌ Rent fetch error:', rentResult.error);
-        } else if (rentResult.data) {
-            dbRent = rentResult.data.map(function(row) {
-                return {
-                    id: row.id,
-                    name: row.name,
-                    shop: row.shop,
-                    date: row.date,
-                    month: row.month,
-                    debit: Number(row.debit || 0),
-                    credit: Number(row.credit || 0),
-                    method: row.method
-                };
-            });
-        }
-        
-        // Load extra users from Supabase (or keep existing)
-        // For users, we'll keep them in memory only since they're managed locally
-        
-        console.log('✅ Data loaded: IN=' + db.in.length + ', OUT=' + db.out.length + ', RENT=' + dbRent.length);
-        showNotification('✅ Data loaded successfully!', 'success');
-        
-        renderAll();
-        renderRentTable();
-        updateDashboardStats();
-        updateItemLists();
-        updateCustomerDropdown();
-        loadUserTable();
-        
+    } catch (err) {
+        console.error('❌ Failed to load local data:', err);
+        db = { in: [], out: [], ledgers: {}, opening_balances: {} };
+        dbRent = [];
+        extraUsers = [];
+    }
+}
+
+// ==========================================
+// SAVE DATA TO LOCALSTORAGE
+// ==========================================
+function saveLocalData() {
+    try {
+        localStorage.setItem('krt_erp_data', JSON.stringify(db));
+        localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
+        localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
+        localStorage.setItem('krt_ledgers_data', JSON.stringify(db.ledgers));
+        localStorage.setItem('krt_opening_balances', JSON.stringify(db.opening_balances));
+        console.log('✅ Data saved to localStorage');
         return true;
     } catch (err) {
-        console.error('❌ Load data error:', err);
-        showNotification('❌ Failed to load data: ' + err.message, 'error');
+        console.error('❌ Failed to save local data:', err);
         return false;
     }
+}
+
+// ==========================================
+// SAVE AND REFRESH
+// ==========================================
+function saveAndRefresh() {
+    saveLocalData();
+    renderAll();
+    updateDashboardStats();
 }
 
 // ==========================================
@@ -486,21 +438,10 @@ function showNotification(message, type = "info") {
 }
 
 // ==========================================
-// STOCK IN - 100% SUPABASE
+// STOCK IN - 100% LOCALSTORAGE
 // ==========================================
-async function addIn() {
+function addIn() {
     try {
-        // Check internet connection first
-        if (!navigator.onLine) {
-            showNotification('⚠️ Internet connection required!', 'error');
-            return;
-        }
-        
-        if (!_supabase) {
-            showNotification('⚠️ Database not available!', 'error');
-            return;
-        }
-        
         const dateInput = document.getElementById('in-date');
         const vendorInput = document.getElementById('in-vendor');
         const itemInput = document.getElementById('in-item');
@@ -525,32 +466,30 @@ async function addIn() {
         if (qty <= 0 || isNaN(qty)) { showNotification("⚠️ Sahi quantity likhain!", "warning"); return; }
         if (price <= 0 || isNaN(price)) { showNotification("⚠️ Sahi price likhain!", "warning"); return; }
         
-        showNotification('⏳ Saving to database...', 'info');
-        
-        // Insert directly into Supabase
-        const { data, error } = await _supabase.from('KRT')
-            .insert([{ 
-                Date: date, 
-                item_name: item, 
-                stock_in: qty, 
-                stock_out: 0, 
-                price: price, 
-                vendor_name: vendor || 'factory' 
-            }])
-            .select();
-        
-        if (error) {
-            console.error('❌ Supabase insert error:', error);
-            showNotification('❌ Failed to save: ' + error.message, 'error');
+        // Check duplicate
+        const duplicate = db.in.some(function(x) {
+            return x.item === item && x.date === date && x.vendor === vendor && x.qty === qty && x.price === price;
+        });
+        if (duplicate) {
+            showNotification("⚠️ Yeh entry pehle se mojud hai!", "warning");
             return;
         }
         
-        if (!data || data.length === 0) {
-            showNotification('❌ No data returned from database', 'error');
-            return;
-        }
+        // Generate unique ID
+        const id = 'in_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
         
-        showNotification('✅ Stock IN saved to database!', 'success');
+        // Save locally
+        db.in.push({ 
+            id: id, 
+            date: date, 
+            vendor: vendor || 'factory', 
+            item: item, 
+            barcode: barcode, 
+            qty: qty, 
+            price: price, 
+            total: qty * price 
+        });
+        saveAndRefresh();
         
         // Clear form
         dateInput.value = '';
@@ -559,31 +498,18 @@ async function addIn() {
         if (priceInput) priceInput.value = '';
         if (barcodeInput) barcodeInput.value = '';
         
-        // Auto refresh data from Supabase
-        await loadDataFromSupabase();
-        
+        showNotification("✅ Stock IN saved locally!", "success");
     } catch (err) {
         console.error('❌ addIn error:', err);
-        showNotification('❌ Error: ' + err.message, 'error');
+        showNotification('❌ Error saving stock IN: ' + err.message, 'error');
     }
 }
 
 // ==========================================
-// STOCK OUT - 100% SUPABASE
+// STOCK OUT - 100% LOCALSTORAGE
 // ==========================================
-async function addOut() {
+function addOut() {
     try {
-        // Check internet connection first
-        if (!navigator.onLine) {
-            showNotification('⚠️ Internet connection required!', 'error');
-            return;
-        }
-        
-        if (!_supabase) {
-            showNotification('⚠️ Database not available!', 'error');
-            return;
-        }
-        
         const dateInput = document.getElementById('out-date');
         const customerInput = document.getElementById('out-customer');
         const itemInput = document.getElementById('out-item');
@@ -608,7 +534,7 @@ async function addOut() {
         if (qty <= 0 || isNaN(qty)) { showNotification("⚠️ Sahi quantity likhain!", "warning"); return; }
         if (price <= 0 || isNaN(price)) { showNotification("⚠️ Sahi price likhain!", "warning"); return; }
         
-        // Check stock availability from current db
+        // Check stock availability
         const totalIn = db.in.filter(function(x) { return x.item === item; }).reduce(function(s, x) { return s + x.qty; }, 0);
         const totalOut = db.out.filter(function(x) { return x.item === item; }).reduce(function(s, x) { return s + x.qty; }, 0);
         const available = totalIn - totalOut;
@@ -618,32 +544,30 @@ async function addOut() {
             return;
         }
         
-        showNotification('⏳ Saving sale to database...', 'info');
-        
-        // Insert directly into Supabase
-        const { data, error } = await _supabase.from('KRT')
-            .insert([{ 
-                Date: date, 
-                item_name: item, 
-                stock_in: 0, 
-                stock_out: qty, 
-                price: price, 
-                customer_name: custName 
-            }])
-            .select();
-        
-        if (error) {
-            console.error('❌ Supabase insert error:', error);
-            showNotification('❌ Failed to save: ' + error.message, 'error');
+        // Check duplicate
+        const duplicate = db.out.some(function(x) {
+            return x.item === item && x.date === date && x.cust === custName && x.qty === qty && x.price === price;
+        });
+        if (duplicate) {
+            showNotification("⚠️ Yeh sale pehle se recorded hai!", "warning");
             return;
         }
         
-        if (!data || data.length === 0) {
-            showNotification('❌ No data returned from database', 'error');
-            return;
-        }
+        // Generate unique ID
+        const id = 'out_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
         
-        showNotification('✅ Stock OUT saved to database!', 'success');
+        // Save locally
+        db.out.push({ 
+            id: id, 
+            item: item, 
+            qty: qty, 
+            date: date, 
+            cust: custName, 
+            barcode: barcode, 
+            price: price, 
+            total: qty * price 
+        });
+        saveAndRefresh();
         
         // Clear form
         if (qtyInput) qtyInput.value = "";
@@ -652,12 +576,10 @@ async function addOut() {
         const statusEl = document.getElementById('stock-status');
         if (statusEl) statusEl.innerHTML = "";
         
-        // Auto refresh data from Supabase
-        await loadDataFromSupabase();
-        
+        showNotification("✅ Stock OUT saved locally!", "success");
     } catch (err) {
         console.error('❌ addOut error:', err);
-        showNotification('❌ Error: ' + err.message, 'error');
+        showNotification('❌ Error saving stock OUT: ' + err.message, 'error');
     }
 }
 
@@ -823,18 +745,10 @@ function updateDashboardStats() {
 }
 
 // ==========================================
-// DELETE ENTRY - SUPABASE
+// DELETE ENTRY - LOCALSTORAGE
 // ==========================================
-async function deleteEntry(type, index) {
+function deleteEntry(type, index) {
     try {
-        if (!navigator.onLine) {
-            showNotification('⚠️ Internet connection required!', 'error');
-            return;
-        }
-        if (!_supabase) {
-            showNotification('⚠️ Database not available!', 'error');
-            return;
-        }
         if (!confirm("⚠️ Bilal Bhai, kya aap waqai ye record delete karna chahte hain?")) return;
         
         const record = db[type] && db[type][index];
@@ -843,38 +757,20 @@ async function deleteEntry(type, index) {
             return;
         }
         
-        showNotification('⏳ Deleting from database...', 'info');
-        
-        const { error } = await _supabase.from('KRT').delete().eq('id', record.id);
-        if (error) {
-            console.error('❌ Supabase delete error:', error);
-            showNotification('❌ Failed to delete: ' + error.message, 'error');
-            return;
-        }
-        
-        showNotification('✅ Record deleted!', 'success');
-        await loadDataFromSupabase();
-        
+        db[type].splice(index, 1);
+        saveAndRefresh();
+        showNotification("✅ Record deleted!", "success");
     } catch (err) {
         console.error('❌ deleteEntry error:', err);
-        showNotification('❌ Error: ' + err.message, 'error');
+        showNotification('❌ Error deleting record: ' + err.message, 'error');
     }
 }
 
 // ==========================================
-// EDIT ENTRY - SUPABASE
+// EDIT ENTRY - LOCALSTORAGE
 // ==========================================
-async function editEntry(type, index) {
+function editEntry(type, index) {
     try {
-        if (!navigator.onLine) {
-            showNotification('⚠️ Internet connection required!', 'error');
-            return;
-        }
-        if (!_supabase) {
-            showNotification('⚠️ Database not available!', 'error');
-            return;
-        }
-        
         const data = db[type] && db[type][index];
         if (!data) {
             showNotification("⚠️ Record not found!", "error");
@@ -897,27 +793,15 @@ async function editEntry(type, index) {
             return;
         }
         
-        showNotification('⏳ Updating in database...', 'info');
-        
-        const { error } = await _supabase.from('KRT').update({
-            stock_in: type === 'in' ? qtyNum : 0,
-            stock_out: type === 'out' ? qtyNum : 0,
-            price: priceNum
-        }).eq('id', data.id);
-        
-        if (error) {
-            console.error('❌ Supabase update error:', error);
-            showNotification('❌ Failed to update: ' + error.message, 'error');
-            return;
-        }
-        
-        showNotification('✅ Updated successfully!', 'success');
-        await loadDataFromSupabase();
+        db[type][index].qty = qtyNum;
+        db[type][index].price = priceNum;
+        db[type][index].total = qtyNum * priceNum;
+        saveAndRefresh();
         generateMasterSearch();
-        
+        showNotification("✅ Updated successfully!", "success");
     } catch (err) {
         console.error('❌ editEntry error:', err);
-        showNotification('❌ Error: ' + err.message, 'error');
+        showNotification('❌ Error updating record: ' + err.message, 'error');
     }
 }
 
@@ -1062,7 +946,7 @@ function generateCustomReport() {
 }
 
 // ==========================================
-// CUSTOMER LEDGERS - KEPT AS IS (local only)
+// CUSTOMER LEDGERS - LOCALSTORAGE
 // ==========================================
 function updateCustomerDropdown() {
     try {
@@ -1111,11 +995,7 @@ function saveLedgerEntry() {
             db.opening_balances[name] = 0;
         }
         db.ledgers[name].push({ date: date, item: item, ctn: ctn, debit: debit, credit: credit, method: method });
-        
-        // Save locally (ledgers are local only)
-        localStorage.setItem('krt_ledgers_data', JSON.stringify(db.ledgers));
-        localStorage.setItem('krt_opening_balances', JSON.stringify(db.opening_balances));
-        
+        saveLocalData();
         updateCustomerDropdown();
         showLedger();
         if (itemInput) itemInput.value = "";
@@ -1138,7 +1018,7 @@ function updateOpeningBal() {
         const val = parseFloat(balInput.value) || 0;
         if (name) {
             db.opening_balances[name] = val;
-            localStorage.setItem('krt_opening_balances', JSON.stringify(db.opening_balances));
+            saveLocalData();
             showLedger();
         }
     } catch (err) {
@@ -1205,8 +1085,7 @@ function delLedger(custName, index) {
                 delete db.ledgers[custName];
                 delete db.opening_balances[custName];
             }
-            localStorage.setItem('krt_ledgers_data', JSON.stringify(db.ledgers));
-            localStorage.setItem('krt_opening_balances', JSON.stringify(db.opening_balances));
+            saveLocalData();
             showLedger();
             showNotification("✅ Entry deleted!", "success");
         }
@@ -1229,7 +1108,7 @@ function editLedger(custName, index) {
         if (nCredit === null) return;
         db.ledgers[custName][index].debit = Number(nDebit) || 0;
         db.ledgers[custName][index].credit = Number(nCredit) || 0;
-        localStorage.setItem('krt_ledgers_data', JSON.stringify(db.ledgers));
+        saveLocalData();
         showLedger();
         showNotification("✅ Updated!", "success");
     } catch (err) {
@@ -1239,19 +1118,10 @@ function editLedger(custName, index) {
 }
 
 // ==========================================
-// RENT BOOK - 100% SUPABASE
+// RENT BOOK - LOCALSTORAGE
 // ==========================================
-async function addRentEntry() {
+function addRentEntry() {
     try {
-        if (!navigator.onLine) {
-            showNotification('⚠️ Internet connection required!', 'error');
-            return;
-        }
-        if (!_supabase) {
-            showNotification('⚠️ Database not available!', 'error');
-            return;
-        }
-        
         const nameInput = document.getElementById('rent-name');
         const shopInput = document.getElementById('rent-shop-no');
         const dateInput = document.getElementById('rent-date');
@@ -1280,25 +1150,14 @@ async function addRentEntry() {
             return;
         }
         
-        showNotification('⏳ Saving rent entry...', 'info');
-        
-        const { data, error } = await _supabase.from('KRT_RENT')
-            .insert([{ name: name, shop: shop, date: date, month: month, debit: debit, credit: credit, method: method }])
-            .select();
-        
-        if (error) {
-            console.error('❌ Rent insert error:', error);
-            showNotification('❌ Failed to save: ' + error.message, 'error');
-            return;
-        }
-        
-        showNotification(`✅ ${name} ki entry save ho gayi!`, "success");
-        await loadDataFromSupabase();
+        const id = 'rent_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        dbRent.push({ id: id, name: name, shop: shop, date: date, month: month, debit: debit, credit: credit, method: method });
+        saveLocalData();
         renderRentTable();
-        
+        showNotification(`✅ ${name} ki entry save ho gayi!`, "success");
     } catch (err) {
         console.error('❌ addRentEntry error:', err);
-        showNotification('❌ Error: ' + err.message, 'error');
+        showNotification('❌ Error saving rent entry: ' + err.message, 'error');
     }
 }
 
@@ -1349,40 +1208,16 @@ function renderRentTable() {
     }
 }
 
-async function deleteRentEntry(index) {
+function deleteRentEntry(index) {
     try {
-        if (!navigator.onLine) {
-            showNotification('⚠️ Internet connection required!', 'error');
-            return;
-        }
-        if (!_supabase) {
-            showNotification('⚠️ Database not available!', 'error');
-            return;
-        }
         if (!confirm("⚠️ Kya ye entry delete kar dein?")) return;
-        
-        const record = dbRent[index];
-        if (!record) {
-            showNotification("⚠️ Record not found!", "error");
-            return;
-        }
-        
-        showNotification('⏳ Deleting rent entry...', 'info');
-        
-        const { error } = await _supabase.from('KRT_RENT').delete().eq('id', record.id);
-        if (error) {
-            console.error('❌ Rent delete error:', error);
-            showNotification('❌ Failed to delete: ' + error.message, 'error');
-            return;
-        }
-        
-        showNotification("✅ Rent entry deleted!", "success");
-        await loadDataFromSupabase();
+        dbRent.splice(index, 1);
+        saveLocalData();
         renderRentTable();
-        
+        showNotification("✅ Rent entry deleted!", "success");
     } catch (err) {
         console.error('❌ deleteRentEntry error:', err);
-        showNotification('❌ Error: ' + err.message, 'error');
+        showNotification('❌ Error deleting rent entry: ' + err.message, 'error');
     }
 }
 
@@ -1417,7 +1252,7 @@ function createNewUser() {
         }
         
         extraUsers.push({ id: id, pass: pass, name: name, perms: perms });
-        localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
+        saveLocalData();
         loadUserTable();
         if (nameInput) nameInput.value = '';
         if (idInput) idInput.value = '';
@@ -1451,7 +1286,7 @@ function deleteExtraUser(index) {
     try {
         if (!confirm("⚠️ Kya aap is user ko delete karna chahte hain?")) return;
         extraUsers.splice(index, 1);
-        localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
+        saveLocalData();
         loadUserTable();
         showNotification("✅ User deleted!", "success");
     } catch (err) {
@@ -1562,10 +1397,17 @@ function updateItemLists() {
 }
 
 // ==========================================
-// SYNC FUNCTION (Now just reloads from Supabase)
+// SYNC FUNCTION (Now just reloads from localStorage)
 // ==========================================
-async function syncAllCloudData() {
-    await loadDataFromSupabase();
+function syncAllCloudData() {
+    loadLocalData();
+    renderAll();
+    renderRentTable();
+    updateDashboardStats();
+    updateItemLists();
+    updateCustomerDropdown();
+    loadUserTable();
+    showNotification('✅ Data reloaded from localStorage!', 'success');
 }
 
 // ==========================================
@@ -1576,44 +1418,27 @@ document.addEventListener('DOMContentLoaded', function() {
         // Setup idle detection
         setupIdleDetection();
         
-        // Load ledgers from localStorage
-        try {
-            const ledgersStored = localStorage.getItem('krt_ledgers_data');
-            if (ledgersStored) db.ledgers = JSON.parse(ledgersStored);
-            const openingStored = localStorage.getItem('krt_opening_balances');
-            if (openingStored) db.opening_balances = JSON.parse(openingStored);
-        } catch (err) {
-            console.warn('⚠️ Failed to load ledgers:', err);
-        }
+        // Load all data
+        loadLocalData();
         
-        // Load extra users
-        try {
-            const usersStored = localStorage.getItem('krt_extra_users');
-            if (usersStored) extraUsers = JSON.parse(usersStored);
-        } catch (err) {
-            console.warn('⚠️ Failed to load users:', err);
-        }
+        // Initial render
+        renderAll();
+        renderRentTable();
+        loadUserTable();
+        updateCustomerDropdown();
+        updateItemLists();
         
         // Check login status
         const loggedIn = localStorage.getItem('isLoggedIn');
         const role = localStorage.getItem('userRole');
         
         if (loggedIn === 'true') {
-            // Load data from Supabase
-            loadDataFromSupabase().then(function() {
-                if (role === 'admin') showSystem('admin');
-                else if (role === 'staff') showSystem('staff');
-                else if (role === 'manager') showSystem('manager');
-            }).catch(function(err) {
-                console.error('❌ Initial load failed:', err);
-                showNotification('⚠️ Failed to load data. Please refresh.', 'error');
-            });
-        } else {
-            // Show login screen
-            document.getElementById('login-screen').style.display = 'flex';
+            if (role === 'admin') showSystem('admin');
+            else if (role === 'staff') showSystem('staff');
+            else if (role === 'manager') showSystem('manager');
         }
         
-        console.log("🚀 KRT TRADERS ERP v5.0 Loaded! (100% Supabase)");
+        console.log("🚀 KRT TRADERS ERP v5.0 Loaded! (100% LocalStorage)");
         console.log("📦 Developed by Bilal Suleman");
         console.log("🐘 Elephant Never Forgets!");
     } catch (err) {
@@ -1661,16 +1486,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
-        
-        // Auto sync every 60 seconds if online
-        setInterval(function() {
-            if (navigator.onLine && _supabase && localStorage.getItem('isLoggedIn') === 'true') {
-                console.log('🔄 Auto sync...');
-                loadDataFromSupabase().catch(function(err) {
-                    console.warn('⚠️ Auto sync failed:', err);
-                });
-            }
-        }, 60000);
         
         console.log('✅ Event listeners setup complete');
     } catch (err) {
