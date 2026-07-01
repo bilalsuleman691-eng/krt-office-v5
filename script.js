@@ -1,5 +1,5 @@
 // ==========================================
-// KRT TRADERS ERP - COMPLETE SCRIPT (FIXED)
+// KRT TRADERS ERP - COMPLETE SCRIPT
 // Developed by Bilal Suleman
 // Version: 5.0
 // ==========================================
@@ -195,7 +195,7 @@ function applyDynamicPermissions(user) {
 }
 
 // ==========================================
-// CLOUD DATA - FIXED
+// CLOUD DATA - FIXED (No Barcode)
 // ==========================================
 async function fetchCloudData() {
     try {
@@ -214,7 +214,6 @@ async function fetchCloudData() {
         
         console.log("📦 Data received:", data.length, "records");
         
-        // Clear existing data
         db.in = [];
         db.out = [];
         
@@ -232,8 +231,7 @@ async function fetchCloudData() {
                     item: row.item_name || 'Unknown', 
                     qty: inQty, 
                     price: price, 
-                    total: inQty * price,
-                    barcode: row.barcode || ''
+                    total: inQty * price
                 });
             }
             
@@ -245,14 +243,13 @@ async function fetchCloudData() {
                     item: row.item_name || 'Unknown', 
                     qty: outQty, 
                     price: price, 
-                    total: outQty * price,
-                    barcode: row.barcode || ''
+                    total: outQty * price
                 });
             }
         });
         
         localStorage.setItem('krt_erp_data', JSON.stringify(db));
-        console.log("✅ Data loaded:", db.in.length, "IN entries,", db.out.length, "OUT entries");
+        console.log("✅ Data loaded:", db.in.length, "IN,", db.out.length, "OUT");
         return true;
     } catch (err) { 
         console.error("❌ Fetch Error:", err); 
@@ -304,7 +301,7 @@ async function syncAllCloudData() {
             updateCustomerDropdown();
             loadUserTable();
             renderRentTable();
-            showNotification("✅ Sync complete! Data loaded.", "success");
+            showNotification("✅ Sync complete!", "success");
         } else {
             showNotification("ℹ️ No new data found.", "info");
         }
@@ -329,13 +326,12 @@ function showNotification(message, type = "info") {
 }
 
 // ==========================================
-// STOCK IN - FIXED (Only Item, Date, Qty required)
+// STOCK IN - FIXED (Only Date, Item, Qty required)
 // ==========================================
 async function addIn() {
     const date = document.getElementById('in-date').value;
     const vendor = document.getElementById('in-vendor').value || 'factory';
     const item = document.getElementById('in-item').value.trim();
-    const barcode = document.getElementById('in-barcode').value || '';
     const qty = Number(document.getElementById('in-qty').value);
     const price = Number(document.getElementById('in-price').value) || 0;
     
@@ -360,8 +356,7 @@ async function addIn() {
             stock_in: qty, 
             stock_out: 0, 
             price: price, 
-            vendor_name: vendor,
-            barcode: barcode
+            vendor_name: vendor
         }]).select();
         
         if (error) { 
@@ -375,7 +370,6 @@ async function addIn() {
                 date: date, 
                 vendor: vendor, 
                 item: item, 
-                barcode: barcode, 
                 qty: qty, 
                 price: price, 
                 total: qty * price 
@@ -383,7 +377,6 @@ async function addIn() {
             
             saveAndRefresh();
             
-            // Clear only item and qty fields
             document.getElementById('in-item').value = "";
             document.getElementById('in-qty').value = "";
             
@@ -395,13 +388,12 @@ async function addIn() {
 }
 
 // ==========================================
-// STOCK OUT - FIXED (Only Item, Date, Qty required)
+// STOCK OUT - FIXED (Only Date, Item, Qty required)
 // ==========================================
 async function addOut() {
     const date = document.getElementById('out-date').value;
     const custName = document.getElementById('out-customer').value || "General Sale";
     const item = document.getElementById('out-item').value.trim();
-    const barcode = document.getElementById('out-barcode').value || "";
     const qty = Number(document.getElementById('out-qty').value);
     const price = Number(document.getElementById('out-price').value) || 0;
     
@@ -419,7 +411,7 @@ async function addOut() {
         return; 
     }
     
-    // Check stock availability (warning only, not blocking)
+    // Check stock availability (warning only)
     const tin = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const tout = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
     const available = tin - tout;
@@ -437,8 +429,7 @@ async function addOut() {
             stock_in: 0, 
             stock_out: qty, 
             price: price, 
-            customer_name: custName,
-            barcode: barcode
+            customer_name: custName
         }]).select();
         
         if (error) { 
@@ -453,7 +444,6 @@ async function addOut() {
                 qty: qty, 
                 date: date, 
                 cust: custName, 
-                barcode: barcode, 
                 price: price, 
                 total: qty * price 
             });
@@ -580,7 +570,7 @@ function renderAll() {
                 const profit = (outPrice - inPrice) * tout;
                 
                 return `<tr>
-                    <td>${db.in.find(x=>x.item===name)?.barcode || 'N/A'}</td>
+                    <td>N/A</td>
                     <td><strong>${name}</strong></td>
                     <td style="color:#06b6d4;">${tin}</td>
                     <td style="color:#f59e0b;">${tout}</td>
@@ -1184,21 +1174,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log("🚀 KRT ERP v5.0 Loading...");
     console.log("📦 Developed by Bilal Suleman");
     
-    // Load local data first
     renderAll();
     renderRentTable();
     loadUserTable();
     updateCustomerDropdown();
     updateItemLists();
     
-    // Sync with cloud
     if (navigator.onLine) {
         await syncAllCloudData();
     } else {
         showNotification("⚠️ Offline mode", "warning");
     }
     
-    // Check login status
     const loggedIn = localStorage.getItem('isLoggedIn');
     const role = localStorage.getItem('userRole');
     
@@ -1209,13 +1196,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Rent live search
 document.addEventListener('DOMContentLoaded', () => {
     const rentName = document.getElementById('rent-name');
     if (rentName) rentName.addEventListener('input', renderRentTable);
 });
 
-// Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.key === 's') { 
         e.preventDefault(); 
