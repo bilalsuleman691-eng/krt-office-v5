@@ -21,17 +21,52 @@ window.addEventListener('unhandledrejection', function(e) {
 });
 
 // ==========================================
-// SUPABASE INITIALIZATION
+// SUPABASE INITIALIZATION - FIXED
 // ==========================================
-const supabaseUrl = 'https://jsxcmlpjdxgloofdrugz.supabase.co/rest/v1/';
+
+// ✅ CORRECT URL (from your dashboard)
+const supabaseUrl = 'https://jsxmlpjdxxgloofdrugz.subpage.co';
+
+// ✅ NEW PUBLISHABLE KEY
 const supabaseKey = 'sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb';
+
 let _supabase = null;
 let isSupabaseConnected = false;
 
 try {
     _supabase = supabase.createClient(supabaseUrl, supabaseKey);
     console.log('✅ Supabase client created');
-    testSupabaseConnection();
+    console.log('📡 URL:', supabaseUrl);
+    console.log('🔑 Key:', supabaseKey.substring(0, 20) + '...');
+    
+    // Test connection after 1 second
+    setTimeout(async function() {
+        try {
+            console.log('📡 Testing connection...');
+            const { data, error } = await _supabase
+                .from('KRT')
+                .select('count', { count: 'exact', head: true });
+            
+            if (error) {
+                console.error('❌ Connection failed:', error);
+                console.error('  Code:', error.code);
+                console.error('  Message:', error.message);
+                isSupabaseConnected = false;
+                showNotification('⚠️ Database not accessible. Using offline mode.', 'warning');
+            } else {
+                isSupabaseConnected = true;
+                console.log('✅ CONNECTED! Records:', data?.count || 0);
+                showNotification('✅ Connected to database!', 'success');
+                await fetchCloudData();
+                renderAll();
+            }
+        } catch(err) {
+            console.error('❌ Connection error:', err);
+            isSupabaseConnected = false;
+            showNotification('⚠️ Connection failed. Offline mode.', 'warning');
+        }
+    }, 1500);
+    
 } catch (err) {
     console.error('❌ Supabase init failed:', err);
     showNotification('⚠️ Database connection failed. Running in offline mode.', 'warning');
@@ -53,40 +88,6 @@ let db = { in: [], out: [], ledgers: {}, opening_balances: {} };
 let dbRent = [];
 let extraUsers = [];
 let pendingSync = [];
-
-// ==========================================
-// TEST SUPABASE CONNECTION
-// ==========================================
-async function testSupabaseConnection() {
-    try {
-        if (!_supabase) {
-            console.warn('⚠️ Supabase not initialized');
-            return;
-        }
-        
-        const { data, error } = await _supabase
-            .from('KRT')
-            .select('count', { count: 'exact', head: true });
-        
-        if (error) {
-            console.error('❌ Supabase connection test failed:', error);
-            isSupabaseConnected = false;
-            showNotification('⚠️ Database not accessible. Using offline mode.', 'warning');
-            return;
-        }
-        
-        isSupabaseConnected = true;
-        console.log('✅ Supabase connected successfully!');
-        console.log(`📊 Total records: ${data?.count || 0}`);
-        
-        if (navigator.onLine) {
-            await processPendingSync();
-        }
-    } catch (err) {
-        console.error('❌ Connection test error:', err);
-        isSupabaseConnected = false;
-    }
-}
 
 // ==========================================
 // LOAD DATA FROM LOCALSTORAGE
@@ -428,6 +429,7 @@ async function addIn() {
             vendor_name: vendor || 'factory'
         };
         
+        // Try cloud insert
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 console.log('📤 Saving to cloud...');
@@ -473,6 +475,7 @@ async function addIn() {
             }
         }
         
+        // Offline - save locally
         saveStockInLocal(date, vendor, item, barcode, qty, price);
         addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
         showNotification("✅ Stock IN saved locally! Will sync when online.", "warning");
@@ -574,6 +577,7 @@ async function addOut() {
             customer_name: custName
         };
         
+        // Try cloud insert
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 console.log('📤 Saving sale to cloud...');
@@ -619,6 +623,7 @@ async function addOut() {
             }
         }
         
+        // Offline - save locally
         saveStockOutLocal(date, custName, item, barcode, qty, price);
         addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
         showNotification("✅ Stock OUT saved locally! Will sync when online.", "warning");
@@ -1948,6 +1953,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("🚀 KRT TRADERS ERP v5.1 Loaded!");
         console.log("📦 Developed by Bilal Suleman");
         console.log(`📊 Status: ${isSupabaseConnected ? '🟢 Connected to Supabase' : '🟡 Offline mode'}`);
+        console.log(`🔑 Using key: ${supabaseKey.substring(0, 30)}...`);
         
     } catch (err) {
         console.error('❌ Startup error:', err);
