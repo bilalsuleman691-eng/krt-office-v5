@@ -4,7 +4,7 @@
 // ==========================================
 
 // ==========================================
-// SUPABASE CONFIG
+// SUPABASE CONFIG - FIXED
 // ==========================================
 const SUPABASE_URL = 'https://jsxcmlpjdxgloofdrugz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb';
@@ -26,6 +26,8 @@ let pendingSync = [];
 try {
     _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     console.log('✅ Supabase client created');
+    console.log('📡 URL:', SUPABASE_URL);
+    console.log('📊 Table: "KRT" (capital)');
 } catch (err) {
     console.error('❌ Supabase init failed:', err);
 }
@@ -36,14 +38,25 @@ try {
 async function testSupabaseConnection() {
     try {
         if (!_supabase) { isSupabaseConnected = false; return; }
-        const { data, error } = await _supabase.from('krt').select('count', { count: 'exact', head: true });
-        if (error) { isSupabaseConnected = false; showNotification('⚠️ Offline mode', 'warning'); return; }
+        console.log('📡 Testing connection...');
+        const { data, error } = await _supabase
+            .from('KRT')
+            .select('count', { count: 'exact', head: true });
+        if (error) {
+            isSupabaseConnected = false;
+            console.error('❌ Connection failed:', error);
+            showNotification('⚠️ Offline mode', 'warning');
+            return;
+        }
         isSupabaseConnected = true;
-        console.log('✅ Connected!');
+        console.log('✅ Connected! Records:', data?.count || 0);
         showNotification('✅ Connected to database!', 'success');
         await fetchCloudData();
         renderAll();
-    } catch (err) { isSupabaseConnected = false; }
+    } catch (err) {
+        isSupabaseConnected = false;
+        console.error('❌ Connection error:', err);
+    }
 }
 
 // ==========================================
@@ -60,7 +73,9 @@ function loadLocalData() {
         const pendingStored = localStorage.getItem('krt_pending_sync');
         pendingSync = pendingStored ? JSON.parse(pendingStored) : [];
         console.log('✅ Local data loaded');
+        console.log(`📊 Local IN: ${db.in.length}, OUT: ${db.out.length}`);
     } catch (err) {
+        console.error('❌ Load error:', err);
         db = { in: [], out: [], ledgers: {}, opening_balances: {} };
         dbRent = [];
         extraUsers = [];
@@ -74,7 +89,10 @@ function saveLocalData() {
         localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
         localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
         localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
-    } catch (err) { console.error('❌ Save error:', err); }
+        console.log('💾 Local data saved');
+    } catch (err) {
+        console.error('❌ Save error:', err);
+    }
 }
 
 function saveAndRefresh() {
@@ -84,45 +102,116 @@ function saveAndRefresh() {
 }
 
 // ==========================================
-// FETCH CLOUD DATA
+// FETCH CLOUD DATA - "KRT" TABLE
 // ==========================================
 async function fetchCloudData() {
     try {
-        if (!_supabase || !isSupabaseConnected) return;
-        const { data, error } = await _supabase.from('krt').select('*').order('id', { ascending: true });
-        if (error || !data) return;
+        if (!_supabase || !isSupabaseConnected) {
+            console.warn('⚠️ Supabase not connected');
+            return;
+        }
+        console.log('📥 Fetching data from "KRT"...');
+        const { data, error } = await _supabase
+            .from('KRT')
+            .select('*')
+            .order('id', { ascending: true });
+        if (error) {
+            console.error('❌ Fetch error:', error);
+            isSupabaseConnected = false;
+            return;
+        }
+        if (!data || data.length === 0) {
+            console.log('ℹ️ No cloud data found');
+            return;
+        }
+        console.log(`📥 Fetched ${data.length} records from "KRT"`);
+        
         db.in = [];
         db.out = [];
+        
         data.forEach(row => {
-            const inQty = Number(row.stock_in || 0);
-            const outQty = Number(row.stock_out || 0);
-            const price = Number(row.price || 0);
-            const date = (row.Date || row.date || '').split('T')[0] || new Date().toISOString().split('T')[0];
-            if (inQty > 0) {
-                db.in.push({ id: row.id, date, vendor: row.vendor_name || 'factory', item: row.item_name || 'Unknown', qty: inQty,
-                    price, total: inQty * price });
-            }
-            if (outQty > 0) {
-                db.out.push({ id: row.id, date, cust: row.customer_name || 'General Sale', item: row.item_name || 'Unknown',
-                    qty: outQty, price, total: outQty * price });
+            try {
+                const inQty = Number(row.stock_in || 0);
+                const outQty = Number(row.stock_out || 0);
+                const price = Number(row.price || 0);
+                const date = (row.Date || row.date || '').split('T')[0] || new Date().toISOString().split('T')[0];
+                
+                if (inQty > 0) {
+                    db.in.push({
+                        id: row.id,
+                        date: date,
+                        vendor: row.vendor_name || 'factory',
+                        item: row.item_name || 'Unknown',
+                        qty: inQty,
+                        price: price,
+                        total: inQty * price
+                    });
+                }
+                
+                if (outQty > 0) {
+                    db.out.push({
+                        id: row.id,
+                        date: date,
+                        cust: row.customer_name || 'General Sale',
+                        item: row.item_name || 'Unknown',
+                        qty: outQty,
+                        price: price,
+                        total: outQty * price
+                    });
+                }
+            } catch (rowErr) {
+                console.warn('⚠️ Row error:', rowErr);
             }
         });
+        
+        console.log(`✅ Cloud data loaded: IN: ${db.in.length}, OUT: ${db.out.length}`);
         saveLocalData();
         renderAll();
         updateDashboardStats();
-    } catch (err) { console.error('❌ Fetch error:', err); }
+    } catch (err) {
+        console.error('❌ Fetch error:', err);
+        isSupabaseConnected = false;
+        showNotification('⚠️ Failed to sync cloud data', 'error');
+    }
 }
 
 async function fetchCloudRentData() {
     try {
-        if (!_supabase || !isSupabaseConnected) return;
-        const { data, error } = await _supabase.from('krt_rent').select('*').order('id', { ascending: true });
-        if (error || !data) return;
-        dbRent = data.map(row => ({ id: row.id, name: row.name, shop: row.shop, date: row.date, month: row.month, debit: Number(
-                row.debit || 0), credit: Number(row.credit || 0), method: row.method || 'Cash' }));
+        if (!_supabase || !isSupabaseConnected) {
+            console.warn('⚠️ Supabase not connected');
+            return;
+        }
+        console.log('📥 Fetching rent data from "KRT_RENT"...');
+        const { data, error } = await _supabase
+            .from('KRT_RENT')
+            .select('*')
+            .order('id', { ascending: true });
+        if (error) {
+            console.error('❌ Rent fetch error:', error);
+            isSupabaseConnected = false;
+            return;
+        }
+        if (!data || data.length === 0) {
+            console.log('ℹ️ No rent data found');
+            return;
+        }
+        dbRent = data.map(row => ({
+            id: row.id,
+            name: row.name,
+            shop: row.shop,
+            date: row.date,
+            month: row.month,
+            debit: Number(row.debit || 0),
+            credit: Number(row.credit || 0),
+            method: row.method || 'Cash'
+        }));
+        console.log(`✅ Rent data loaded: ${dbRent.length} records`);
         saveLocalData();
         renderRentTable();
-    } catch (err) { console.error('❌ Rent fetch error:', err); }
+    } catch (err) {
+        console.error('❌ Rent fetch error:', err);
+        isSupabaseConnected = false;
+    }
 }
 
 // ==========================================
@@ -130,14 +219,24 @@ async function fetchCloudRentData() {
 // ==========================================
 async function syncAllCloudData() {
     try {
-        if (!navigator.onLine) { showNotification('⚠️ No internet!', 'warning'); return; }
-        if (!_supabase || !isSupabaseConnected) { showNotification('⚠️ Database not available', 'warning'); return; }
+        if (!navigator.onLine) {
+            showNotification('⚠️ No internet!', 'warning');
+            return;
+        }
+        if (!_supabase || !isSupabaseConnected) {
+            showNotification('⚠️ Database not available', 'warning');
+            return;
+        }
         showNotification('☁️ Syncing...', 'info');
         await fetchCloudData();
         await fetchCloudRentData();
         await processPendingSync();
         showNotification('✅ Sync complete!', 'success');
-    } catch (err) { console.error('❌ Sync error:', err); }
+        console.log('✅ Full sync completed');
+    } catch (err) {
+        console.error('❌ Sync error:', err);
+        showNotification('❌ Sync failed: ' + err.message, 'error');
+    }
 }
 
 // ==========================================
@@ -145,23 +244,39 @@ async function syncAllCloudData() {
 // ==========================================
 async function processPendingSync() {
     if (!_supabase || !isSupabaseConnected || !navigator.onLine || pendingSync.length === 0) return;
+    console.log(`📤 Processing ${pendingSync.length} pending operations...`);
     const failed = [];
     for (const op of pendingSync) {
         try {
-            if (op.type === 'insert') { const { error } = await _supabase.from(op.table).insert(op.data); if (error) failed.push(
-                    op); } else if (op.type === 'delete') { const { error } = await _supabase.from(op.table).delete().eq('id',
-                    op.id); if (error) failed.push(op); } else if (op.type === 'update') { const { error } = await _supabase
-                    .from(op.table).update(op.data).eq('id', op.id); if (error) failed.push(op); }
-        } catch (err) { failed.push(op); }
+            if (op.type === 'insert') {
+                const { error } = await _supabase.from(op.table).insert(op.data);
+                if (error) failed.push(op);
+                else console.log('✅ Pending insert synced');
+            } else if (op.type === 'delete') {
+                const { error } = await _supabase.from(op.table).delete().eq('id', op.id);
+                if (error) failed.push(op);
+                else console.log('✅ Pending delete synced');
+            } else if (op.type === 'update') {
+                const { error } = await _supabase.from(op.table).update(op.data).eq('id', op.id);
+                if (error) failed.push(op);
+                else console.log('✅ Pending update synced');
+            }
+        } catch (err) {
+            console.error('❌ Operation failed:', err);
+            failed.push(op);
+        }
     }
     pendingSync = failed;
     localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
+    console.log(`✅ ${pendingSync.length} pending operations remaining`);
 }
 
 function addPendingSync(op) {
     pendingSync.push(op);
     localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
-    if (navigator.onLine && isSupabaseConnected) setTimeout(processPendingSync, 2000);
+    if (navigator.onLine && isSupabaseConnected) {
+        setTimeout(processPendingSync, 2000);
+    }
 }
 
 // ==========================================
@@ -175,31 +290,71 @@ async function addIn() {
         const barcode = document.getElementById('in-barcode').value || '';
         const qty = Number(document.getElementById('in-qty').value);
         const price = Number(document.getElementById('in-price').value) || 0;
+        
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
         if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
-        const entryData = { Date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
+        
+        const entryData = {
+            Date: date,
+            item_name: item,
+            stock_in: qty,
+            stock_out: 0,
+            price: price,
+            vendor_name: vendor
+        };
+        
+        console.log('📤 Saving to cloud (KRT)...', entryData);
+        
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
-                const { data, error } = await _supabase.from('krt').insert([entryData]).select();
+                const { data, error } = await _supabase
+                    .from('KRT')
+                    .insert([entryData])
+                    .select();
                 if (!error && data && data.length > 0) {
-                    db.in.push({ id: data[0].id, date, vendor, item, barcode, qty, price, total: qty * price });
+                    db.in.push({
+                        id: data[0].id,
+                        date: date,
+                        vendor: vendor,
+                        item: item,
+                        barcode: barcode,
+                        qty: qty,
+                        price: price,
+                        total: qty * price
+                    });
                     saveAndRefresh();
                     clearInForm();
                     showNotification('✅ Stock IN saved to cloud!', 'success');
                     await fetchCloudData();
                     return;
+                } else if (error) {
+                    console.error('❌ Cloud error:', error);
                 }
-            } catch (err) { console.error('❌ Cloud error:', err); }
+            } catch (err) {
+                console.error('❌ Cloud exception:', err);
+            }
         }
+        
         const tempId = 'local_' + Date.now();
-        db.in.push({ id: tempId, date, vendor, item, barcode, qty, price, total: qty * price });
+        db.in.push({
+            id: tempId,
+            date: date,
+            vendor: vendor,
+            item: item,
+            barcode: barcode,
+            qty: qty,
+            price: price,
+            total: qty * price
+        });
         saveAndRefresh();
-        addPendingSync({ type: 'insert', table: 'krt', data: entryData });
+        addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
         clearInForm();
         showNotification('✅ Stock IN saved locally!', 'warning');
-    } catch (err) { console.error('❌ addIn error:', err);
-        showNotification('❌ Error: ' + err.message, 'error'); }
+    } catch (err) {
+        console.error('❌ addIn error:', err);
+        showNotification('❌ Error: ' + err.message, 'error');
+    }
 }
 
 function clearInForm() {
@@ -220,34 +375,78 @@ async function addOut() {
         const barcode = document.getElementById('out-barcode').value || '';
         const qty = Number(document.getElementById('out-qty').value);
         const price = Number(document.getElementById('out-price').value) || 0;
+        
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
         if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
+        
         const totalIn = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
         const totalOut = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
-        if (qty > totalIn - totalOut) { showNotification(`⚠️ Only ${totalIn - totalOut} available!`, 'warning'); return; }
-        const entryData = { Date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: cust };
+        if (qty > totalIn - totalOut) {
+            showNotification(`⚠️ Only ${totalIn - totalOut} available!`, 'warning');
+            return;
+        }
+        
+        const entryData = {
+            Date: date,
+            item_name: item,
+            stock_in: 0,
+            stock_out: qty,
+            price: price,
+            customer_name: cust
+        };
+        
+        console.log('📤 Saving sale to cloud (KRT)...', entryData);
+        
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
-                const { data, error } = await _supabase.from('krt').insert([entryData]).select();
+                const { data, error } = await _supabase
+                    .from('KRT')
+                    .insert([entryData])
+                    .select();
                 if (!error && data && data.length > 0) {
-                    db.out.push({ id: data[0].id, date, cust, item, barcode, qty, price, total: qty * price });
+                    db.out.push({
+                        id: data[0].id,
+                        date: date,
+                        cust: cust,
+                        item: item,
+                        barcode: barcode,
+                        qty: qty,
+                        price: price,
+                        total: qty * price
+                    });
                     saveAndRefresh();
                     clearOutForm();
                     showNotification('✅ Stock OUT saved to cloud!', 'success');
                     await fetchCloudData();
                     return;
+                } else if (error) {
+                    console.error('❌ Cloud error:', error);
                 }
-            } catch (err) { console.error('❌ Cloud error:', err); }
+            } catch (err) {
+                console.error('❌ Cloud exception:', err);
+            }
         }
+        
         const tempId = 'local_' + Date.now();
-        db.out.push({ id: tempId, date, cust, item, barcode, qty, price, total: qty * price });
+        db.out.push({
+            id: tempId,
+            date: date,
+            cust: cust,
+            item: item,
+            barcode: barcode,
+            qty: qty,
+            price: price,
+            total: qty * price
+        });
         saveAndRefresh();
-        addPendingSync({ type: 'insert', table: 'krt', data: entryData });
+        addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
         clearOutForm();
         showNotification('✅ Stock OUT saved locally!', 'warning');
-    } catch (err) { console.error('❌ addOut error:', err);
-        showNotification('❌ Error: ' + err.message, 'error'); }
+    } catch (err) {
+        console.error('❌ addOut error:', err);
+        showNotification('❌ Error: ' + err.message, 'error');
+    }
 }
 
 function clearOutForm() {
@@ -265,10 +464,18 @@ function clearOutForm() {
 async function deleteEntry(type, index) {
     if (!confirm('⚠️ Delete this record?')) return;
     const record = db[type] && db[type][index];
-    if (!record) { showNotification('⚠️ Record not found!', 'error'); return; }
+    if (!record) {
+        showNotification('⚠️ Record not found!', 'error');
+        return;
+    }
     if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
-        try { await _supabase.from('krt').delete().eq('id', record.id); } catch (err) { addPendingSync({ type: 'delete',
-                table: 'krt', id: record.id }); }
+        try {
+            await _supabase.from('KRT').delete().eq('id', record.id);
+            console.log('✅ Cloud delete success');
+        } catch (err) {
+            console.error('❌ Delete error:', err);
+            addPendingSync({ type: 'delete', table: 'KRT', id: record.id });
+        }
     }
     db[type].splice(index, 1);
     saveAndRefresh();
@@ -280,20 +487,44 @@ async function deleteEntry(type, index) {
 // ==========================================
 async function editEntry(type, index) {
     const record = db[type] && db[type][index];
-    if (!record) { showNotification('⚠️ Record not found!', 'error'); return; }
+    if (!record) {
+        showNotification('⚠️ Record not found!', 'error');
+        return;
+    }
     const newQty = prompt('New Quantity:', record.qty);
     if (newQty === null) return;
     const newPrice = prompt('New Price:', record.price);
     if (newPrice === null) return;
     const qtyNum = Number(newQty);
     const priceNum = Number(newPrice) || 0;
-    if (isNaN(qtyNum) || qtyNum < 0) { showNotification('⚠️ Invalid qty!', 'warning'); return; }
+    if (isNaN(qtyNum) || qtyNum < 0) {
+        showNotification('⚠️ Invalid qty!', 'warning');
+        return;
+    }
     if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
         try {
-            await _supabase.from('krt').update({ stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0,
-                price: priceNum }).eq('id', record.id);
-        } catch (err) { addPendingSync({ type: 'update', table: 'krt', id: record.id, data: { stock_in: type === 'in' ?
-                    qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum } }); }
+            await _supabase
+                .from('KRT')
+                .update({
+                    stock_in: type === 'in' ? qtyNum : 0,
+                    stock_out: type === 'out' ? qtyNum : 0,
+                    price: priceNum
+                })
+                .eq('id', record.id);
+            console.log('✅ Cloud update success');
+        } catch (err) {
+            console.error('❌ Update error:', err);
+            addPendingSync({
+                type: 'update',
+                table: 'KRT',
+                id: record.id,
+                data: {
+                    stock_in: type === 'in' ? qtyNum : 0,
+                    stock_out: type === 'out' ? qtyNum : 0,
+                    price: priceNum
+                }
+            });
+        }
     }
     db[type][index].qty = qtyNum;
     db[type][index].price = priceNum;
@@ -308,30 +539,56 @@ async function editEntry(type, index) {
 function renderAll() {
     try {
         const today = new Date().toISOString().split('T')[0];
+        
+        // Today's IN
         const inBody = document.getElementById('today-list-in');
         if (inBody) {
-            let html = '',
-                c = 1;
+            let html = '', c = 1;
             db.in.forEach((x, i) => {
                 if (x.date === today) {
-                    html += `<tr><td>${c++}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.vendor)}</td><td>${x.qty}</td><td>${x.price || 0}</td><td>${(x.qty * (x.price || 0)).toLocaleString()}</td>
-                        <td><button class="btn-action btn-edit" onclick="editEntry('in',${i})">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('in',${i})">🗑️</button></td></tr>`;
+                    html += `<tr>
+                        <td>${c++}</td>
+                        <td>${escapeHtml(x.item)}</td>
+                        <td>${escapeHtml(x.vendor)}</td>
+                        <td>${x.qty}</td>
+                        <td>${x.price || 0}</td>
+                        <td>${(x.qty * (x.price || 0)).toLocaleString()}</td>
+                        <td>
+                            <button class="btn-action btn-edit" onclick="editEntry('in',${i})">✏️</button>
+                            <button class="btn-action btn-delete" onclick="deleteEntry('in',${i})">🗑️</button>
+                        </td>
+                    </tr>`;
                 }
             });
             inBody.innerHTML = html || `<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">📭 No entries today</td></tr>`;
         }
+        
+        // Today's OUT
         const outBody = document.getElementById('today-list-out');
         if (outBody) {
-            let html = '',
-                c = 1;
+            let html = '', c = 1;
             db.out.forEach((x, i) => {
                 if (x.date === today) {
-                    html += `<tr><td>${c++}</td><td>${x.date}</td><td>${escapeHtml(x.cust)}</td><td>${escapeHtml(x.item)}</td><td>${x.barcode || 'N/A'}</td><td>${x.qty}</td><td>${x.price || 0}</td><td>${(x.qty * (x.price || 0)).toLocaleString()}</td>
-                        <td><button class="btn-action btn-edit" onclick="editEntry('out',${i})">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('out',${i})">🗑️</button></td></tr>`;
+                    html += `<tr>
+                        <td>${c++}</td>
+                        <td>${x.date}</td>
+                        <td>${escapeHtml(x.cust)}</td>
+                        <td>${escapeHtml(x.item)}</td>
+                        <td>${x.barcode || 'N/A'}</td>
+                        <td>${x.qty}</td>
+                        <td>${x.price || 0}</td>
+                        <td>${(x.qty * (x.price || 0)).toLocaleString()}</td>
+                        <td>
+                            <button class="btn-action btn-edit" onclick="editEntry('out',${i})">✏️</button>
+                            <button class="btn-action btn-delete" onclick="deleteEntry('out',${i})">🗑️</button>
+                        </td>
+                    </tr>`;
                 }
             });
             outBody.innerHTML = html || `<tr><td colspan="9" style="text-align:center;padding:20px;color:#888;">📭 No sales today</td></tr>`;
         }
+        
+        // Stock Balance - All Items
         const balBody = document.getElementById('table-balance-body');
         if (balBody) {
             const items = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
@@ -344,15 +601,24 @@ function renderAll() {
                 const profit = totalOutValue - totalInValue;
                 const bal = tin - tout;
                 const inItem = db.in.find(x => x.item === name);
-                return `<tr><td>${inItem ? escapeHtml(inItem.barcode) : 'N/A'}</td><td style="font-weight:600;">${escapeHtml(name)}</td>
-                    <td style="color:#2980b9;">${tin}</td><td style="color:#e67e22;">${tout}</td>
+                return `<tr>
+                    <td>${inItem ? escapeHtml(inItem.barcode) : 'N/A'}</td>
+                    <td style="font-weight:600;">${escapeHtml(name)}</td>
+                    <td style="color:#2980b9;">${tin}</td>
+                    <td style="color:#e67e22;">${tout}</td>
                     <td style="font-weight:bold;color:${bal < 5 ? '#e74c3c' : '#27ae60'};">${bal}</td>
-                    <td style="color:${profit >= 0 ? '#27ae60' : '#e74c3c'};font-weight:bold;">PKR ${profit.toLocaleString()}</td></tr>`;
+                    <td style="color:${profit >= 0 ? '#27ae60' : '#e74c3c'};font-weight:bold;">
+                        PKR ${profit.toLocaleString()}
+                    </td>
+                </tr>`;
             }).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">📭 No items</td></tr>`;
         }
+        
         updateItemLists();
         updateDashboardStats();
-    } catch (err) { console.error('❌ renderAll error:', err); }
+    } catch (err) {
+        console.error('❌ renderAll error:', err);
+    }
 }
 
 // ==========================================
@@ -366,6 +632,7 @@ function updateDashboardStats() {
         const totalOutValue = db.out.reduce((s, x) => s + (x.qty * x.price), 0);
         const totalProfit = totalOutValue - totalInValue;
         const uniqueItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
+        
         const el1 = document.getElementById('dash-total-in');
         if (el1) el1.textContent = totalIn;
         const el2 = document.getElementById('dash-total-out');
@@ -375,29 +642,39 @@ function updateDashboardStats() {
         const el4 = document.getElementById('dash-revenue');
         if (el4) el4.textContent = 'PKR ' + totalOutValue.toLocaleString();
         const el5 = document.getElementById('dash-profit');
-        if (el5) { el5.textContent = 'PKR ' + totalProfit.toLocaleString();
-            el5.style.color = totalProfit >= 0 ? '#27ae60' : '#e74c3c'; }
+        if (el5) {
+            el5.textContent = 'PKR ' + totalProfit.toLocaleString();
+            el5.style.color = totalProfit >= 0 ? '#27ae60' : '#e74c3c';
+        }
+        
         const act = document.getElementById('recent-activity');
         if (act) {
-            const all = [...db.in.map(x => ({ ...x,
-                type: 'IN' })), ...db.out.map(x => ({ ...x,
-                type: 'OUT' }))];
+            const all = [...db.in.map(x => ({ ...x, type: 'IN' })), ...db.out.map(x => ({ ...x, type: 'OUT' }))];
             all.sort((a, b) => new Date(b.date) - new Date(a.date));
             const recent = all.slice(0, 10);
             act.innerHTML = recent.length ? recent.map(x => `
                 <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;">
-                    <span><span style="font-weight:600;">${escapeHtml(x.item)}</span> <span style="color:${x.type === 'IN' ? '#27ae60' : '#e74c3c'};font-weight:bold;">${x.type === 'IN' ? '📥 +' : '📤 -'}${x.qty}</span></span>
+                    <span>
+                        <span style="font-weight:600;">${escapeHtml(x.item)}</span>
+                        <span style="color:${x.type === 'IN' ? '#27ae60' : '#e74c3c'};font-weight:bold;">
+                            ${x.type === 'IN' ? '📥 +' : '📤 -'}${x.qty}
+                        </span>
+                    </span>
                     <span style="color:#7f8c8d;font-size:12px;">${x.date}</span>
                 </div>
             `).join('') : `<p style="color:#7f8c8d;text-align:center;padding:20px;">No activity yet</p>`;
         }
-    } catch (err) { console.error('❌ Dashboard error:', err); }
+    } catch (err) {
+        console.error('❌ Dashboard error:', err);
+    }
 }
 
-function escapeHtml(text) { if (!text) return '';
+function escapeHtml(text) {
+    if (!text) return '';
     const d = document.createElement('div');
     d.textContent = text;
-    return d.innerHTML; }
+    return d.innerHTML;
+}
 
 function updateItemLists() {
     const list = document.getElementById('items-list');
@@ -436,11 +713,13 @@ function showLiveStock(itemName) {
             status.style.color = '#7f8c8d';
             status.innerHTML = 'ℹ️ No record found.';
         }
-    } catch (err) { console.error('❌ showLiveStock error:', err); }
+    } catch (err) {
+        console.error('❌ showLiveStock error:', err);
+    }
 }
 
 // ==========================================
-// RENT BOOK - COMPLETE
+// RENT BOOK
 // ==========================================
 function addRentEntry() {
     try {
@@ -451,29 +730,30 @@ function addRentEntry() {
         const debit = Number(document.getElementById('rent-debit').value) || 0;
         const credit = Number(document.getElementById('rent-credit').value) || 0;
         const method = document.getElementById('rent-method').value || 'Cash';
-
+        
         if (!name) { showNotification('⚠️ Enter shopkeeper name!', 'warning'); return; }
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (debit === 0 && credit === 0) { showNotification('⚠️ Enter rent or advance!', 'warning'); return; }
-
+        
         const entryData = { name, shop, date, month, debit, credit, method };
         const tempId = 'local_' + Date.now();
         dbRent.push({ id: tempId, ...entryData });
         saveLocalData();
         renderRentTable();
-
+        
         if (_supabase && isSupabaseConnected && navigator.onLine) {
-            _supabase.from('krt_rent').insert([entryData])
+            _supabase.from('KRT_RENT').insert([entryData])
                 .then(result => {
                     if (!result.error && result.data && result.data.length > 0) {
                         const idx = dbRent.findIndex(x => x.id === tempId);
-                        if (idx !== -1) { dbRent[idx].id = result.data[0].id;
-                            saveLocalData(); }
+                        if (idx !== -1) { dbRent[idx].id = result.data[0].id; saveLocalData(); }
                     }
                 })
-                .catch(() => addPendingSync({ type: 'insert', table: 'krt_rent', data: entryData }));
-        } else { addPendingSync({ type: 'insert', table: 'krt_rent', data: entryData }); }
-
+                .catch(() => addPendingSync({ type: 'insert', table: 'KRT_RENT', data: entryData }));
+        } else {
+            addPendingSync({ type: 'insert', table: 'KRT_RENT', data: entryData });
+        }
+        
         document.getElementById('rent-name').value = '';
         document.getElementById('rent-shop-no').value = '';
         document.getElementById('rent-date').value = '';
@@ -481,17 +761,18 @@ function addRentEntry() {
         document.getElementById('rent-debit').value = '';
         document.getElementById('rent-credit').value = '';
         showNotification('✅ Rent entry saved!', 'success');
-    } catch (err) { console.error('❌ addRentEntry error:', err); }
+    } catch (err) {
+        console.error('❌ addRentEntry error:', err);
+        showNotification('❌ Error: ' + err.message, 'error');
+    }
 }
 
 function renderRentTable() {
     try {
         const tbody = document.getElementById('rent-main-rows');
         if (!tbody) return;
-        let html = '',
-            totalDebit = 0,
-            totalCredit = 0;
-
+        let html = '', totalDebit = 0, totalCredit = 0;
+        
         dbRent.forEach((r, i) => {
             totalDebit += r.debit;
             totalCredit += r.credit;
@@ -507,9 +788,9 @@ function renderRentTable() {
                 <td><button class="btn-action btn-delete" onclick="deleteRentEntry(${i})">🗑️</button></td>
             </tr>`;
         });
-
+        
         tbody.innerHTML = html || `<tr><td colspan="8" style="text-align:center;padding:20px;color:#888;">📭 No entries</td></tr>`;
-
+        
         const td = document.getElementById('rent-total-debit');
         if (td) td.textContent = totalDebit.toLocaleString();
         const tc = document.getElementById('rent-total-credit');
@@ -520,16 +801,17 @@ function renderRentTable() {
             bal.textContent = finalBal.toLocaleString();
             bal.style.color = finalBal >= 0 ? '#e74c3c' : '#27ae60';
         }
-    } catch (err) { console.error('❌ renderRentTable error:', err); }
+    } catch (err) {
+        console.error('❌ renderRentTable error:', err);
+    }
 }
 
 function deleteRentEntry(index) {
     if (!confirm('⚠️ Delete this entry?')) return;
     const record = dbRent[index];
-    if (record && record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator
-        .onLine) {
-        _supabase.from('krt_rent').delete().eq('id', record.id).catch(() => addPendingSync({ type: 'delete', table: 'krt_rent',
-            id: record.id }));
+    if (record && record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
+        _supabase.from('KRT_RENT').delete().eq('id', record.id)
+            .catch(() => addPendingSync({ type: 'delete', table: 'KRT_RENT', id: record.id }));
     }
     dbRent.splice(index, 1);
     saveLocalData();
@@ -538,7 +820,7 @@ function deleteRentEntry(index) {
 }
 
 // ==========================================
-// LEDGERS - COMPLETE
+// LEDGERS
 // ==========================================
 function saveLedgerEntry() {
     try {
@@ -550,19 +832,19 @@ function saveLedgerEntry() {
         const debit = Number(document.getElementById('led-debit').value) || 0;
         const credit = Number(document.getElementById('led-credit').value) || 0;
         const method = document.getElementById('led-method').value || 'Cash';
-
+        
         if (!name) { showNotification('⚠️ Enter customer name!', 'warning'); return; }
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (debit === 0 && credit === 0) { showNotification('⚠️ Enter debit or credit!', 'warning'); return; }
-
+        
         if (!db.ledgers[name]) db.ledgers[name] = [];
         if (!db.opening_balances[name]) db.opening_balances[name] = 0;
-
+        
         const total = qty * price;
         db.ledgers[name].push({ date, item, qty, price, total, debit, credit, method });
         saveLocalData();
         showLedger();
-
+        
         document.getElementById('ledger-cust-name').value = '';
         document.getElementById('led-date').value = '';
         document.getElementById('led-item').value = '';
@@ -571,7 +853,10 @@ function saveLedgerEntry() {
         document.getElementById('led-debit').value = '';
         document.getElementById('led-credit').value = '';
         showNotification('✅ Ledger entry saved!', 'success');
-    } catch (err) { console.error('❌ saveLedgerEntry error:', err); }
+    } catch (err) {
+        console.error('❌ saveLedgerEntry error:', err);
+        showNotification('❌ Error: ' + err.message, 'error');
+    }
 }
 
 function updateOpeningBal() {
@@ -583,7 +868,9 @@ function updateOpeningBal() {
             saveLocalData();
             showLedger();
         }
-    } catch (err) { console.error('❌ updateOpeningBal error:', err); }
+    } catch (err) {
+        console.error('❌ updateOpeningBal error:', err);
+    }
 }
 
 function showLedger() {
@@ -592,24 +879,16 @@ function showLedger() {
         const tbody = document.getElementById('ledger-table-body');
         if (!tbody) return;
         tbody.innerHTML = '';
-        let totalQty = 0,
-            totalPrice = 0,
-            totalValue = 0,
-            totalDebit = 0,
-            totalCredit = 0;
-
+        let totalQty = 0, totalPrice = 0, totalValue = 0, totalDebit = 0, totalCredit = 0;
+        
         if (name && db.ledgers[name]) {
             const opening = db.opening_balances[name] || 0;
-            let runningBalance = opening;
-
             db.ledgers[name].forEach((entry, i) => {
                 totalQty += entry.qty || 0;
                 totalPrice += entry.price || 0;
                 totalValue += entry.total || 0;
                 totalDebit += entry.debit || 0;
                 totalCredit += entry.credit || 0;
-                runningBalance += (entry.debit || 0) - (entry.credit || 0);
-
                 tbody.innerHTML += `<tr>
                     <td>${i+1}</td>
                     <td>${entry.date}</td>
@@ -627,7 +906,7 @@ function showLedger() {
                 </tr>`;
             });
         }
-
+        
         document.getElementById('total-ledger-qty').textContent = totalQty;
         document.getElementById('total-ledger-price').textContent = totalPrice.toLocaleString();
         document.getElementById('total-ledger-value').textContent = totalValue.toLocaleString();
@@ -640,7 +919,9 @@ function showLedger() {
             finalBal.textContent = `Balance: ${balance.toLocaleString()}`;
             finalBal.style.color = balance >= 0 ? '#e74c3c' : '#27ae60';
         }
-    } catch (err) { console.error('❌ showLedger error:', err); }
+    } catch (err) {
+        console.error('❌ showLedger error:', err);
+    }
 }
 
 function delLedger(custName, index) {
@@ -679,10 +960,16 @@ function loadUserTable() {
         const tbody = document.getElementById('user-table-body');
         if (!tbody) return;
         tbody.innerHTML = extraUsers.map((u, i) =>
-            `<tr><td>${escapeHtml(u.id)}</td><td>${escapeHtml(u.name)}</td><td><small>${escapeHtml(u.perms ? u.perms.join(', ') : '')}</small></td>
-            <td><button class="btn-action btn-delete" onclick="deleteExtraUser(${i})">🗑️</button></td></tr>`
+            `<tr>
+                <td>${escapeHtml(u.id)}</td>
+                <td>${escapeHtml(u.name)}</td>
+                <td><small>${escapeHtml(u.perms ? u.perms.join(', ') : '')}</small></td>
+                <td><button class="btn-action btn-delete" onclick="deleteExtraUser(${i})">🗑️</button></td>
+            </tr>`
         ).join('') || `<tr><td colspan="4" style="text-align:center;padding:20px;color:#888;">No users</td></tr>`;
-    } catch (err) { console.error('❌ loadUserTable error:', err); }
+    } catch (err) {
+        console.error('❌ loadUserTable error:', err);
+    }
 }
 
 function deleteExtraUser(index) {
@@ -712,7 +999,10 @@ function createNewUser() {
         document.getElementById('new-password').value = '';
         document.querySelectorAll('.perm:checked').forEach(cb => cb.checked = false);
         showNotification(`✅ User "${name}" created!`, 'success');
-    } catch (err) { console.error('❌ createNewUser error:', err); }
+    } catch (err) {
+        console.error('❌ createNewUser error:', err);
+        showNotification('❌ Error: ' + err.message, 'error');
+    }
 }
 
 // ==========================================
@@ -744,7 +1034,10 @@ function login() {
                 showNotification('❌ Wrong ID or Password!', 'error');
             }
         }
-    } catch (err) { console.error('❌ Login error:', err); }
+    } catch (err) {
+        console.error('❌ Login error:', err);
+        showNotification('❌ Login failed!', 'error');
+    }
 }
 
 function showSystem(roleOrUser) {
@@ -756,7 +1049,10 @@ function showSystem(roleOrUser) {
             const items = document.querySelectorAll('#sidebar ul li');
             items.forEach(item => {
                 const onclick = item.getAttribute('onclick') || '';
-                if (onclick.includes('page-dashboard') || onclick.includes('logout')) { item.style.display = 'flex'; return; }
+                if (onclick.includes('page-dashboard') || onclick.includes('logout')) {
+                    item.style.display = 'flex';
+                    return;
+                }
                 let hasPerm = false;
                 if (roleOrUser.perms) hasPerm = roleOrUser.perms.some(p => onclick.includes(p));
                 item.style.display = hasPerm ? 'flex' : 'none';
@@ -767,16 +1063,14 @@ function showSystem(roleOrUser) {
             if (roleOrUser === 'staff') {
                 items.forEach(item => {
                     const t = item.innerText || '';
-                    if (!t.includes('Dashboard') && !t.includes('Report') && !t.includes('Balance') && !t.includes(
-                            'Logout')) {
+                    if (!t.includes('Dashboard') && !t.includes('Report') && !t.includes('Balance') && !t.includes('Logout')) {
                         item.style.display = 'none';
                     }
                 });
             } else if (roleOrUser === 'manager') {
                 items.forEach(item => {
                     const t = item.innerText || '';
-                    if (!t.includes('Dashboard') && !t.includes('Ledgers') && !t.includes('Rent Book') && !t
-                        .includes('Balance') && !t.includes('Logout')) {
+                    if (!t.includes('Dashboard') && !t.includes('Ledgers') && !t.includes('Rent Book') && !t.includes('Balance') && !t.includes('Logout')) {
                         item.style.display = 'none';
                     }
                 });
@@ -785,7 +1079,10 @@ function showSystem(roleOrUser) {
         renderAll();
         updateDashboardStats();
         loadUserTable();
-    } catch (err) { console.error('❌ showSystem error:', err); }
+    } catch (err) {
+        console.error('❌ showSystem error:', err);
+        showNotification('❌ Failed to load system!', 'error');
+    }
 }
 
 function logout() {
@@ -802,9 +1099,13 @@ function toggleSidebar() {
     const sb = document.getElementById('sidebar');
     const mc = document.getElementById('main-content');
     if (!sb || !mc) return;
-    if (sb.style.left === '0px') { sb.style.left = '-240px';
-        mc.style.marginLeft = '0'; } else { sb.style.left = '0px';
-        mc.style.marginLeft = '240px'; }
+    if (sb.style.left === '0px') {
+        sb.style.left = '-240px';
+        mc.style.marginLeft = '0';
+    } else {
+        sb.style.left = '0px';
+        mc.style.marginLeft = '240px';
+    }
 }
 
 function switchPage(pageId, title) {
@@ -827,18 +1128,39 @@ function generateMasterSearch() {
         const fOut = db.out.filter(x => x.date >= from && x.date <= to);
         const inTable = document.getElementById('master-in-table');
         if (inTable) {
-            inTable.innerHTML = fIn.map(x => `<tr><td>${x.date}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.vendor)}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
-                <td><button class="btn-action btn-edit" onclick="editEntry('in',${db.in.indexOf(x)})">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('in',${db.in.indexOf(x)})">🗑️</button></td></tr>`).join('') ||
-                `<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
+            inTable.innerHTML = fIn.map(x => `<tr>
+                <td>${x.date}</td>
+                <td>${escapeHtml(x.item)}</td>
+                <td>${escapeHtml(x.vendor)}</td>
+                <td>${x.qty}</td>
+                <td>${x.price}</td>
+                <td>${x.total}</td>
+                <td>
+                    <button class="btn-action btn-edit" onclick="editEntry('in',${db.in.indexOf(x)})">✏️</button>
+                    <button class="btn-action btn-delete" onclick="deleteEntry('in',${db.in.indexOf(x)})">🗑️</button>
+                </td>
+            </tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
         }
         const outTable = document.getElementById('master-out-table');
         if (outTable) {
-            outTable.innerHTML = fOut.map(x => `<tr><td>${x.date}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.cust)}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
-                <td><button class="btn-action btn-edit" onclick="editEntry('out',${db.out.indexOf(x)})">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('out',${db.out.indexOf(x)})">🗑️</button></td></tr>`).join('') ||
-                `<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
+            outTable.innerHTML = fOut.map(x => `<tr>
+                <td>${x.date}</td>
+                <td>${escapeHtml(x.item)}</td>
+                <td>${escapeHtml(x.cust)}</td>
+                <td>${x.qty}</td>
+                <td>${x.price}</td>
+                <td>${x.total}</td>
+                <td>
+                    <button class="btn-action btn-edit" onclick="editEntry('out',${db.out.indexOf(x)})">✏️</button>
+                    <button class="btn-action btn-delete" onclick="deleteEntry('out',${db.out.indexOf(x)})">🗑️</button>
+                </td>
+            </tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
         }
         showNotification(`✅ Found ${fIn.length + fOut.length} records`, 'success');
-    } catch (err) { console.error('❌ generateMasterSearch error:', err); }
+    } catch (err) {
+        console.error('❌ generateMasterSearch error:', err);
+        showNotification('❌ Error: ' + err.message, 'error');
+    }
 }
 
 function generateCustomReport() {
@@ -852,22 +1174,31 @@ function generateCustomReport() {
         const totalOutValue = fOut.reduce((s, x) => s + x.total, 0);
         const inTable = document.querySelector('#rep-in-table');
         if (inTable) {
-            inTable.innerHTML = fIn.map(x => `<tr><td>${x.date}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.vendor)}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total.toLocaleString()}</td></tr>`)
-                .join('') ||
-                `<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
+            inTable.innerHTML = fIn.map(x => `<tr>
+                <td>${x.date}</td>
+                <td>${escapeHtml(x.item)}</td>
+                <td>${escapeHtml(x.vendor)}</td>
+                <td>${x.qty}</td>
+                <td>${x.price}</td>
+                <td>${x.total.toLocaleString()}</td>
+            </tr>`).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
         }
         const outTable = document.querySelector('#rep-out-table');
         if (outTable) {
-            outTable.innerHTML = fOut.map(x => `<tr><td>${x.date}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.cust)}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total.toLocaleString()}</td></tr>`)
-                .join('') ||
-                `<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
+            outTable.innerHTML = fOut.map(x => `<tr>
+                <td>${x.date}</td>
+                <td>${escapeHtml(x.item)}</td>
+                <td>${escapeHtml(x.cust)}</td>
+                <td>${x.qty}</td>
+                <td>${x.price}</td>
+                <td>${x.total.toLocaleString()}</td>
+            </tr>`).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
         }
         const existing = document.querySelector('.report-summary');
         if (existing) existing.remove();
         const summary = document.createElement('div');
         summary.className = 'report-summary';
-        summary.style.cssText =
-            'display:flex;justify-content:space-around;background:#2c3e50;color:white;padding:15px;border-radius:8px;margin-top:20px;flex-wrap:wrap;';
+        summary.style.cssText = 'display:flex;justify-content:space-around;background:#2c3e50;color:white;padding:15px;border-radius:8px;margin-top:20px;flex-wrap:wrap;';
         summary.innerHTML = `
             <span>📥 Total IN: PKR ${totalInValue.toLocaleString()}</span>
             <span>📤 Total OUT: PKR ${totalOutValue.toLocaleString()}</span>
@@ -878,7 +1209,10 @@ function generateCustomReport() {
         const printArea = document.getElementById('print-area');
         if (printArea) printArea.appendChild(summary);
         showNotification('✅ Report generated!', 'success');
-    } catch (err) { console.error('❌ generateCustomReport error:', err); }
+    } catch (err) {
+        console.error('❌ generateCustomReport error:', err);
+        showNotification('❌ Error: ' + err.message, 'error');
+    }
 }
 
 // ==========================================
@@ -901,15 +1235,23 @@ function showNotification(message, type = 'info') {
             transition:all 0.4s ease;font-size:14px;
         `;
         document.body.appendChild(div);
-        setTimeout(() => { div.style.transform = 'translateY(0)';
-            div.style.opacity = '1'; }, 50);
-        setTimeout(() => { div.style.transform = 'translateY(100px)';
+        setTimeout(() => {
+            div.style.transform = 'translateY(0)';
+            div.style.opacity = '1';
+        }, 50);
+        setTimeout(() => {
+            div.style.transform = 'translateY(100px)';
             div.style.opacity = '0';
-            setTimeout(() => { if (div.parentNode) div.remove(); }, 400); }, 4000);
-    } catch (err) { console.error('❌ showNotification error:', err); }
+            setTimeout(() => { if (div.parentNode) div.remove(); }, 400);
+        }, 4000);
+    } catch (err) {
+        console.error('❌ showNotification error:', err);
+    }
 }
 
-function printSection() { window.print(); }
+function printSection() {
+    window.print();
+}
 
 // ==========================================
 // STARTUP
@@ -935,19 +1277,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         console.log('🚀 KRT TRADERS ERP v5.0 Loaded!');
         console.log('📦 Developed by Bilal Suleman');
-    } catch (err) { console.error('❌ Startup error:', err);
-        showNotification('⚠️ Error loading app: ' + err.message, 'error'); }
+        console.log('🐘 Elephant Never Forgets!');
+    } catch (err) {
+        console.error('❌ Startup error:', err);
+        showNotification('⚠️ Error loading app: ' + err.message, 'error');
+    }
 });
 
 // ==========================================
 // KEYBOARD SHORTCUTS
 // ==========================================
 document.addEventListener('keydown', function(e) {
-    if (e.ctrlKey && e.key === 's') { e.preventDefault();
-        syncAllCloudData(); }
-    if (e.key === 'Escape') { const sb = document.getElementById('sidebar'); if (sb && sb.style.left === '0px') toggleSidebar(); }
-    if (e.key === 'Enter') { const pass = document.getElementById('pass'); if (pass && document.activeElement === pass)
-            login(); }
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        syncAllCloudData();
+    }
+    if (e.key === 'Escape') {
+        const sb = document.getElementById('sidebar');
+        if (sb && sb.style.left === '0px') toggleSidebar();
+    }
+    if (e.key === 'Enter') {
+        const pass = document.getElementById('pass');
+        if (pass && document.activeElement === pass) login();
+    }
 });
 
 // ==========================================
@@ -957,8 +1309,14 @@ function updateClock() {
     const el = document.getElementById('live-clock');
     if (el) {
         const now = new Date();
-        el.textContent = now.toLocaleString('en-PK', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
-            hour: '2-digit', minute: '2-digit' });
+        el.textContent = now.toLocaleString('en-PK', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     }
 }
 setInterval(updateClock, 10000);
@@ -974,15 +1332,21 @@ updateClock();
         let progress = 0;
         const interval = setInterval(() => {
             progress += Math.random() * 3 + 0.5;
-            if (progress >= 100) { progress = 100;
+            if (progress >= 100) {
+                progress = 100;
                 clearInterval(interval);
-                setTimeout(() => { overlay.style.display = 'none';
-                    document.getElementById('login-screen').style.display = 'flex'; }, 500); }
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    document.getElementById('login-screen').style.display = 'flex';
+                }, 500);
+            }
             bar.style.width = progress + '%';
         }, 70);
     } else {
-        setTimeout(() => { overlay.style.display = 'none';
-            document.getElementById('login-screen').style.display = 'flex'; }, 1000);
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            document.getElementById('login-screen').style.display = 'flex';
+        }, 1000);
     }
 })();
 
