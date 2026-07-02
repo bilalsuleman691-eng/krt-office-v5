@@ -6,11 +6,12 @@
 // ==========================================
 // SUPABASE CONFIG
 // ==========================================
-const SUPABASE_URL ="https://jsxcmlpjdxgloofdrugz.supabase.co";
-const SUPABASE_KEY = 'sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb';
+const SUPABASE_URL = "https://jsxcmlpjdxgloofdrugz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb";
 
 let _supabase = null;
 let isSupabaseConnected = false;
+let isLoading = false;
 
 // ==========================================
 // GLOBAL VARIABLES
@@ -129,6 +130,13 @@ async function fetchCloudRentData() {
 // SYNC CLOUD
 // ==========================================
 async function syncAllCloudData() {
+    if (isLoading) return;
+    isLoading = true;
+    const btn = document.querySelector('.sync-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Syncing...';
+    }
     try {
         if (!navigator.onLine) { showNotification('⚠️ No internet!', 'warning'); return; }
         if (!_supabase || !isSupabaseConnected) { showNotification('⚠️ Database not available', 'warning'); return; }
@@ -137,7 +145,14 @@ async function syncAllCloudData() {
         await fetchCloudRentData();
         await processPendingSync();
         showNotification('✅ Sync complete!', 'success');
-    } catch (err) { console.error('❌ Sync error:', err); }
+    } catch (err) { console.error('❌ Sync error:', err);
+        showNotification('❌ Sync failed!', 'error'); } finally {
+        isLoading = false;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync"></i> Sync';
+        }
+    }
 }
 
 // ==========================================
@@ -148,10 +163,16 @@ async function processPendingSync() {
     const failed = [];
     for (const op of pendingSync) {
         try {
-            if (op.type === 'insert') { const { error } = await _supabase.from(op.table).insert(op.data); if (error) failed.push(
-                    op); } else if (op.type === 'delete') { const { error } = await _supabase.from(op.table).delete().eq('id',
-                    op.id); if (error) failed.push(op); } else if (op.type === 'update') { const { error } = await _supabase
-                    .from(op.table).update(op.data).eq('id', op.id); if (error) failed.push(op); }
+            if (op.type === 'insert') {
+                const { error } = await _supabase.from(op.table).insert(op.data);
+                if (error) failed.push(op);
+            } else if (op.type === 'delete') {
+                const { error } = await _supabase.from(op.table).delete().eq('id', op.id);
+                if (error) failed.push(op);
+            } else if (op.type === 'update') {
+                const { error } = await _supabase.from(op.table).update(op.data).eq('id', op.id);
+                if (error) failed.push(op);
+            }
         } catch (err) { failed.push(op); }
     }
     pendingSync = failed;
@@ -178,6 +199,7 @@ async function addIn() {
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
         if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
+        if (price <= 0 || isNaN(price)) { showNotification('⚠️ Enter valid price!', 'warning'); return; }
         const entryData = { date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
@@ -223,6 +245,7 @@ async function addOut() {
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
         if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
+        if (price <= 0 || isNaN(price)) { showNotification('⚠️ Enter valid price!', 'warning'); return; }
         const totalIn = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
         const totalOut = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
         if (qty > totalIn - totalOut) { showNotification(`⚠️ Only ${totalIn - totalOut} available!`, 'warning'); return; }
@@ -260,12 +283,13 @@ function clearOutForm() {
 }
 
 // ==========================================
-// DELETE ENTRY
+// DELETE ENTRY - FIXED with ID
 // ==========================================
-async function deleteEntry(type, index) {
+async function deleteEntry(type, id) {
     if (!confirm('⚠️ Delete this record?')) return;
-    const record = db[type] && db[type][index];
-    if (!record) { showNotification('⚠️ Record not found!', 'error'); return; }
+    const index = db[type].findIndex(x => x.id === id);
+    if (index === -1) { showNotification('⚠️ Record not found!', 'error'); return; }
+    const record = db[type][index];
     if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
         try { await _supabase.from('KRT').delete().eq('id', record.id); } catch (err) { addPendingSync({ type: 'delete',
                 table: 'krt', id: record.id }); }
@@ -276,11 +300,12 @@ async function deleteEntry(type, index) {
 }
 
 // ==========================================
-// EDIT ENTRY
+// EDIT ENTRY - FIXED with ID
 // ==========================================
-async function editEntry(type, index) {
-    const record = db[type] && db[type][index];
-    if (!record) { showNotification('⚠️ Record not found!', 'error'); return; }
+async function editEntry(type, id) {
+    const index = db[type].findIndex(x => x.id === id);
+    if (index === -1) { showNotification('⚠️ Record not found!', 'error'); return; }
+    const record = db[type][index];
     const newQty = prompt('New Quantity:', record.qty);
     if (newQty === null) return;
     const newPrice = prompt('New Price:', record.price);
@@ -288,6 +313,7 @@ async function editEntry(type, index) {
     const qtyNum = Number(newQty);
     const priceNum = Number(newPrice) || 0;
     if (isNaN(qtyNum) || qtyNum < 0) { showNotification('⚠️ Invalid qty!', 'warning'); return; }
+    if (priceNum < 0) { showNotification('⚠️ Invalid price!', 'warning'); return; }
     if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
         try {
             await _supabase.from('KRT').update({ stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0,
@@ -303,7 +329,7 @@ async function editEntry(type, index) {
 }
 
 // ==========================================
-// RENDER ALL
+// RENDER ALL - FIXED with ID
 // ==========================================
 function renderAll() {
     try {
@@ -312,10 +338,10 @@ function renderAll() {
         if (inBody) {
             let html = '',
                 c = 1;
-            db.in.forEach((x, i) => {
+            db.in.forEach((x) => {
                 if (x.date === today) {
                     html += `<tr><td>${c++}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.vendor)}</td><td>${x.qty}</td><td>${x.price || 0}</td><td>${(x.qty * (x.price || 0)).toLocaleString()}</td>
-                        <td><button class="btn-action btn-edit" onclick="editEntry('in',${i})">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('in',${i})">🗑️</button></td></tr>`;
+                        <td><button class="btn-action btn-edit" onclick="editEntry('in','${x.id}')">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('in','${x.id}')">🗑️</button></td></tr>`;
                 }
             });
             inBody.innerHTML = html || `<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">📭 No entries today</td></tr>`;
@@ -324,10 +350,10 @@ function renderAll() {
         if (outBody) {
             let html = '',
                 c = 1;
-            db.out.forEach((x, i) => {
+            db.out.forEach((x) => {
                 if (x.date === today) {
                     html += `<tr><td>${c++}</td><td>${x.date}</td><td>${escapeHtml(x.cust)}</td><td>${escapeHtml(x.item)}</td><td>${x.barcode || 'N/A'}</td><td>${x.qty}</td><td>${x.price || 0}</td><td>${(x.qty * (x.price || 0)).toLocaleString()}</td>
-                        <td><button class="btn-action btn-edit" onclick="editEntry('out',${i})">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('out',${i})">🗑️</button></td></tr>`;
+                        <td><button class="btn-action btn-edit" onclick="editEntry('out','${x.id}')">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('out','${x.id}')">🗑️</button></td></tr>`;
                 }
             });
             outBody.innerHTML = html || `<tr><td colspan="9" style="text-align:center;padding:20px;color:#888;">📭 No sales today</td></tr>`;
@@ -440,7 +466,7 @@ function showLiveStock(itemName) {
 }
 
 // ==========================================
-// RENT BOOK - COMPLETE
+// RENT BOOK - FIXED with Filter
 // ==========================================
 function addRentEntry() {
     try {
@@ -488,15 +514,28 @@ function renderRentTable() {
     try {
         const tbody = document.getElementById('rent-main-rows');
         if (!tbody) return;
+        
+        const filterText = document.getElementById('rent-filter')?.value?.toLowerCase() || '';
+        const filtered = filterText ? dbRent.filter(r => r.name.toLowerCase().includes(filterText)) : dbRent;
+        
         let html = '',
             totalDebit = 0,
             totalCredit = 0;
 
-        dbRent.forEach((r, i) => {
+        // Calculate cumulative balance per shopkeeper
+        const shopkeepers = {};
+        filtered.forEach(r => {
+            if (!shopkeepers[r.name]) shopkeepers[r.name] = { debit: 0, credit: 0 };
+            shopkeepers[r.name].debit += r.debit;
+            shopkeepers[r.name].credit += r.credit;
+        });
+
+        filtered.forEach((r) => {
             totalDebit += r.debit;
             totalCredit += r.credit;
-            const balance = r.debit - r.credit;
+            const balance = shopkeepers[r.name].debit - shopkeepers[r.name].credit;
             html += `<tr>
+                <td>${escapeHtml(r.name)}</td>
                 <td>${escapeHtml(r.shop || 'N/A')}</td>
                 <td>${r.date}</td>
                 <td>${escapeHtml(r.month || '')}</td>
@@ -504,11 +543,11 @@ function renderRentTable() {
                 <td style="color:#27ae60;">${r.credit.toLocaleString()}</td>
                 <td>${escapeHtml(r.method)}</td>
                 <td style="font-weight:bold;color:${balance >= 0 ? '#e74c3c' : '#27ae60'};">${balance.toLocaleString()}</td>
-                <td><button class="btn-action btn-delete" onclick="deleteRentEntry(${i})">🗑️</button></td>
+                <td><button class="btn-action btn-delete" onclick="deleteRentEntry('${r.id}')">🗑️</button></td>
             </tr>`;
         });
 
-        tbody.innerHTML = html || `<tr><td colspan="8" style="text-align:center;padding:20px;color:#888;">📭 No entries</td></tr>`;
+        tbody.innerHTML = html || `<tr><td colspan="9" style="text-align:center;padding:20px;color:#888;">📭 No entries</td></tr>`;
 
         const td = document.getElementById('rent-total-debit');
         if (td) td.textContent = totalDebit.toLocaleString();
@@ -523,8 +562,10 @@ function renderRentTable() {
     } catch (err) { console.error('❌ renderRentTable error:', err); }
 }
 
-function deleteRentEntry(index) {
+function deleteRentEntry(id) {
     if (!confirm('⚠️ Delete this entry?')) return;
+    const index = dbRent.findIndex(x => x.id === id);
+    if (index === -1) return;
     const record = dbRent[index];
     if (record && record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator
         .onLine) {
@@ -538,7 +579,7 @@ function deleteRentEntry(index) {
 }
 
 // ==========================================
-// LEDGERS - COMPLETE
+// LEDGERS
 // ==========================================
 function saveLedgerEntry() {
     try {
@@ -816,7 +857,7 @@ function switchPage(pageId, title) {
 }
 
 // ==========================================
-// SEARCH / REPORT
+// SEARCH / REPORT - FIXED with ID
 // ==========================================
 function generateMasterSearch() {
     try {
@@ -828,13 +869,13 @@ function generateMasterSearch() {
         const inTable = document.getElementById('master-in-table');
         if (inTable) {
             inTable.innerHTML = fIn.map(x => `<tr><td>${x.date}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.vendor)}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
-                <td><button class="btn-action btn-edit" onclick="editEntry('in',${db.in.indexOf(x)})">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('in',${db.in.indexOf(x)})">🗑️</button></td></tr>`).join('') ||
+                <td><button class="btn-action btn-edit" onclick="editEntry('in','${x.id}')">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('in','${x.id}')">🗑️</button></td></tr>`).join('') ||
                 `<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
         }
         const outTable = document.getElementById('master-out-table');
         if (outTable) {
             outTable.innerHTML = fOut.map(x => `<tr><td>${x.date}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.cust)}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
-                <td><button class="btn-action btn-edit" onclick="editEntry('out',${db.out.indexOf(x)})">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('out',${db.out.indexOf(x)})">🗑️</button></td></tr>`).join('') ||
+                <td><button class="btn-action btn-edit" onclick="editEntry('out','${x.id}')">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('out','${x.id}')">🗑️</button></td></tr>`).join('') ||
                 `<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
         }
         showNotification(`✅ Found ${fIn.length + fOut.length} records`, 'success');
@@ -877,8 +918,50 @@ function generateCustomReport() {
         `;
         const printArea = document.getElementById('print-area');
         if (printArea) printArea.appendChild(summary);
+        document.getElementById('report-period').textContent = `📅 Period: ${from} to ${to}`;
         showNotification('✅ Report generated!', 'success');
     } catch (err) { console.error('❌ generateCustomReport error:', err); }
+}
+
+// ==========================================
+// EXPORT DATA - NEW FUNCTION
+// ==========================================
+function exportAllData() {
+    try {
+        // Export Stock IN
+        let csvIn = 'Date,Item,Vendor,Qty,Price,Total\n';
+        db.in.forEach(x => {
+            csvIn += `${x.date},${x.item},${x.vendor},${x.qty},${x.price},${x.total}\n`;
+        });
+        downloadCSV(csvIn, 'stock_in_data.csv');
+
+        // Export Stock OUT
+        let csvOut = 'Date,Item,Customer,Qty,Price,Total\n';
+        db.out.forEach(x => {
+            csvOut += `${x.date},${x.item},${x.cust},${x.qty},${x.price},${x.total}\n`;
+        });
+        downloadCSV(csvOut, 'stock_out_data.csv');
+
+        // Export Rent Book
+        let csvRent = 'Name,Shop,Date,Month,Debit,Credit,Method\n';
+        dbRent.forEach(x => {
+            csvRent += `${x.name},${x.shop},${x.date},${x.month},${x.debit},${x.credit},${x.method}\n`;
+        });
+        downloadCSV(csvRent, 'rent_book_data.csv');
+
+        showNotification('✅ All data exported!', 'success');
+    } catch (err) { console.error('❌ Export error:', err);
+        showNotification('❌ Export failed!', 'error'); }
+}
+
+function downloadCSV(csv, filename) {
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 // ==========================================
