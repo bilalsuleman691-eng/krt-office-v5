@@ -1,14 +1,12 @@
 // ==========================================
-// KRT TRADERS ERP - COMPLETE SCRIPT
+// KRT TRADERS ERP - COMPLETE SCRIPT v5.0
 // Developed by Bilal Suleman
 // ==========================================
-// ✅ SUPABASE CONFIG - FIXED
+
 // ==========================================
-
-// ✅ SAHI URL (domain only, NO /rest/v1/)
+// SUPABASE CONFIG
+// ==========================================
 const SUPABASE_URL = 'https://jsxcmlpjdxgloofdrugz.supabase.co';
-
-// ✅ SAHI KEY
 const SUPABASE_KEY = 'sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb';
 
 let _supabase = null;
@@ -28,17 +26,17 @@ let pendingSync = [];
 try {
     _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     console.log('✅ Supabase client created');
-    console.log('📡 URL:', SUPABASE_URL);
 } catch (err) {
     console.error('❌ Supabase init failed:', err);
 }
+
 // ==========================================
 // TEST CONNECTION
 // ==========================================
 async function testSupabaseConnection() {
     try {
         if (!_supabase) { isSupabaseConnected = false; return; }
-        const { data, error } = await _supabase.from('KRT').select('count', { count: 'exact', head: true });
+        const { data, error } = await _supabase.from('krt').select('count', { count: 'exact', head: true });
         if (error) { isSupabaseConnected = false; showNotification('⚠️ Offline mode', 'warning'); return; }
         isSupabaseConnected = true;
         console.log('✅ Connected!');
@@ -89,7 +87,7 @@ function saveAndRefresh() {
 async function fetchCloudData() {
     try {
         if (!_supabase || !isSupabaseConnected) return;
-        const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
+        const { data, error } = await _supabase.from('krt').select('*').order('id', { ascending: true });
         if (error || !data) return;
         db.in = []; db.out = [];
         data.forEach(row => {
@@ -113,7 +111,7 @@ async function fetchCloudData() {
 async function fetchCloudRentData() {
     try {
         if (!_supabase || !isSupabaseConnected) return;
-        const { data, error } = await _supabase.from('KRT_RENT').select('*').order('id', { ascending: true });
+        const { data, error } = await _supabase.from('krt_rent').select('*').order('id', { ascending: true });
         if (error || !data) return;
         dbRent = data.map(row => ({ id: row.id, name: row.name, shop: row.shop, date: row.date, month: row.month, debit: Number(row.debit || 0), credit: Number(row.credit || 0), method: row.method || 'Cash' }));
         saveLocalData();
@@ -173,10 +171,10 @@ async function addIn() {
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
         if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
-        const entryData = { date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
+        const entryData = { Date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
-                const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
+                const { data, error } = await _supabase.from('krt').insert([entryData]).select();
                 if (!error && data && data.length > 0) {
                     db.in.push({ id: data[0].id, date, vendor, item, barcode, qty, price, total: qty * price });
                     saveAndRefresh(); clearInForm();
@@ -187,7 +185,7 @@ async function addIn() {
         }
         const tempId = 'local_' + Date.now();
         db.in.push({ id: tempId, date, vendor, item, barcode, qty, price, total: qty * price });
-        saveAndRefresh(); addPendingSync({ type: 'insert', table: 'KRT', data: entryData }); clearInForm();
+        saveAndRefresh(); addPendingSync({ type: 'insert', table: 'krt', data: entryData }); clearInForm();
         showNotification('✅ Stock IN saved locally!', 'warning');
     } catch (err) { console.error('❌ addIn error:', err); showNotification('❌ Error: ' + err.message, 'error'); }
 }
@@ -215,10 +213,10 @@ async function addOut() {
         const totalIn = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
         const totalOut = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
         if (qty > totalIn - totalOut) { showNotification(`⚠️ Only ${totalIn - totalOut} available!`, 'warning'); return; }
-        const entryData = { date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: cust };
+        const entryData = { Date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: cust };
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
-                const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
+                const { data, error } = await _supabase.from('krt').insert([entryData]).select();
                 if (!error && data && data.length > 0) {
                     db.out.push({ id: data[0].id, date, cust, item, barcode, qty, price, total: qty * price });
                     saveAndRefresh(); clearOutForm();
@@ -229,7 +227,7 @@ async function addOut() {
         }
         const tempId = 'local_' + Date.now();
         db.out.push({ id: tempId, date, cust, item, barcode, qty, price, total: qty * price });
-        saveAndRefresh(); addPendingSync({ type: 'insert', table: 'KRT', data: entryData }); clearOutForm();
+        saveAndRefresh(); addPendingSync({ type: 'insert', table: 'krt', data: entryData }); clearOutForm();
         showNotification('✅ Stock OUT saved locally!', 'warning');
     } catch (err) { console.error('❌ addOut error:', err); showNotification('❌ Error: ' + err.message, 'error'); }
 }
@@ -249,7 +247,7 @@ async function deleteEntry(type, index) {
     const record = db[type] && db[type][index];
     if (!record) { showNotification('⚠️ Record not found!', 'error'); return; }
     if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
-        try { await _supabase.from('KRT').delete().eq('id', record.id); } catch (err) { addPendingSync({ type: 'delete', table: 'KRT', id: record.id }); }
+        try { await _supabase.from('krt').delete().eq('id', record.id); } catch (err) { addPendingSync({ type: 'delete', table: 'krt', id: record.id }); }
     }
     db[type].splice(index, 1);
     saveAndRefresh();
@@ -271,8 +269,8 @@ async function editEntry(type, index) {
     if (isNaN(qtyNum) || qtyNum < 0) { showNotification('⚠️ Invalid qty!', 'warning'); return; }
     if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
         try {
-            await _supabase.from('KRT').update({ stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum }).eq('id', record.id);
-        } catch (err) { addPendingSync({ type: 'update', table: 'KRT', id: record.id, data: { stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum } }); }
+            await _supabase.from('krt').update({ stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum }).eq('id', record.id);
+        } catch (err) { addPendingSync({ type: 'update', table: 'krt', id: record.id, data: { stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum } }); }
     }
     db[type][index].qty = qtyNum;
     db[type][index].price = priceNum;
@@ -379,34 +377,72 @@ function updateCustomerDropdown() {
 }
 
 // ==========================================
-// RENT BOOK
+// LIVE STOCK CHECK
+// ==========================================
+function showLiveStock(itemName) {
+    try {
+        const status = document.getElementById('stock-status');
+        if (!status) return;
+        if (!itemName || !itemName.trim()) {
+            status.innerHTML = '';
+            return;
+        }
+        const totalIn = db.in.filter(x => x.item === itemName).reduce((s, x) => s + x.qty, 0);
+        const totalOut = db.out.filter(x => x.item === itemName).reduce((s, x) => s + x.qty, 0);
+        const balance = totalIn - totalOut;
+        if (balance > 0) {
+            status.style.color = '#27ae60';
+            status.innerHTML = `✅ Available: <strong>${balance}</strong>`;
+        } else if (balance <= 0 && totalIn > 0) {
+            status.style.color = '#e74c3c';
+            status.innerHTML = `⚠️ Out of Stock! (Balance: ${balance})`;
+        } else {
+            status.style.color = '#7f8c8d';
+            status.innerHTML = 'ℹ️ No record found.';
+        }
+    } catch (err) { console.error('❌ showLiveStock error:', err); }
+}
+
+// ==========================================
+// RENT BOOK - COMPLETE
 // ==========================================
 function addRentEntry() {
     try {
         const name = document.getElementById('rent-name').value.trim();
+        const shop = document.getElementById('rent-shop-no').value.trim() || 'N/A';
         const date = document.getElementById('rent-date').value;
+        const month = document.getElementById('rent-month').value.trim();
         const debit = Number(document.getElementById('rent-debit').value) || 0;
         const credit = Number(document.getElementById('rent-credit').value) || 0;
-        if (!name) { showNotification('⚠️ Enter name!', 'warning'); return; }
+        const method = document.getElementById('rent-method').value || 'Cash';
+        
+        if (!name) { showNotification('⚠️ Enter shopkeeper name!', 'warning'); return; }
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
-        if (debit === 0 && credit === 0) { showNotification('⚠️ Enter debit or credit!', 'warning'); return; }
-        const entryData = { name, date, debit, credit, shop: '', month: '', method: 'Cash' };
+        if (debit === 0 && credit === 0) { showNotification('⚠️ Enter rent or advance!', 'warning'); return; }
+        
+        const entryData = { name, shop, date, month, debit, credit, method };
         const tempId = 'local_' + Date.now();
         dbRent.push({ id: tempId, ...entryData });
         saveLocalData();
         renderRentTable();
+        
         if (_supabase && isSupabaseConnected && navigator.onLine) {
-            _supabase.from('KRT_RENT').insert([entryData])
+            _supabase.from('krt_rent').insert([entryData])
                 .then(result => {
                     if (!result.error && result.data && result.data.length > 0) {
                         const idx = dbRent.findIndex(x => x.id === tempId);
                         if (idx !== -1) { dbRent[idx].id = result.data[0].id; saveLocalData(); }
                     }
                 })
-                .catch(() => addPendingSync({ type: 'insert', table: 'KRT_RENT', data: entryData }));
-        } else { addPendingSync({ type: 'insert', table: 'KRT_RENT', data: entryData }); }
-        document.getElementById('rent-name').value = ''; document.getElementById('rent-date').value = '';
-        document.getElementById('rent-debit').value = ''; document.getElementById('rent-credit').value = '';
+                .catch(() => addPendingSync({ type: 'insert', table: 'krt_rent', data: entryData }));
+        } else { addPendingSync({ type: 'insert', table: 'krt_rent', data: entryData }); }
+        
+        document.getElementById('rent-name').value = '';
+        document.getElementById('rent-shop-no').value = '';
+        document.getElementById('rent-date').value = '';
+        document.getElementById('rent-month').value = '';
+        document.getElementById('rent-debit').value = '';
+        document.getElementById('rent-credit').value = '';
         showNotification('✅ Rent entry saved!', 'success');
     } catch (err) { console.error('❌ addRentEntry error:', err); }
 }
@@ -416,14 +452,35 @@ function renderRentTable() {
         const tbody = document.getElementById('rent-main-rows');
         if (!tbody) return;
         let html = '', totalDebit = 0, totalCredit = 0;
+        
         dbRent.forEach((r, i) => {
-            totalDebit += r.debit; totalCredit += r.credit;
-            html += `<tr><td>${escapeHtml(r.name)}</td><td>${r.date}</td><td style="color:#e74c3c;">${r.debit}</td><td style="color:#27ae60;">${r.credit}</td>
-                <td><button class="btn-action btn-delete" onclick="deleteRentEntry(${i})">🗑️</button></td></tr>`;
+            totalDebit += r.debit;
+            totalCredit += r.credit;
+            const balance = r.debit - r.credit;
+            html += `<tr>
+                <td>${escapeHtml(r.shop || 'N/A')}</td>
+                <td>${r.date}</td>
+                <td>${escapeHtml(r.month || '')}</td>
+                <td style="color:#e74c3c;">${r.debit.toLocaleString()}</td>
+                <td style="color:#27ae60;">${r.credit.toLocaleString()}</td>
+                <td>${escapeHtml(r.method)}</td>
+                <td style="font-weight:bold;color:${balance >= 0 ? '#e74c3c' : '#27ae60'};">${balance.toLocaleString()}</td>
+                <td><button class="btn-action btn-delete" onclick="deleteRentEntry(${i})">🗑️</button></td>
+            </tr>`;
         });
-        tbody.innerHTML = html || `<tr><td colspan="5" style="text-align:center;padding:20px;color:#888;">📭 No entries</td></tr>`;
-        const td = document.getElementById('rent-total-debit'); if (td) td.textContent = totalDebit;
-        const tc = document.getElementById('rent-total-credit'); if (tc) tc.textContent = totalCredit;
+        
+        tbody.innerHTML = html || `<tr><td colspan="8" style="text-align:center;padding:20px;color:#888;">📭 No entries</td></tr>`;
+        
+        const td = document.getElementById('rent-total-debit');
+        if (td) td.textContent = totalDebit.toLocaleString();
+        const tc = document.getElementById('rent-total-credit');
+        if (tc) tc.textContent = totalCredit.toLocaleString();
+        const bal = document.getElementById('rent-final-balance');
+        if (bal) {
+            const finalBal = totalDebit - totalCredit;
+            bal.textContent = finalBal.toLocaleString();
+            bal.style.color = finalBal >= 0 ? '#e74c3c' : '#27ae60';
+        }
     } catch (err) { console.error('❌ renderRentTable error:', err); }
 }
 
@@ -431,32 +488,61 @@ function deleteRentEntry(index) {
     if (!confirm('⚠️ Delete this entry?')) return;
     const record = dbRent[index];
     if (record && record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
-        _supabase.from('KRT_RENT').delete().eq('id', record.id).catch(() => addPendingSync({ type: 'delete', table: 'KRT_RENT', id: record.id }));
+        _supabase.from('krt_rent').delete().eq('id', record.id).catch(() => addPendingSync({ type: 'delete', table: 'krt_rent', id: record.id }));
     }
-    dbRent.splice(index, 1); saveLocalData(); renderRentTable();
+    dbRent.splice(index, 1);
+    saveLocalData();
+    renderRentTable();
     showNotification('✅ Rent entry deleted!', 'success');
 }
 
 // ==========================================
-// LEDGERS
+// LEDGERS - COMPLETE
 // ==========================================
 function saveLedgerEntry() {
     try {
         const name = document.getElementById('ledger-cust-name').value.trim();
         const date = document.getElementById('led-date').value;
+        const item = document.getElementById('led-item').value.trim();
+        const qty = Number(document.getElementById('led-qty').value) || 0;
+        const price = Number(document.getElementById('led-price').value) || 0;
         const debit = Number(document.getElementById('led-debit').value) || 0;
         const credit = Number(document.getElementById('led-credit').value) || 0;
+        const method = document.getElementById('led-method').value || 'Cash';
+        
         if (!name) { showNotification('⚠️ Enter customer name!', 'warning'); return; }
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (debit === 0 && credit === 0) { showNotification('⚠️ Enter debit or credit!', 'warning'); return; }
+        
         if (!db.ledgers[name]) db.ledgers[name] = [];
         if (!db.opening_balances[name]) db.opening_balances[name] = 0;
-        db.ledgers[name].push({ date, debit, credit, item: '', method: 'Cash' });
-        saveLocalData(); showLedger();
-        document.getElementById('ledger-cust-name').value = ''; document.getElementById('led-date').value = '';
-        document.getElementById('led-debit').value = ''; document.getElementById('led-credit').value = '';
+        
+        const total = qty * price;
+        db.ledgers[name].push({ date, item, qty, price, total, debit, credit, method });
+        saveLocalData();
+        showLedger();
+        
+        document.getElementById('ledger-cust-name').value = '';
+        document.getElementById('led-date').value = '';
+        document.getElementById('led-item').value = '';
+        document.getElementById('led-qty').value = '';
+        document.getElementById('led-price').value = '';
+        document.getElementById('led-debit').value = '';
+        document.getElementById('led-credit').value = '';
         showNotification('✅ Ledger entry saved!', 'success');
     } catch (err) { console.error('❌ saveLedgerEntry error:', err); }
+}
+
+function updateOpeningBal() {
+    try {
+        const name = document.getElementById('ledger-cust-name').value.trim();
+        const val = Number(document.getElementById('opening-bal').value) || 0;
+        if (name) {
+            db.opening_balances[name] = val;
+            saveLocalData();
+            showLedger();
+        }
+    } catch (err) { console.error('❌ updateOpeningBal error:', err); }
 }
 
 function showLedger() {
@@ -464,17 +550,80 @@ function showLedger() {
         const name = document.getElementById('ledger-cust-name').value.trim();
         const tbody = document.getElementById('ledger-table-body');
         if (!tbody) return;
-        tbody.innerHTML = ''; let totalDebit = 0, totalCredit = 0;
+        tbody.innerHTML = '';
+        let totalQty = 0, totalPrice = 0, totalValue = 0, totalDebit = 0, totalCredit = 0;
+        
         if (name && db.ledgers[name]) {
+            const opening = db.opening_balances[name] || 0;
+            let runningBalance = opening;
+            
             db.ledgers[name].forEach((entry, i) => {
-                totalDebit += entry.debit; totalCredit += entry.credit;
-                tbody.innerHTML += `<tr><td>${i+1}</td><td>${entry.date}</td><td>${entry.debit}</td><td>${entry.credit}</td></tr>`;
+                totalQty += entry.qty || 0;
+                totalPrice += entry.price || 0;
+                totalValue += entry.total || 0;
+                totalDebit += entry.debit || 0;
+                totalCredit += entry.credit || 0;
+                runningBalance += (entry.debit || 0) - (entry.credit || 0);
+                
+                tbody.innerHTML += `<tr>
+                    <td>${i+1}</td>
+                    <td>${entry.date}</td>
+                    <td>${escapeHtml(entry.item || '')}</td>
+                    <td>${entry.qty || 0}</td>
+                    <td>${(entry.price || 0).toLocaleString()}</td>
+                    <td>${(entry.total || 0).toLocaleString()}</td>
+                    <td style="color:#e74c3c;">${(entry.debit || 0).toLocaleString()}</td>
+                    <td style="color:#27ae60;">${(entry.credit || 0).toLocaleString()}</td>
+                    <td>${escapeHtml(entry.method || 'Cash')}</td>
+                    <td>
+                        <button class="btn-action btn-edit" onclick="editLedger('${escapeHtml(name)}',${i})">✏️</button>
+                        <button class="btn-action btn-delete" onclick="delLedger('${escapeHtml(name)}',${i})">🗑️</button>
+                    </td>
+                </tr>`;
             });
         }
-        const td = document.getElementById('total-debit'); if (td) td.textContent = totalDebit;
-        const tc = document.getElementById('total-credit'); if (tc) tc.textContent = totalCredit;
-        const bal = document.getElementById('final-balance'); if (bal) bal.textContent = `Balance: ${totalDebit - totalCredit}`;
+        
+        document.getElementById('total-ledger-qty').textContent = totalQty;
+        document.getElementById('total-ledger-price').textContent = totalPrice.toLocaleString();
+        document.getElementById('total-ledger-value').textContent = totalValue.toLocaleString();
+        document.getElementById('total-ledger-debit').textContent = totalDebit.toLocaleString();
+        document.getElementById('total-ledger-credit').textContent = totalCredit.toLocaleString();
+        const finalBal = document.getElementById('final-ledger-balance');
+        if (finalBal) {
+            const opening = db.opening_balances[name] || 0;
+            const balance = opening + totalDebit - totalCredit;
+            finalBal.textContent = `Balance: ${balance.toLocaleString()}`;
+            finalBal.style.color = balance >= 0 ? '#e74c3c' : '#27ae60';
+        }
     } catch (err) { console.error('❌ showLedger error:', err); }
+}
+
+function delLedger(custName, index) {
+    if (!confirm('⚠️ Delete this entry?')) return;
+    if (db.ledgers[custName] && db.ledgers[custName][index]) {
+        db.ledgers[custName].splice(index, 1);
+        if (db.ledgers[custName].length === 0) {
+            delete db.ledgers[custName];
+            delete db.opening_balances[custName];
+        }
+        saveLocalData();
+        showLedger();
+        showNotification('✅ Entry deleted!', 'success');
+    }
+}
+
+function editLedger(custName, index) {
+    const entry = db.ledgers[custName] && db.ledgers[custName][index];
+    if (!entry) { showNotification('⚠️ Entry not found!', 'error'); return; }
+    const newDebit = prompt('New Debit:', entry.debit);
+    if (newDebit === null) return;
+    const newCredit = prompt('New Credit:', entry.credit);
+    if (newCredit === null) return;
+    db.ledgers[custName][index].debit = Number(newDebit) || 0;
+    db.ledgers[custName][index].credit = Number(newCredit) || 0;
+    saveLocalData();
+    showLedger();
+    showNotification('✅ Updated!', 'success');
 }
 
 // ==========================================
@@ -493,7 +642,9 @@ function loadUserTable() {
 
 function deleteExtraUser(index) {
     if (!confirm('⚠️ Delete user?')) return;
-    extraUsers.splice(index, 1); saveLocalData(); loadUserTable();
+    extraUsers.splice(index, 1);
+    saveLocalData();
+    loadUserTable();
     showNotification('✅ User deleted!', 'success');
 }
 
@@ -502,14 +653,19 @@ function createNewUser() {
         const name = document.getElementById('new-username').value.trim();
         const id = document.getElementById('new-userid').value.trim();
         const pass = document.getElementById('new-password').value.trim();
-        const perms = []; document.querySelectorAll('.perm:checked').forEach(cb => perms.push(cb.value));
+        const perms = [];
+        document.querySelectorAll('.perm:checked').forEach(cb => perms.push(cb.value));
         if (!name) { showNotification('⚠️ Enter name!', 'warning'); return; }
         if (!id) { showNotification('⚠️ Enter user ID!', 'warning'); return; }
         if (!pass) { showNotification('⚠️ Enter password!', 'warning'); return; }
         if (extraUsers.some(u => u.id === id)) { showNotification('⚠️ User ID exists!', 'warning'); return; }
-        extraUsers.push({ id, pass, name, perms }); saveLocalData(); loadUserTable();
-        document.getElementById('new-username').value = ''; document.getElementById('new-userid').value = '';
-        document.getElementById('new-password').value = ''; document.querySelectorAll('.perm:checked').forEach(cb => cb.checked = false);
+        extraUsers.push({ id, pass, name, perms });
+        saveLocalData();
+        loadUserTable();
+        document.getElementById('new-username').value = '';
+        document.getElementById('new-userid').value = '';
+        document.getElementById('new-password').value = '';
+        document.querySelectorAll('.perm:checked').forEach(cb => cb.checked = false);
         showNotification(`✅ User "${name}" created!`, 'success');
     } catch (err) { console.error('❌ createNewUser error:', err); }
 }
@@ -522,15 +678,23 @@ function login() {
         const u = document.getElementById('user').value.trim().toLowerCase();
         const p = document.getElementById('pass').value.trim();
         if (u === 'admin' && p === '123') {
-            localStorage.setItem('isLoggedIn', 'true'); localStorage.setItem('userRole', 'admin'); showSystem('admin');
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('userRole', 'admin');
+            showSystem('admin');
         } else if (u === 'ali' && p === '123') {
-            localStorage.setItem('isLoggedIn', 'true'); localStorage.setItem('userRole', 'staff'); showSystem('staff');
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('userRole', 'staff');
+            showSystem('staff');
         } else if (u === 'sattar' && p === '123') {
-            localStorage.setItem('isLoggedIn', 'true'); localStorage.setItem('userRole', 'manager'); showSystem('manager');
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('userRole', 'manager');
+            showSystem('manager');
         } else {
             const found = extraUsers.find(user => user.id === u && user.pass === p);
             if (found) {
-                localStorage.setItem('isLoggedIn', 'true'); localStorage.setItem('userRole', 'extra'); showSystem(found);
+                localStorage.setItem('isLoggedIn', 'true');
+                localStorage.setItem('userRole', 'extra');
+                showSystem(found);
             } else {
                 showNotification('❌ Wrong ID or Password!', 'error');
             }
@@ -547,7 +711,10 @@ function showSystem(roleOrUser) {
             const items = document.querySelectorAll('#sidebar ul li');
             items.forEach(item => {
                 const onclick = item.getAttribute('onclick') || '';
-                if (onclick.includes('page-dashboard') || onclick.includes('logout')) { item.style.display = 'flex'; return; }
+                if (onclick.includes('page-dashboard') || onclick.includes('logout')) {
+                    item.style.display = 'flex';
+                    return;
+                }
                 let hasPerm = false;
                 if (roleOrUser.perms) hasPerm = roleOrUser.perms.some(p => onclick.includes(p));
                 item.style.display = hasPerm ? 'flex' : 'none';
@@ -571,13 +738,16 @@ function showSystem(roleOrUser) {
                 });
             }
         }
-        renderAll(); updateDashboardStats(); loadUserTable();
+        renderAll();
+        updateDashboardStats();
+        loadUserTable();
     } catch (err) { console.error('❌ showSystem error:', err); }
 }
 
 function logout() {
     if (!confirm('🚪 Logout?')) return;
-    localStorage.removeItem('isLoggedIn'); localStorage.removeItem('userRole');
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('userRole');
     location.reload();
 }
 
@@ -588,8 +758,9 @@ function toggleSidebar() {
     const sb = document.getElementById('sidebar');
     const mc = document.getElementById('main-content');
     if (!sb || !mc) return;
-    if (sb.style.left === '0px') { sb.style.left = '-240px'; mc.style.marginLeft = '0'; }
-    else { sb.style.left = '0px'; mc.style.marginLeft = '240px'; }
+    if (sb.style.left === '0px') { sb.style.left = '-240px';
+        mc.style.marginLeft = '0'; } else { sb.style.left = '0px';
+        mc.style.marginLeft = '240px'; }
 }
 
 function switchPage(pageId, title) {
@@ -683,8 +854,11 @@ function showNotification(message, type = 'info') {
             transition:all 0.4s ease;font-size:14px;
         `;
         document.body.appendChild(div);
-        setTimeout(() => { div.style.transform = 'translateY(0)'; div.style.opacity = '1'; }, 50);
-        setTimeout(() => { div.style.transform = 'translateY(100px)'; div.style.opacity = '0'; setTimeout(() => { if (div.parentNode) div.remove(); }, 400); }, 4000);
+        setTimeout(() => { div.style.transform = 'translateY(0)';
+            div.style.opacity = '1'; }, 50);
+        setTimeout(() => { div.style.transform = 'translateY(100px)';
+            div.style.opacity = '0';
+            setTimeout(() => { if (div.parentNode) div.remove(); }, 400); }, 4000);
     } catch (err) { console.error('❌ showNotification error:', err); }
 }
 
@@ -714,14 +888,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         console.log('🚀 KRT TRADERS ERP v5.0 Loaded!');
         console.log('📦 Developed by Bilal Suleman');
-    } catch (err) { console.error('❌ Startup error:', err); showNotification('⚠️ Error loading app: ' + err.message, 'error'); }
+    } catch (err) { console.error('❌ Startup error:', err);
+        showNotification('⚠️ Error loading app: ' + err.message, 'error'); }
 });
 
 // ==========================================
 // KEYBOARD SHORTCUTS
 // ==========================================
 document.addEventListener('keydown', function(e) {
-    if (e.ctrlKey && e.key === 's') { e.preventDefault(); syncAllCloudData(); }
+    if (e.ctrlKey && e.key === 's') { e.preventDefault();
+        syncAllCloudData(); }
     if (e.key === 'Escape') { const sb = document.getElementById('sidebar'); if (sb && sb.style.left === '0px') toggleSidebar(); }
     if (e.key === 'Enter') { const pass = document.getElementById('pass'); if (pass && document.activeElement === pass) login(); }
 });
@@ -749,12 +925,15 @@ updateClock();
         let progress = 0;
         const interval = setInterval(() => {
             progress += Math.random() * 3 + 0.5;
-            if (progress >= 100) { progress = 100; clearInterval(interval);
-                setTimeout(() => { overlay.style.display = 'none'; document.getElementById('login-screen').style.display = 'flex'; }, 500); }
+            if (progress >= 100) { progress = 100;
+                clearInterval(interval);
+                setTimeout(() => { overlay.style.display = 'none';
+                    document.getElementById('login-screen').style.display = 'flex'; }, 500); }
             bar.style.width = progress + '%';
         }, 70);
     } else {
-        setTimeout(() => { overlay.style.display = 'none'; document.getElementById('login-screen').style.display = 'flex'; }, 1000);
+        setTimeout(() => { overlay.style.display = 'none';
+            document.getElementById('login-screen').style.display = 'flex'; }, 1000);
     }
 })();
 
