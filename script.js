@@ -4,7 +4,7 @@
 // ==========================================
 
 // ==========================================
-// SUPABASE CONFIG - FIXED
+// SUPABASE CONFIG
 // ==========================================
 const SUPABASE_URL = 'https://jsxcmlpjdxgloofdrugz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb';
@@ -240,7 +240,7 @@ async function syncAllCloudData() {
 }
 
 // ==========================================
-// PENDING SYNC
+// PENDING SYNC - FIXED
 // ==========================================
 async function processPendingSync() {
     if (!_supabase || !isSupabaseConnected || !navigator.onLine || pendingSync.length === 0) return;
@@ -248,18 +248,33 @@ async function processPendingSync() {
     const failed = [];
     for (const op of pendingSync) {
         try {
+            const tableName = op.table || 'KRT';
+            console.log(`  📝 ${op.type} on ${tableName}`);
+            
             if (op.type === 'insert') {
-                const { error } = await _supabase.from(op.table).insert(op.data);
-                if (error) failed.push(op);
-                else console.log('✅ Pending insert synced');
+                const { error } = await _supabase.from(tableName).insert(op.data);
+                if (error) {
+                    console.error('❌ Insert error:', error);
+                    failed.push(op);
+                } else {
+                    console.log('✅ Pending insert synced');
+                }
             } else if (op.type === 'delete') {
-                const { error } = await _supabase.from(op.table).delete().eq('id', op.id);
-                if (error) failed.push(op);
-                else console.log('✅ Pending delete synced');
+                const { error } = await _supabase.from(tableName).delete().eq('id', op.id);
+                if (error) {
+                    console.error('❌ Delete error:', error);
+                    failed.push(op);
+                } else {
+                    console.log('✅ Pending delete synced');
+                }
             } else if (op.type === 'update') {
-                const { error } = await _supabase.from(op.table).update(op.data).eq('id', op.id);
-                if (error) failed.push(op);
-                else console.log('✅ Pending update synced');
+                const { error } = await _supabase.from(tableName).update(op.data).eq('id', op.id);
+                if (error) {
+                    console.error('❌ Update error:', error);
+                    failed.push(op);
+                } else {
+                    console.log('✅ Pending update synced');
+                }
             }
         } catch (err) {
             console.error('❌ Operation failed:', err);
@@ -272,8 +287,10 @@ async function processPendingSync() {
 }
 
 function addPendingSync(op) {
+    op.table = 'KRT';
     pendingSync.push(op);
     localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
+    console.log(`📝 Added to pending sync: ${op.type} on ${op.table}`);
     if (navigator.onLine && isSupabaseConnected) {
         setTimeout(processPendingSync, 2000);
     }
@@ -348,7 +365,7 @@ async function addIn() {
             total: qty * price
         });
         saveAndRefresh();
-        addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
+        addPendingSync({ type: 'insert', data: entryData });
         clearInForm();
         showNotification('✅ Stock IN saved locally!', 'warning');
     } catch (err) {
@@ -440,7 +457,7 @@ async function addOut() {
             total: qty * price
         });
         saveAndRefresh();
-        addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
+        addPendingSync({ type: 'insert', data: entryData });
         clearOutForm();
         showNotification('✅ Stock OUT saved locally!', 'warning');
     } catch (err) {
@@ -474,7 +491,7 @@ async function deleteEntry(type, index) {
             console.log('✅ Cloud delete success');
         } catch (err) {
             console.error('❌ Delete error:', err);
-            addPendingSync({ type: 'delete', table: 'KRT', id: record.id });
+            addPendingSync({ type: 'delete', id: record.id });
         }
     }
     db[type].splice(index, 1);
@@ -516,7 +533,6 @@ async function editEntry(type, index) {
             console.error('❌ Update error:', err);
             addPendingSync({
                 type: 'update',
-                table: 'KRT',
                 id: record.id,
                 data: {
                     stock_in: type === 'in' ? qtyNum : 0,
