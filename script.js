@@ -325,6 +325,13 @@ async function addIn() {
                     .from('KRT')
                     .insert([entryData])
                     .select();
+                console.log("Entry Data:", entryData);
+console.log("Data:", data);
+console.log("Error:", error);
+
+if (error) {
+    alert(error.message);
+}
                 
                 if (!error && data && data.length > 0) {
                     db.in.push({
