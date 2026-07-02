@@ -6,7 +6,7 @@
 // ==========================================
 // SUPABASE CONFIG
 // ==========================================
-const SUPABASE_URL = 'https://jsxcmlpjdxgloofdrugz.supabase.co/rest/v1/';
+const SUPABASE_URL ="https://jsxcmlpjdxgloofdrugz.supabase.co";';
 const SUPABASE_KEY = 'sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb';
 
 let _supabase = null;
