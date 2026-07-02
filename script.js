@@ -2,11 +2,13 @@
 // KRT TRADERS ERP - COMPLETE SCRIPT
 // Developed by Bilal Suleman
 // ==========================================
+// ✅ SUPABASE CONFIG - FIXED
+// ==========================================
 
-// ==========================================
-// SUPABASE CONFIG
-// ==========================================
-const SUPABASE_URL = 'https://jsxcmlpjdxgloofdrugz.supabase.co/rest/v1/';
+// ✅ SAHI URL (domain only, NO /rest/v1/)
+const SUPABASE_URL = 'https://jsxcmlpjdxgloofdrugz.supabase.co';
+
+// ✅ SAHI KEY
 const SUPABASE_KEY = 'sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb';
 
 let _supabase = null;
@@ -26,10 +28,10 @@ let pendingSync = [];
 try {
     _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     console.log('✅ Supabase client created');
+    console.log('📡 URL:', SUPABASE_URL);
 } catch (err) {
     console.error('❌ Supabase init failed:', err);
 }
-
 // ==========================================
 // TEST CONNECTION
 // ==========================================
