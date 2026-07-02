@@ -81,8 +81,9 @@
         <h3 class="card-title"><i class="fas fa-arrow-down" style="color:#27ae60;"></i> Add Stock</h3>
         <div class="form-group">
             <input type="date" id="in-date">
-            <input type="text" id="in-vendor" placeholder="Vendor">
-            <input type="text" id="in-item" placeholder="Item *">
+            <input type="text" id="in-vendor" placeholder="Vendor Name">
+            <input type="text" id="in-item" list="items-list" placeholder="Item Name *">
+            <datalist id="items-list"></datalist>
             <input type="text" id="in-barcode" placeholder="Barcode">
             <input type="number" id="in-qty" placeholder="Qty *">
             <input type="number" id="in-price" placeholder="Price *">
@@ -91,7 +92,12 @@
     </div>
     <div class="card">
         <h3 class="card-title">Today's Stock IN</h3>
-        <div class="table-responsive"><table><thead><tr><th>#</th><th>Item</th><th>Vendor</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr></thead><tbody id="today-list-in"></tbody></table></div>
+        <div class="table-responsive">
+            <table>
+                <thead><tr><th>#</th><th>Item</th><th>Vendor</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr></thead>
+                <tbody id="today-list-in"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -101,18 +107,24 @@
         <h3 class="card-title"><i class="fas fa-arrow-up" style="color:#e74c3c;"></i> Add Sale</h3>
         <div class="form-group">
             <input type="date" id="out-date">
-            <input type="text" id="out-customer" placeholder="Customer">
-            <input type="text" id="out-item" placeholder="Item *">
+            <input type="text" id="out-customer" placeholder="Customer Name">
+            <input type="text" id="out-item" list="items-list" oninput="showLiveStock(this.value)" placeholder="Item Name *">
+            <datalist id="items-list"></datalist>
             <input type="text" id="out-barcode" placeholder="Barcode">
             <input type="number" id="out-qty" placeholder="Qty *">
-            <input type="number" id="out-price" placeholder="Price *">
-            <button class="btn-danger" onclick="addOut()"><i class="fas fa-cash-register"></i> Sale</button>
+            <input type="number" id="out-price" placeholder="Sale Price *">
+            <button class="btn-danger" onclick="addOut()"><i class="fas fa-cash-register"></i> Register Sale</button>
         </div>
         <div id="stock-status"></div>
     </div>
     <div class="card">
         <h3 class="card-title">Today's Sales</h3>
-        <div class="table-responsive"><table><thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Item</th><th>Barcode</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr></thead><tbody id="today-list-out"></tbody></table></div>
+        <div class="table-responsive">
+            <table>
+                <thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Item</th><th>Barcode</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr></thead>
+                <tbody id="today-list-out"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -121,7 +133,12 @@
     <div class="card">
         <h3 class="card-title"><i class="fas fa-balance-scale" style="color:#3498db;"></i> Stock Balance</h3>
         <button class="btn-warning" onclick="printSection()"><i class="fas fa-print"></i> Print</button>
-        <div class="table-responsive"><table><thead><tr><th>Barcode</th><th>Item</th><th>Total In</th><th>Total Out</th><th>Available</th><th>Profit</th></tr></thead><tbody id="table-balance-body"></tbody></table></div>
+        <div class="table-responsive">
+            <table>
+                <thead><tr><th>Barcode</th><th>Item</th><th>Total In</th><th>Total Out</th><th>Available</th><th>Profit</th></tr></thead>
+                <tbody id="table-balance-body"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -162,35 +179,115 @@
     <div class="table-responsive"><table><thead><tr><th>Date</th><th>Item</th><th>Customer</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr></thead><tbody id="master-out-table"></tbody></table></div></div>
 </div>
 
-<!-- ===== LEDGERS ===== -->
+<!-- ===== LEDGERS - COMPLETE ===== -->
 <div id="page-customer-ledgers" class="erp-page" style="display:none;">
     <div class="card">
         <h3 class="card-title"><i class="fas fa-address-book" style="color:#9b59b6;"></i> Customer Ledgers</h3>
-        <div class="form-group">
-            <input type="text" id="ledger-cust-name" placeholder="Customer Name" oninput="showLedger()">
-            <input type="date" id="led-date">
-            <input type="number" id="led-debit" placeholder="Debit">
-            <input type="number" id="led-credit" placeholder="Credit">
-            <button class="btn-info" onclick="saveLedgerEntry()">Save</button>
+        
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px;">
+            <input type="text" id="ledger-cust-name" list="customer-list" placeholder="Customer Name *" oninput="showLedger()" style="flex:2; min-width:150px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <datalist id="customer-list"></datalist>
+            <input type="number" id="opening-bal" placeholder="Opening Balance" value="0" onchange="updateOpeningBal()" style="flex:1; min-width:120px; padding:10px; border:1px solid #ddd; border-radius:6px;">
         </div>
-        <div class="table-responsive"><table><thead><tr><th>#</th><th>Date</th><th>Debit</th><th>Credit</th></tr></thead><tbody id="ledger-table-body"></tbody></table></div>
-        <div>Total Debit: <span id="total-debit">0</span> | Total Credit: <span id="total-credit">0</span> | <strong id="final-balance">Balance: 0</strong></div>
+        
+        <div style="display:flex; flex-wrap:wrap; gap:8px; background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:15px;">
+            <input type="date" id="led-date" style="flex:1; min-width:100px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <input type="text" id="led-item" placeholder="Item Name" style="flex:2; min-width:120px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <input type="number" id="led-qty" placeholder="Qty" value="0" style="flex:1; min-width:70px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <input type="number" id="led-price" placeholder="Price" value="0" style="flex:1; min-width:70px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <input type="number" id="led-debit" placeholder="Debit" value="0" style="flex:1; min-width:90px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <input type="number" id="led-credit" placeholder="Credit" value="0" style="flex:1; min-width:90px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <select id="led-method" style="flex:1; min-width:100px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+                <option value="Cash">Cash</option>
+                <option value="Bank">Bank</option>
+                <option value="Cheque">Cheque</option>
+            </select>
+            <button class="btn-info" onclick="saveLedgerEntry()"><i class="fas fa-save"></i> Save</button>
+        </div>
+        
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Date</th>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>Price</th>
+                        <th>Total</th>
+                        <th>Debit</th>
+                        <th>Credit</th>
+                        <th>Method</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="ledger-table-body"></tbody>
+                <tfoot>
+                    <tr style="background:#2c3e50; color:white; font-weight:bold;">
+                        <td colspan="3" style="text-align:right;">Grand Total:</td>
+                        <td id="total-ledger-qty">0</td>
+                        <td id="total-ledger-price">0</td>
+                        <td id="total-ledger-value">0</td>
+                        <td id="total-ledger-debit">0</td>
+                        <td id="total-ledger-credit">0</td>
+                        <td colspan="2" id="final-ledger-balance" style="background:#f1c40f; color:#1a1a2e;">Balance: 0</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
     </div>
 </div>
 
-<!-- ===== RENT ===== -->
+<!-- ===== RENT BOOK - COMPLETE ===== -->
 <div id="page-rent-book" class="erp-page" style="display:none;">
     <div class="card">
-        <h3 class="card-title"><i class="fas fa-building" style="color:#e67e22;"></i> Rent Book</h3>
-        <div class="form-group">
-            <input type="text" id="rent-name" placeholder="Name" oninput="renderRentTable()">
-            <input type="date" id="rent-date">
-            <input type="number" id="rent-debit" placeholder="Debit">
-            <input type="number" id="rent-credit" placeholder="Credit">
-            <button class="btn-danger" onclick="addRentEntry()">Save</button>
+        <h3 class="card-title"><i class="fas fa-building" style="color:#e67e22;"></i> Market Rent Book</h3>
+        
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px;">
+            <input type="text" id="rent-name" placeholder="Shopkeeper Name *" oninput="renderRentTable()" style="flex:2; min-width:150px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <input type="text" id="rent-shop-no" placeholder="Shop No" style="flex:1; min-width:100px; padding:10px; border:1px solid #ddd; border-radius:6px;">
         </div>
-        <div class="table-responsive"><table><thead><tr><th>Name</th><th>Date</th><th>Debit</th><th>Credit</th><th>Action</th></tr></thead><tbody id="rent-main-rows"></tbody></table></div>
-        <div>Total Debit: <span id="rent-total-debit">0</span> | Total Credit: <span id="rent-total-credit">0</span></div>
+        
+        <div style="display:flex; flex-wrap:wrap; gap:8px; background:#fef9e7; padding:15px; border-radius:8px; margin-bottom:15px;">
+            <input type="date" id="rent-date" style="flex:1; min-width:100px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <input type="text" id="rent-month" placeholder="Month (e.g. July 2026)" style="flex:1; min-width:120px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <input type="number" id="rent-debit" placeholder="Rent Amount" value="0" style="flex:1; min-width:100px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <input type="number" id="rent-credit" placeholder="Advance Paid" value="0" style="flex:1; min-width:100px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+            <select id="rent-method" style="flex:1; min-width:100px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+                <option value="Cash">Cash</option>
+                <option value="Bank">Bank Transfer</option>
+                <option value="Cheque">Cheque</option>
+            </select>
+            <button class="btn-danger" onclick="addRentEntry()"><i class="fas fa-save"></i> Save</button>
+        </div>
+        
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Shop</th>
+                        <th>Date</th>
+                        <th>Month</th>
+                        <th>Rent (Debit)</th>
+                        <th>Advance (Credit)</th>
+                        <th>Method</th>
+                        <th>Balance</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="rent-main-rows"></tbody>
+                <tfoot>
+                    <tr style="background:#2c3e50; color:white; font-weight:bold;">
+                        <td colspan="3" style="text-align:right;">Grand Total:</td>
+                        <td id="rent-total-debit">0</td>
+                        <td id="rent-total-credit">0</td>
+                        <td>Balance:</td>
+                        <td id="rent-final-balance">0</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
     </div>
 </div>
 
