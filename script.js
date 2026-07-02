@@ -4,7 +4,7 @@
 // ==========================================
 
 // ==========================================
-// SUPABASE CONFIG
+// SUPABASE CONFIG - FIXED
 // ==========================================
 const SUPABASE_URL = 'https://jsxcmlpjdxgloofdrugz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb';
@@ -33,7 +33,7 @@ try {
 }
 
 // ==========================================
-// TEST CONNECTION & CLEAR LOCAL IF CLOUD EMPTY
+// TEST CONNECTION
 // ==========================================
 async function testSupabaseConnection() {
     try {
@@ -51,19 +51,7 @@ async function testSupabaseConnection() {
         isSupabaseConnected = true;
         console.log('✅ Connected! Records:', data?.count || 0);
         showNotification('✅ Connected to database!', 'success');
-        
-        // ✅ If cloud has 0 records, clear local data too
-        if (data?.count === 0) {
-            console.log('📭 Cloud is empty, clearing local data...');
-            db = { in: [], out: [], ledgers: {}, opening_balances: {} };
-            dbRent = [];
-            saveLocalData();
-            renderAll();
-            updateDashboardStats();
-            showNotification('📭 No data in cloud', 'info');
-        } else {
-            await fetchCloudData();
-        }
+        await fetchCloudData();
         renderAll();
     } catch (err) {
         isSupabaseConnected = false;
@@ -133,12 +121,7 @@ async function fetchCloudData() {
             return;
         }
         if (!data || data.length === 0) {
-            console.log('📭 No cloud data found');
-            db.in = [];
-            db.out = [];
-            saveLocalData();
-            renderAll();
-            updateDashboardStats();
+            console.log('ℹ️ No cloud data found');
             return;
         }
         console.log(`📥 Fetched ${data.length} records from "KRT"`);
@@ -209,10 +192,7 @@ async function fetchCloudRentData() {
             return;
         }
         if (!data || data.length === 0) {
-            console.log('📭 No rent data found');
-            dbRent = [];
-            saveLocalData();
-            renderRentTable();
+            console.log('ℹ️ No rent data found');
             return;
         }
         dbRent = data.map(row => ({
@@ -608,7 +588,7 @@ function renderAll() {
             outBody.innerHTML = html || `<tr><td colspan="9" style="text-align:center;padding:20px;color:#888;">📭 No sales today</td></tr>`;
         }
         
-        // Stock Balance
+        // Stock Balance - All Items
         const balBody = document.getElementById('table-balance-body');
         if (balBody) {
             const items = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
