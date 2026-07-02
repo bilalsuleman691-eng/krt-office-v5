@@ -36,7 +36,7 @@ try {
 async function testSupabaseConnection() {
     try {
         if (!_supabase) { isSupabaseConnected = false; return; }
-        const { data, error } = await _supabase.from('krt').select('count', { count: 'exact', head: true });
+        const { data, error } = await _supabase.from('KRT').select('count', { count: 'exact', head: true });
         if (error) { isSupabaseConnected = false; showNotification('⚠️ Offline mode', 'warning'); return; }
         isSupabaseConnected = true;
         console.log('✅ Connected!');
@@ -89,7 +89,7 @@ function saveAndRefresh() {
 async function fetchCloudData() {
     try {
         if (!_supabase || !isSupabaseConnected) return;
-        const { data, error } = await _supabase.from('krt').select('*').order('id', { ascending: true });
+        const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
         if (error || !data) return;
         db.in = [];
         db.out = [];
@@ -116,7 +116,7 @@ async function fetchCloudData() {
 async function fetchCloudRentData() {
     try {
         if (!_supabase || !isSupabaseConnected) return;
-        const { data, error } = await _supabase.from('krt_rent').select('*').order('id', { ascending: true });
+        const { data, error } = await _supabase.from('KRT_RENT').select('*').order('id', { ascending: true });
         if (error || !data) return;
         dbRent = data.map(row => ({ id: row.id, name: row.name, shop: row.shop, date: row.date, month: row.month, debit: Number(
                 row.debit || 0), credit: Number(row.credit || 0), method: row.method || 'Cash' }));
@@ -181,7 +181,7 @@ async function addIn() {
         const entryData = { date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
-                const { data, error } = await _supabase.from('krt').insert([entryData]).select();
+                const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
                 if (!error && data && data.length > 0) {
                     db.in.push({ id: data[0].id, date, vendor, item, barcode, qty, price, total: qty * price });
                     saveAndRefresh();
@@ -229,7 +229,7 @@ async function addOut() {
         const entryData = { date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: cust };
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
-                const { data, error } = await _supabase.from('krt').insert([entryData]).select();
+                const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
                 if (!error && data && data.length > 0) {
                     db.out.push({ id: data[0].id, date, cust, item, barcode, qty, price, total: qty * price });
                     saveAndRefresh();
@@ -267,7 +267,7 @@ async function deleteEntry(type, index) {
     const record = db[type] && db[type][index];
     if (!record) { showNotification('⚠️ Record not found!', 'error'); return; }
     if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
-        try { await _supabase.from('krt').delete().eq('id', record.id); } catch (err) { addPendingSync({ type: 'delete',
+        try { await _supabase.from('KRT').delete().eq('id', record.id); } catch (err) { addPendingSync({ type: 'delete',
                 table: 'krt', id: record.id }); }
     }
     db[type].splice(index, 1);
@@ -290,7 +290,7 @@ async function editEntry(type, index) {
     if (isNaN(qtyNum) || qtyNum < 0) { showNotification('⚠️ Invalid qty!', 'warning'); return; }
     if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
         try {
-            await _supabase.from('krt').update({ stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0,
+            await _supabase.from('KRT').update({ stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0,
                 price: priceNum }).eq('id', record.id);
         } catch (err) { addPendingSync({ type: 'update', table: 'krt', id: record.id, data: { stock_in: type === 'in' ?
                     qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum } }); }
