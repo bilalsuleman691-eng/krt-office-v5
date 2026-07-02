@@ -173,7 +173,7 @@ async function addIn() {
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
         if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
-        const entryData = { Date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
+        const entryData = { date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
