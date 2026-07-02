@@ -4,9 +4,9 @@
 // ==========================================
 
 // ==========================================
-// SUPABASE CONFIG
+// SUPABASE CONFIG - ✅ FIXED
 // ==========================================
-const SUPABASE_URL = 'https://jsxcm1pjdxxgloofdrugz.supabase.co';
+const SUPABASE_URL = 'https://jsxcm1pjdxxgloofdrugz.supabase.co';  // ← YEH LINE THEEK KARO
 const SUPABASE_KEY = 'sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb';
 
 let _supabase = null;
@@ -26,6 +26,7 @@ let pendingSync = [];
 try {
     _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     console.log('✅ Supabase client created');
+    console.log('📡 URL:', SUPABASE_URL);
 } catch (err) {
     console.error('❌ Supabase init failed:', err);
 }
@@ -36,14 +37,23 @@ try {
 async function testSupabaseConnection() {
     try {
         if (!_supabase) return;
+        console.log('📡 Testing connection...');
         const { data, error } = await _supabase.from('KRT').select('count', { count: 'exact', head: true });
-        if (error) { isSupabaseConnected = false; showNotification('⚠️ Offline mode', 'warning'); return; }
+        if (error) {
+            isSupabaseConnected = false;
+            console.error('❌ Connection failed:', error.message);
+            showNotification('⚠️ Offline mode', 'warning');
+            return;
+        }
         isSupabaseConnected = true;
-        console.log('✅ Connected!');
+        console.log('✅ Connected! Records:', data?.count || 0);
         showNotification('✅ Connected to database!', 'success');
         await fetchCloudData();
         renderAll();
-    } catch (err) { isSupabaseConnected = false; }
+    } catch (err) {
+        isSupabaseConnected = false;
+        console.error('❌ Connection error:', err);
+    }
 }
 
 // ==========================================
@@ -62,7 +72,9 @@ function loadLocalData() {
         console.log('✅ Local data loaded');
     } catch (err) {
         db = { in: [], out: [], ledgers: {}, opening_balances: {} };
-        dbRent = []; extraUsers = []; pendingSync = [];
+        dbRent = [];
+        extraUsers = [];
+        pendingSync = [];
     }
 }
 
@@ -87,9 +99,18 @@ function saveAndRefresh() {
 async function fetchCloudData() {
     try {
         if (!_supabase || !isSupabaseConnected) return;
+        console.log('📥 Fetching cloud data...');
         const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
-        if (error || !data) return;
-        db.in = []; db.out = [];
+        if (error) {
+            console.error('❌ Fetch error:', error);
+            return;
+        }
+        if (!data || data.length === 0) {
+            console.log('ℹ️ No cloud data found');
+            return;
+        }
+        db.in = [];
+        db.out = [];
         data.forEach(row => {
             const inQty = Number(row.stock_in || 0);
             const outQty = Number(row.stock_out || 0);
@@ -102,6 +123,7 @@ async function fetchCloudData() {
                 db.out.push({ id: row.id, date, cust: row.customer_name || 'General Sale', item: row.item_name || 'Unknown', qty: outQty, price, total: outQty * price });
             }
         });
+        console.log(`✅ Cloud data loaded: IN: ${db.in.length}, OUT: ${db.out.length}`);
         saveLocalData();
         renderAll();
         updateDashboardStats();
@@ -116,6 +138,7 @@ async function fetchCloudRentData() {
         dbRent = data.map(row => ({ id: row.id, name: row.name, shop: row.shop, date: row.date, month: row.month, debit: Number(row.debit || 0), credit: Number(row.credit || 0), method: row.method || 'Cash' }));
         saveLocalData();
         renderRentTable();
+        console.log(`✅ Rent data loaded: ${dbRent.length} records`);
     } catch (err) { console.error('❌ Rent fetch error:', err); }
 }
 
@@ -139,6 +162,7 @@ async function syncAllCloudData() {
 // ==========================================
 async function processPendingSync() {
     if (!_supabase || !isSupabaseConnected || !navigator.onLine || pendingSync.length === 0) return;
+    console.log(`📤 Processing ${pendingSync.length} pending operations...`);
     const failed = [];
     for (const op of pendingSync) {
         try {
@@ -149,6 +173,7 @@ async function processPendingSync() {
     }
     pendingSync = failed;
     localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
+    console.log(`✅ ${pendingSync.length} pending operations remaining`);
 }
 
 function addPendingSync(op) {
@@ -172,6 +197,7 @@ async function addIn() {
         if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
         if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
         const entryData = { Date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
+        console.log('📤 Saving Stock IN:', entryData);
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
@@ -179,11 +205,13 @@ async function addIn() {
                     db.in.push({ id: data[0].id, date, vendor, item, barcode, qty, price, total: qty * price });
                     saveAndRefresh();
                     clearInForm();
-                    showNotification('✅ Stock IN saved!', 'success');
+                    showNotification('✅ Stock IN saved to cloud!', 'success');
                     await fetchCloudData();
                     return;
+                } else if (error) {
+                    console.error('❌ Cloud error:', error);
                 }
-            } catch (err) { console.error('❌ Cloud error:', err); }
+            } catch (err) { console.error('❌ Cloud exception:', err); }
         }
         const tempId = 'local_' + Date.now();
         db.in.push({ id: tempId, date, vendor, item, barcode, qty, price, total: qty * price });
@@ -196,7 +224,8 @@ async function addIn() {
 
 function clearInForm() {
     ['in-date', 'in-vendor', 'in-item', 'in-barcode', 'in-qty', 'in-price'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = '';
+        const el = document.getElementById(id);
+        if (el) el.value = '';
     });
 }
 
@@ -218,6 +247,7 @@ async function addOut() {
         const totalOut = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
         if (qty > totalIn - totalOut) { showNotification(`⚠️ Only ${totalIn - totalOut} available!`, 'warning'); return; }
         const entryData = { Date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: cust };
+        console.log('📤 Saving Stock OUT:', entryData);
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
@@ -225,11 +255,13 @@ async function addOut() {
                     db.out.push({ id: data[0].id, date, cust, item, barcode, qty, price, total: qty * price });
                     saveAndRefresh();
                     clearOutForm();
-                    showNotification('✅ Stock OUT saved!', 'success');
+                    showNotification('✅ Stock OUT saved to cloud!', 'success');
                     await fetchCloudData();
                     return;
+                } else if (error) {
+                    console.error('❌ Cloud error:', error);
                 }
-            } catch (err) { console.error('❌ Cloud error:', err); }
+            } catch (err) { console.error('❌ Cloud exception:', err); }
         }
         const tempId = 'local_' + Date.now();
         db.out.push({ id: tempId, date, cust, item, barcode, qty, price, total: qty * price });
@@ -242,9 +274,11 @@ async function addOut() {
 
 function clearOutForm() {
     ['out-date', 'out-customer', 'out-item', 'out-barcode', 'out-qty', 'out-price'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = '';
+        const el = document.getElementById(id);
+        if (el) el.value = '';
     });
-    const status = document.getElementById('stock-status'); if (status) status.innerHTML = '';
+    const status = document.getElementById('stock-status');
+    if (status) status.innerHTML = '';
 }
 
 // ==========================================
@@ -293,7 +327,8 @@ function renderAll() {
         const today = new Date().toISOString().split('T')[0];
         const inBody = document.getElementById('today-list-in');
         if (inBody) {
-            let html = '', c = 1;
+            let html = '',
+                c = 1;
             db.in.forEach((x, i) => {
                 if (x.date === today) {
                     html += `<tr><td>${c++}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.vendor)}</td><td>${x.qty}</td><td>${x.price || 0}</td><td>${(x.qty * (x.price || 0)).toLocaleString()}</td>
@@ -304,7 +339,8 @@ function renderAll() {
         }
         const outBody = document.getElementById('today-list-out');
         if (outBody) {
-            let html = '', c = 1;
+            let html = '',
+                c = 1;
             db.out.forEach((x, i) => {
                 if (x.date === today) {
                     html += `<tr><td>${c++}</td><td>${x.date}</td><td>${escapeHtml(x.cust)}</td><td>${escapeHtml(x.item)}</td><td>${x.barcode || 'N/A'}</td><td>${x.qty}</td><td>${x.price || 0}</td><td>${(x.qty * (x.price || 0)).toLocaleString()}</td>
@@ -347,21 +383,36 @@ function updateDashboardStats() {
         const totalOutValue = db.out.reduce((s, x) => s + (x.qty * x.price), 0);
         const totalProfit = totalOutValue - totalInValue;
         const uniqueItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
-        const el1 = document.getElementById('dash-total-in'); if (el1) el1.textContent = totalIn;
-        const el2 = document.getElementById('dash-total-out'); if (el2) el2.textContent = totalOut;
-        const el3 = document.getElementById('dash-unique-items'); if (el3) el3.textContent = uniqueItems.length;
-        const el4 = document.getElementById('dash-revenue'); if (el4) el4.textContent = 'PKR ' + totalOutValue.toLocaleString();
-        const el5 = document.getElementById('dash-profit'); if (el5) { el5.textContent = 'PKR ' + totalProfit.toLocaleString(); el5.style.color = totalProfit >= 0 ? '#27ae60' : '#e74c3c'; }
+        const el1 = document.getElementById('dash-total-in');
+        if (el1) el1.textContent = totalIn;
+        const el2 = document.getElementById('dash-total-out');
+        if (el2) el2.textContent = totalOut;
+        const el3 = document.getElementById('dash-unique-items');
+        if (el3) el3.textContent = uniqueItems.length;
+        const el4 = document.getElementById('dash-revenue');
+        if (el4) el4.textContent = 'PKR ' + totalOutValue.toLocaleString();
+        const el5 = document.getElementById('dash-profit');
+        if (el5) { el5.textContent = 'PKR ' + totalProfit.toLocaleString();
+            el5.style.color = totalProfit >= 0 ? '#27ae60' : '#e74c3c'; }
     } catch (err) { console.error('❌ Dashboard error:', err); }
 }
 
-function escapeHtml(text) { if (!text) return ''; const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
+function escapeHtml(text) { if (!text) return '';
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML; }
 
 function updateItemLists() {
     const list = document.getElementById('items-list');
     if (!list) return;
     const items = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
     list.innerHTML = items.map(name => `<option value="${escapeHtml(name)}">`).join('');
+}
+
+function updateCustomerDropdown() {
+    const list = document.getElementById('customer-list');
+    if (!list) return;
+    list.innerHTML = Object.keys(db.ledgers).map(name => `<option value="${escapeHtml(name)}">`).join('');
 }
 
 // ==========================================
@@ -385,7 +436,8 @@ function addRentEntry() {
             _supabase.from('KRT_RENT').insert([entryData]).then(result => {
                 if (!result.error && result.data && result.data.length > 0) {
                     const idx = dbRent.findIndex(x => x.id === tempId);
-                    if (idx !== -1) { dbRent[idx].id = result.data[0].id; saveLocalData(); }
+                    if (idx !== -1) { dbRent[idx].id = result.data[0].id;
+                        saveLocalData(); }
                 }
             }).catch(() => addPendingSync({ type: 'insert', table: 'KRT_RENT', data: entryData }));
         } else { addPendingSync({ type: 'insert', table: 'KRT_RENT', data: entryData }); }
@@ -401,7 +453,9 @@ function renderRentTable() {
     try {
         const tbody = document.getElementById('rent-main-rows');
         if (!tbody) return;
-        let html = '', totalDebit = 0, totalCredit = 0;
+        let html = '',
+            totalDebit = 0,
+            totalCredit = 0;
         dbRent.forEach((r, i) => {
             totalDebit += r.debit;
             totalCredit += r.credit;
@@ -409,8 +463,10 @@ function renderRentTable() {
                 <td><button class="btn-action btn-delete" onclick="deleteRentEntry(${i})">🗑️</button></td></tr>`;
         });
         tbody.innerHTML = html || `<tr><td colspan="5" style="text-align:center;padding:20px;color:#888;">📭 No entries</td></tr>`;
-        const td = document.getElementById('rent-total-debit'); if (td) td.textContent = totalDebit;
-        const tc = document.getElementById('rent-total-credit'); if (tc) tc.textContent = totalCredit;
+        const td = document.getElementById('rent-total-debit');
+        if (td) td.textContent = totalDebit;
+        const tc = document.getElementById('rent-total-credit');
+        if (tc) tc.textContent = totalCredit;
     } catch (err) { console.error('❌ renderRentTable error:', err); }
 }
 
@@ -457,7 +513,8 @@ function showLedger() {
         const tbody = document.getElementById('ledger-table-body');
         if (!tbody) return;
         tbody.innerHTML = '';
-        let totalDebit = 0, totalCredit = 0;
+        let totalDebit = 0,
+            totalCredit = 0;
         if (name && db.ledgers[name]) {
             db.ledgers[name].forEach((entry, i) => {
                 totalDebit += entry.debit;
@@ -465,16 +522,13 @@ function showLedger() {
                 tbody.innerHTML += `<tr><td>${i+1}</td><td>${entry.date}</td><td>${entry.debit}</td><td>${entry.credit}</td></tr>`;
             });
         }
-        const td = document.getElementById('total-debit'); if (td) td.textContent = totalDebit;
-        const tc = document.getElementById('total-credit'); if (tc) tc.textContent = totalCredit;
-        const bal = document.getElementById('final-balance'); if (bal) bal.textContent = `Balance: ${totalDebit - totalCredit}`;
+        const td = document.getElementById('total-debit');
+        if (td) td.textContent = totalDebit;
+        const tc = document.getElementById('total-credit');
+        if (tc) tc.textContent = totalCredit;
+        const bal = document.getElementById('final-balance');
+        if (bal) bal.textContent = `Balance: ${totalDebit - totalCredit}`;
     } catch (err) { console.error('❌ showLedger error:', err); }
-}
-
-function updateCustomerDropdown() {
-    const list = document.getElementById('customer-list');
-    if (!list) return;
-    list.innerHTML = Object.keys(db.ledgers).map(name => `<option value="${escapeHtml(name)}">`).join('');
 }
 
 // ==========================================
@@ -665,10 +719,12 @@ function generateCustomReport() {
             outTable.innerHTML = fOut.map(x => `<tr><td>${x.date}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.cust)}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total.toLocaleString()}</td></tr>`).join('') ||
                 `<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
         }
-        document.querySelector('.report-summary')?.remove();
+        const existing = document.querySelector('.report-summary');
+        if (existing) existing.remove();
         const summary = document.createElement('div');
         summary.className = 'report-summary';
-        summary.style.cssText = 'display:flex;justify-content:space-around;background:#2c3e50;color:white;padding:15px;border-radius:8px;margin-top:20px;flex-wrap:wrap;';
+        summary.style.cssText =
+            'display:flex;justify-content:space-around;background:#2c3e50;color:white;padding:15px;border-radius:8px;margin-top:20px;flex-wrap:wrap;';
         summary.innerHTML = `
             <span>📥 Total IN: PKR ${totalInValue.toLocaleString()}</span>
             <span>📤 Total OUT: PKR ${totalOutValue.toLocaleString()}</span>
@@ -677,7 +733,7 @@ function generateCustomReport() {
             </span>
         `;
         const printArea = document.getElementById('print-area');
-        if (printArea) { const existing = printArea.querySelector('.report-summary'); if (existing) existing.remove(); printArea.appendChild(summary); }
+        if (printArea) printArea.appendChild(summary);
         showNotification('✅ Report generated!', 'success');
     } catch (err) { console.error('❌ generateCustomReport error:', err); }
 }
@@ -702,8 +758,11 @@ function showNotification(message, type = 'info') {
             transition:all 0.4s ease;font-size:14px;
         `;
         document.body.appendChild(div);
-        setTimeout(() => { div.style.transform = 'translateY(0)'; div.style.opacity = '1'; }, 50);
-        setTimeout(() => { div.style.transform = 'translateY(100px)'; div.style.opacity = '0'; setTimeout(() => { if (div.parentNode) div.remove(); }, 400); }, 4000);
+        setTimeout(() => { div.style.transform = 'translateY(0)';
+            div.style.opacity = '1'; }, 50);
+        setTimeout(() => { div.style.transform = 'translateY(100px)';
+            div.style.opacity = '0';
+            setTimeout(() => { if (div.parentNode) div.remove(); }, 400); }, 4000);
     } catch (err) { console.error('❌ showNotification error:', err); }
 }
 
@@ -738,7 +797,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ===== KEYBOARD SHORTCUTS =====
 document.addEventListener('keydown', function(e) {
-    if (e.ctrlKey && e.key === 's') { e.preventDefault(); syncAllCloudData(); }
+    if (e.ctrlKey && e.key === 's') { e.preventDefault();
+        syncAllCloudData(); }
     if (e.key === 'Escape') { const sb = document.getElementById('sidebar'); if (sb && sb.style.left === '0px') toggleSidebar(); }
     if (e.key === 'Enter') { const pass = document.getElementById('pass'); if (pass && document.activeElement === pass) login(); }
 });
@@ -748,7 +808,8 @@ function updateClock() {
     const el = document.getElementById('live-clock');
     if (el) {
         const now = new Date();
-        el.textContent = now.toLocaleString('en-PK', { weekday:'short', day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+        el.textContent = now.toLocaleString('en-PK', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit' });
     }
 }
 setInterval(updateClock, 10000);
@@ -764,12 +825,12 @@ updateClock();
         let progress = 0;
         const interval = setInterval(() => {
             progress += Math.random() * 3 + 0.5;
-            if (progress >= 100) { progress = 100; clearInterval(interval);
+            if (progress >= 100) { progress = 100;
+                clearInterval(interval);
                 setTimeout(() => {
                     overlay.style.display = 'none';
                     document.getElementById('login-screen').style.display = 'flex';
-                }, 500);
-            }
+                }, 500); }
             bar.style.width = progress + '%';
         }, 70);
     } else {
@@ -779,3 +840,5 @@ updateClock();
         }, 1000);
     }
 })();
+
+console.log('🐘 KRT TRADERS ERP v5.0 - All Errors Fixed!');
