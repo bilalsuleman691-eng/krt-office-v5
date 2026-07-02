@@ -290,6 +290,7 @@ function addPendingSync(op) {
 // STOCK IN
 // ==========================================
 async function addIn() {
+    alert("addIn function called");
     try {
         const dateInput = document.getElementById('in-date');
         const vendorInput = document.getElementById('in-vendor');
