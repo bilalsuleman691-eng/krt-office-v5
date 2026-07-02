@@ -178,7 +178,7 @@ async function addIn() {
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
         if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
-        const entryData = { Date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
+        const entryData = { date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 const { data, error } = await _supabase.from('krt').insert([entryData]).select();
@@ -226,7 +226,7 @@ async function addOut() {
         const totalIn = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
         const totalOut = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
         if (qty > totalIn - totalOut) { showNotification(`⚠️ Only ${totalIn - totalOut} available!`, 'warning'); return; }
-        const entryData = { Date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: cust };
+        const entryData = { date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: cust };
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 const { data, error } = await _supabase.from('krt').insert([entryData]).select();
