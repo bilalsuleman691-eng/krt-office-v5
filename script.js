@@ -12,6 +12,7 @@ const SUPABASE_KEY = "sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb";
 let _supabase = null;
 let isSupabaseConnected = false;
 let isLoading = false;
+let notificationTimeout = null;
 
 // ==========================================
 // GLOBAL VARIABLES
@@ -186,7 +187,7 @@ function addPendingSync(op) {
 }
 
 // ==========================================
-// STOCK IN
+// STOCK IN - FIXED (No duplicate notifications)
 // ==========================================
 async function addIn() {
     try {
@@ -196,11 +197,15 @@ async function addIn() {
         const barcode = document.getElementById('in-barcode').value || '';
         const qty = Number(document.getElementById('in-qty').value);
         const price = Number(document.getElementById('in-price').value) || 0;
+        
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
         if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
         if (price <= 0 || isNaN(price)) { showNotification('⚠️ Enter valid price!', 'warning'); return; }
-        const entryData = { date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
+        
+        const entryData = { Date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
+        let saved = false;
+        
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
@@ -208,18 +213,21 @@ async function addIn() {
                     db.in.push({ id: data[0].id, date, vendor, item, barcode, qty, price, total: qty * price });
                     saveAndRefresh();
                     clearInForm();
-                    showNotification('✅ Stock IN saved to cloud!', 'success');
+                    showNotification('✅ Stock IN saved!', 'success');
                     await fetchCloudData();
-                    return;
+                    saved = true;
                 }
             } catch (err) { console.error('❌ Cloud error:', err); }
         }
-        const tempId = 'local_' + Date.now();
-        db.in.push({ id: tempId, date, vendor, item, barcode, qty, price, total: qty * price });
-        saveAndRefresh();
-        addPendingSync({ type: 'insert', table: 'krt', data: entryData });
-        clearInForm();
-        showNotification('✅ Stock IN saved locally!', 'warning');
+        
+        if (!saved) {
+            const tempId = 'local_' + Date.now();
+            db.in.push({ id: tempId, date, vendor, item, barcode, qty, price, total: qty * price });
+            saveAndRefresh();
+            addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
+            clearInForm();
+            showNotification('✅ Stock IN saved locally!', 'warning');
+        }
     } catch (err) { console.error('❌ addIn error:', err);
         showNotification('❌ Error: ' + err.message, 'error'); }
 }
@@ -232,7 +240,7 @@ function clearInForm() {
 }
 
 // ==========================================
-// STOCK OUT
+// STOCK OUT - FIXED
 // ==========================================
 async function addOut() {
     try {
@@ -242,14 +250,19 @@ async function addOut() {
         const barcode = document.getElementById('out-barcode').value || '';
         const qty = Number(document.getElementById('out-qty').value);
         const price = Number(document.getElementById('out-price').value) || 0;
+        
         if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
         if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
         if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
         if (price <= 0 || isNaN(price)) { showNotification('⚠️ Enter valid price!', 'warning'); return; }
+        
         const totalIn = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
         const totalOut = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
         if (qty > totalIn - totalOut) { showNotification(`⚠️ Only ${totalIn - totalOut} available!`, 'warning'); return; }
-        const entryData = { date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: cust };
+        
+        const entryData = { Date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: cust };
+        let saved = false;
+        
         if (_supabase && isSupabaseConnected && navigator.onLine) {
             try {
                 const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
@@ -257,18 +270,21 @@ async function addOut() {
                     db.out.push({ id: data[0].id, date, cust, item, barcode, qty, price, total: qty * price });
                     saveAndRefresh();
                     clearOutForm();
-                    showNotification('✅ Stock OUT saved to cloud!', 'success');
+                    showNotification('✅ Stock OUT saved!', 'success');
                     await fetchCloudData();
-                    return;
+                    saved = true;
                 }
             } catch (err) { console.error('❌ Cloud error:', err); }
         }
-        const tempId = 'local_' + Date.now();
-        db.out.push({ id: tempId, date, cust, item, barcode, qty, price, total: qty * price });
-        saveAndRefresh();
-        addPendingSync({ type: 'insert', table: 'krt', data: entryData });
-        clearOutForm();
-        showNotification('✅ Stock OUT saved locally!', 'warning');
+        
+        if (!saved) {
+            const tempId = 'local_' + Date.now();
+            db.out.push({ id: tempId, date, cust, item, barcode, qty, price, total: qty * price });
+            saveAndRefresh();
+            addPendingSync({ type: 'insert', table: 'KRT', data: entryData });
+            clearOutForm();
+            showNotification('✅ Stock OUT saved locally!', 'warning');
+        }
     } catch (err) { console.error('❌ addOut error:', err);
         showNotification('❌ Error: ' + err.message, 'error'); }
 }
@@ -283,7 +299,7 @@ function clearOutForm() {
 }
 
 // ==========================================
-// DELETE ENTRY - FIXED with ID
+// DELETE ENTRY
 // ==========================================
 async function deleteEntry(type, id) {
     if (!confirm('⚠️ Delete this record?')) return;
@@ -292,7 +308,7 @@ async function deleteEntry(type, id) {
     const record = db[type][index];
     if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
         try { await _supabase.from('KRT').delete().eq('id', record.id); } catch (err) { addPendingSync({ type: 'delete',
-                table: 'krt', id: record.id }); }
+                table: 'KRT', id: record.id }); }
     }
     db[type].splice(index, 1);
     saveAndRefresh();
@@ -300,7 +316,7 @@ async function deleteEntry(type, id) {
 }
 
 // ==========================================
-// EDIT ENTRY - FIXED with ID
+// EDIT ENTRY
 // ==========================================
 async function editEntry(type, id) {
     const index = db[type].findIndex(x => x.id === id);
@@ -318,7 +334,7 @@ async function editEntry(type, id) {
         try {
             await _supabase.from('KRT').update({ stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0,
                 price: priceNum }).eq('id', record.id);
-        } catch (err) { addPendingSync({ type: 'update', table: 'krt', id: record.id, data: { stock_in: type === 'in' ?
+        } catch (err) { addPendingSync({ type: 'update', table: 'KRT', id: record.id, data: { stock_in: type === 'in' ?
                     qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum } }); }
     }
     db[type][index].qty = qtyNum;
@@ -329,7 +345,7 @@ async function editEntry(type, id) {
 }
 
 // ==========================================
-// RENDER ALL - FIXED with ID
+// RENDER ALL
 // ==========================================
 function renderAll() {
     try {
@@ -466,7 +482,7 @@ function showLiveStock(itemName) {
 }
 
 // ==========================================
-// RENT BOOK - FIXED with Filter
+// RENT BOOK
 // ==========================================
 function addRentEntry() {
     try {
@@ -489,7 +505,7 @@ function addRentEntry() {
         renderRentTable();
 
         if (_supabase && isSupabaseConnected && navigator.onLine) {
-            _supabase.from('krt_rent').insert([entryData])
+            _supabase.from('KRT_RENT').insert([entryData])
                 .then(result => {
                     if (!result.error && result.data && result.data.length > 0) {
                         const idx = dbRent.findIndex(x => x.id === tempId);
@@ -497,8 +513,8 @@ function addRentEntry() {
                             saveLocalData(); }
                     }
                 })
-                .catch(() => addPendingSync({ type: 'insert', table: 'krt_rent', data: entryData }));
-        } else { addPendingSync({ type: 'insert', table: 'krt_rent', data: entryData }); }
+                .catch(() => addPendingSync({ type: 'insert', table: 'KRT_RENT', data: entryData }));
+        } else { addPendingSync({ type: 'insert', table: 'KRT_RENT', data: entryData }); }
 
         document.getElementById('rent-name').value = '';
         document.getElementById('rent-shop-no').value = '';
@@ -522,7 +538,6 @@ function renderRentTable() {
             totalDebit = 0,
             totalCredit = 0;
 
-        // Calculate cumulative balance per shopkeeper
         const shopkeepers = {};
         filtered.forEach(r => {
             if (!shopkeepers[r.name]) shopkeepers[r.name] = { debit: 0, credit: 0 };
@@ -569,7 +584,7 @@ function deleteRentEntry(id) {
     const record = dbRent[index];
     if (record && record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator
         .onLine) {
-        _supabase.from('krt_rent').delete().eq('id', record.id).catch(() => addPendingSync({ type: 'delete', table: 'krt_rent',
+        _supabase.from('KRT_RENT').delete().eq('id', record.id).catch(() => addPendingSync({ type: 'delete', table: 'KRT_RENT',
             id: record.id }));
     }
     dbRent.splice(index, 1);
@@ -857,7 +872,7 @@ function switchPage(pageId, title) {
 }
 
 // ==========================================
-// SEARCH / REPORT - FIXED with ID
+// SEARCH / REPORT
 // ==========================================
 function generateMasterSearch() {
     try {
@@ -924,25 +939,79 @@ function generateCustomReport() {
 }
 
 // ==========================================
-// EXPORT DATA - NEW FUNCTION
+// NOTIFICATIONS - FIXED (No duplicates)
+// ==========================================
+function showNotification(message, type = 'info') {
+    try {
+        // Clear previous notification timeout
+        if (notificationTimeout) {
+            clearTimeout(notificationTimeout);
+            notificationTimeout = null;
+        }
+        
+        // Remove existing notification with same message
+        const existing = document.querySelectorAll('.toast-notification');
+        existing.forEach(el => {
+            if (el.textContent === message) {
+                el.remove();
+            }
+        });
+        
+        const colors = { 
+            success: '#27ae60', 
+            error: '#e74c3c', 
+            warning: '#f39c12', 
+            info: '#3498db' 
+        };
+        
+        const div = document.createElement('div');
+        div.className = `toast-notification ${type}`;
+        div.textContent = message;
+        div.style.cssText = `
+            position:fixed;bottom:20px;right:20px;padding:12px 24px;
+            background:#1a1a2e;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.3);
+            border-left:4px solid ${colors[type] || '#3498db'};
+            z-index:999999;font-family:'Poppins',sans-serif;
+            max-width:400px;transform:translateY(100px);opacity:0;
+            transition:all 0.4s ease;font-size:14px;color:white;
+        `;
+        document.body.appendChild(div);
+        
+        setTimeout(() => {
+            div.style.transform = 'translateY(0)';
+            div.style.opacity = '1';
+        }, 50);
+        
+        notificationTimeout = setTimeout(() => {
+            div.style.transform = 'translateY(100px)';
+            div.style.opacity = '0';
+            setTimeout(() => {
+                if (div.parentNode) div.remove();
+                notificationTimeout = null;
+            }, 400);
+        }, 4000);
+    } catch (err) { console.error('❌ showNotification error:', err); }
+}
+
+function printSection() { window.print(); }
+
+// ==========================================
+// EXPORT DATA
 // ==========================================
 function exportAllData() {
     try {
-        // Export Stock IN
         let csvIn = 'Date,Item,Vendor,Qty,Price,Total\n';
         db.in.forEach(x => {
             csvIn += `${x.date},${x.item},${x.vendor},${x.qty},${x.price},${x.total}\n`;
         });
         downloadCSV(csvIn, 'stock_in_data.csv');
 
-        // Export Stock OUT
         let csvOut = 'Date,Item,Customer,Qty,Price,Total\n';
         db.out.forEach(x => {
             csvOut += `${x.date},${x.item},${x.cust},${x.qty},${x.price},${x.total}\n`;
         });
         downloadCSV(csvOut, 'stock_out_data.csv');
 
-        // Export Rent Book
         let csvRent = 'Name,Shop,Date,Month,Debit,Credit,Method\n';
         dbRent.forEach(x => {
             csvRent += `${x.name},${x.shop},${x.date},${x.month},${x.debit},${x.credit},${x.method}\n`;
@@ -963,36 +1032,6 @@ function downloadCSV(csv, filename) {
     a.click();
     URL.revokeObjectURL(url);
 }
-
-// ==========================================
-// NOTIFICATIONS
-// ==========================================
-function showNotification(message, type = 'info') {
-    try {
-        const colors = { success: '#27ae60', error: '#e74c3c', warning: '#f39c12', info: '#3498db' };
-        const existing = document.querySelectorAll('.toast-notification');
-        existing.forEach(el => { if (el.textContent === message) el.remove(); });
-        const div = document.createElement('div');
-        div.className = `toast-notification ${type}`;
-        div.textContent = message;
-        div.style.cssText = `
-            position:fixed;bottom:20px;right:20px;padding:12px 24px;
-            background:white;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.2);
-            border-left:4px solid ${colors[type] || '#3498db'};
-            z-index:999999;font-family:'Poppins',sans-serif;
-            max-width:400px;transform:translateY(100px);opacity:0;
-            transition:all 0.4s ease;font-size:14px;
-        `;
-        document.body.appendChild(div);
-        setTimeout(() => { div.style.transform = 'translateY(0)';
-            div.style.opacity = '1'; }, 50);
-        setTimeout(() => { div.style.transform = 'translateY(100px)';
-            div.style.opacity = '0';
-            setTimeout(() => { if (div.parentNode) div.remove(); }, 400); }, 4000);
-    } catch (err) { console.error('❌ showNotification error:', err); }
-}
-
-function printSection() { window.print(); }
 
 // ==========================================
 // STARTUP
