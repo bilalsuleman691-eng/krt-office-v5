@@ -1351,4 +1351,3 @@ updateClock();
 })();
 
 console.log('🐘 KRT TRADERS ERP v5.0 - Ready!');
-isko dykty huy wo sab theek kr ka do mujy
