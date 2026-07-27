@@ -1005,10 +1005,13 @@ document.addEventListener('DOMContentLoaded', function() {
         loadUserTable();
         updateCustomerDropdown();
         updateItemLists();
-        setTimeout(() => {
-            testSupabaseConnection();
-            if (navigator.onLine && isSupabaseConnected) syncAllCloudData();
-        }, 2000);
+        setTimeout(async () => {
+    await testSupabaseConnection();
+
+    if (navigator.onLine && isSupabaseConnected) {
+        await syncAllCloudData();
+    }
+}, 2000);
         const loggedIn = localStorage.getItem('isLoggedIn');
         const role = localStorage.getItem('userRole');
         if (loggedIn === 'true') {
