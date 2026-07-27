@@ -87,6 +87,7 @@ function saveAndRefresh() {
 // ==========================================
 // FETCH CLOUD DATA
 async function fetchCloudData() {
+    console.log("VERSION TEST 27-JUL");
     try {
         if (!_supabase || !isSupabaseConnected) return;
 
