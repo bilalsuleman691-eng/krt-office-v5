@@ -86,33 +86,69 @@ function saveAndRefresh() {
 // ==========================================
 // FETCH CLOUD DATA
 // ==========================================
+// ==========================================
+// FETCH CLOUD DATA - FIXED
+// ==========================================
 async function fetchCloudData() {
     try {
         if (!_supabase || !isSupabaseConnected) return;
         const { data, error } = await _supabase.from('KRT').select('*').order('id', { ascending: true });
-        if (error || !data) return;
+        if (error || !data) {
+            console.error('❌ Cloud fetch error:', error);
+            return;
+        }
+        
         db.in = [];
         db.out = [];
+        
         data.forEach(row => {
             const inQty = Number(row.stock_in || 0);
             const outQty = Number(row.stock_out || 0);
             const price = Number(row.price || 0);
-            const date = (row.Date || row.date || '').split('T')[0] || new Date().toISOString().split('T')[0];
+            
+            // Safe Date Parsing
+            let dateStr = row.date || row.Date || new Date().toISOString();
+            if (dateStr.includes('T')) {
+                dateStr = dateStr.split('T')[0];
+            }
+            
+            const item = row.item_name || row.item || 'Unknown';
+            const barcode = row.barcode || '';
+
             if (inQty > 0) {
-                db.in.push({ id: row.id, date, vendor: row.vendor_name || 'factory', item: row.item_name || 'Unknown', qty: inQty,
-                    price, total: inQty * price });
+                db.in.push({ 
+                    id: row.id, 
+                    date: dateStr, 
+                    vendor: row.vendor_name || row.vendor || 'factory', 
+                    item: item, 
+                    barcode: barcode,
+                    qty: inQty, 
+                    price: price, 
+                    total: inQty * price 
+                });
             }
             if (outQty > 0) {
-                db.out.push({ id: row.id, date, cust: row.customer_name || 'General Sale', item: row.item_name || 'Unknown',
-                    qty: outQty, price, total: outQty * price });
+                db.out.push({ 
+                    id: row.id, 
+                    date: dateStr, 
+                    cust: row.customer_name || row.customer || 'General Sale', 
+                    item: item, 
+                    barcode: barcode,
+                    qty: outQty, 
+                    price: price, 
+                    total: outQty * price 
+                });
             }
         });
+        
         saveLocalData();
         renderAll();
         updateDashboardStats();
-    } catch (err) { console.error('❌ Fetch error:', err); }
+        console.log('✅ Cloud data fetched and rendered successfully!');
+    } catch (err) { 
+        console.error('❌ Fetch error:', err); 
+    }
 }
-
 async function fetchCloudRentData() {
     try {
         if (!_supabase || !isSupabaseConnected) return;
