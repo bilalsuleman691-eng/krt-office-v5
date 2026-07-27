@@ -1,1115 +1,2418 @@
-// ==========================================
-// KRT TRADERS ERP - COMPLETE SCRIPT v5.0
-// Developed by Bilal Suleman
-// ==========================================
+/**
+ * ======================================================================
+ * KRT TRADERS ERP - Complete Enterprise System
+ * Version: 5.0.0
+ * Author: Bilal Suleman
+ * Description: Full-featured ERP with Cloud Sync, Multi-User, Ledgers, Rent Book
+ * ======================================================================
+ */
 
-// ==========================================
-// SUPABASE CONFIG
-// ==========================================
-const SUPABASE_URL = "https://jsxcmlpjdxgloofdrugz.supabase.co";
-const SUPABASE_KEY = "sb_publishable_Gyt7XmMb2fQxDouyHQMTYg_pB8dhGtb";
+// ======================================================================
+// SECTION 1: CONFIGURATION & CONSTANTS
+// ======================================================================
 
-let _supabase = null;
-let isSupabaseConnected = false;
-let isLoading = false;
+const CONFIG = {
+    SUPABASE_URL: 'https://your-project.supabase.co', // REPLACE WITH YOUR URL
+    SUPABASE_KEY: 'your-anon-key', // REPLACE WITH YOUR KEY
+    TABLE_NAME: 'krt',
+    COMPANY_NAME: 'KRT TRADERS',
+    CURRENCY: 'PKR',
+    APP_VERSION: '5.0.0',
+    SYNC_INTERVAL: 60000, // 1 minute
+    CACHE_TTL: 300000, // 5 minutes
+    RETRY_DELAY: 5000,
+    MAX_RETRIES: 3
+};
 
-// ==========================================
-// GLOBAL VARIABLES
-// ==========================================
-let db = { in: [], out: [], ledgers: {}, opening_balances: {} };
-let dbRent = [];
-let extraUsers = [];
-let pendingSync = [];
+// ======================================================================
+// SECTION 2: STATE MANAGEMENT
+// ======================================================================
 
-// ==========================================
-// INIT SUPABASE
-// ==========================================
-try {
-    _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    console.log('✅ Supabase client created');
-} catch (err) {
-    console.error('❌ Supabase init failed:', err);
-}
+const AppState = {
+    currentUser: null,
+    users: [],
+    stockIn: [],
+    stockOut: [],
+    balance: {},
+    customers: new Set(),
+    vendors: new Set(),
+    items: new Set(),
+    ledgerEntries: [],
+    rentEntries: [],
+    syncQueue: [],
+    isOnline: navigator.onLine,
+    isSyncing: false,
+    lastSync: null,
+    permissions: []
+};
 
-// ==========================================
-// TEST CONNECTION
-// ==========================================
-async function testSupabaseConnection() {
-    try {
-        if (!_supabase) { isSupabaseConnected = false; return; }
-        const { data, error } = await _supabase.from('KRT').select('count', { count: 'exact', head: true });
-        if (error) { isSupabaseConnected = false; showNotification('⚠️ Offline mode', 'warning'); return; }
-        isSupabaseConnected = true;
-        console.log('✅ Connected!');
-        showNotification('✅ Connected to database!', 'success');
-        await fetchCloudData();
-        renderAll();
-    } catch (err) { isSupabaseConnected = false; }
-}
+// ======================================================================
+// SECTION 3: UTILITY FUNCTIONS
+// ======================================================================
 
-// ==========================================
-// LOAD LOCAL DATA
-// ==========================================
-function loadLocalData() {
-    try {
-        const stored = localStorage.getItem('krt_erp_data');
-        db = stored ? JSON.parse(stored) : { in: [], out: [], ledgers: {}, opening_balances: {} };
-        const rentStored = localStorage.getItem('krt_rent_data');
-        dbRent = rentStored ? JSON.parse(rentStored) : [];
-        const usersStored = localStorage.getItem('krt_extra_users');
-        extraUsers = usersStored ? JSON.parse(usersStored) : [];
-        const pendingStored = localStorage.getItem('krt_pending_sync');
-        pendingSync = pendingStored ? JSON.parse(pendingStored) : [];
-        console.log('✅ Local data loaded');
-    } catch (err) {
-        db = { in: [], out: [], ledgers: {}, opening_balances: {} };
-        dbRent = [];
-        extraUsers = [];
-        pendingSync = [];
-    }
-}
+const Utils = {
+    // Date formatting
+    formatDate: (date) => {
+        const d = new Date(date);
+        return d.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
+    },
 
-function saveLocalData() {
-    try {
-        localStorage.setItem('krt_erp_data', JSON.stringify(db));
-        localStorage.setItem('krt_rent_data', JSON.stringify(dbRent));
-        localStorage.setItem('krt_extra_users', JSON.stringify(extraUsers));
-        localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
-    } catch (err) { console.error('❌ Save error:', err); }
-}
+    formatDateTime: (date) => {
+        const d = new Date(date);
+        return d.toLocaleString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    },
 
-function saveAndRefresh() {
-    saveLocalData();
-    renderAll();
-    updateDashboardStats();
-}
+    // Currency formatting
+    formatCurrency: (amount) => {
+        return `PKR ${Number(amount).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+    },
 
-// ==========================================
-// FETCH CLOUD DATA
-async function fetchCloudData() {
-    
-    try {
-        if (!_supabase || !isSupabaseConnected) return;
+    // Generate unique ID
+    generateId: () => {
+        return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+    },
 
-       const { data, error } = await _supabase
-    .from('KRT')
-    .select('*')
-    .order('id', { ascending: true })
-    .range(0, 5000);
+    // Calculate totals
+    calculateTotal: (qty, price) => {
+        return Number(qty) * Number(price);
+    },
 
-        if (error) {
-            console.error("❌ Supabase Error:", error);
-            return;
+    // Debounce function for performance
+    debounce: (func, wait) => {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    },
+
+    // Deep clone object
+    deepClone: (obj) => {
+        return JSON.parse(JSON.stringify(obj));
+    },
+
+    // Show toast notification
+    toast: (message, type = 'success') => {
+        const container = document.getElementById('toast-container');
+        if (!container) {
+            const newContainer = document.createElement('div');
+            newContainer.id = 'toast-container';
+            document.body.appendChild(newContainer);
         }
+        
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        toast.textContent = message;
+        document.getElementById('toast-container').appendChild(toast);
+        
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 400);
+        }, 3000);
+    },
 
-        if (!data) {
-            console.warn("⚠️ No data received from Supabase");
-            return;
-        }
-
-        console.log("📦 Rows from Supabase:", data.length);
-
-        db.in = [];
-        db.out = [];
-
-        data.forEach(row => {
-            const inQty = Number(row.stock_in || 0);
-            const outQty = Number(row.stock_out || 0);
-            const price = Number(row.price || 0);
-            const date = (row.Date || row.date || '').split('T')[0] ||
-                new Date().toISOString().split('T')[0];
-
-            if (inQty > 0) {
-                db.in.push({
-                    id: row.id,
-                    date,
-                    vendor: row.vendor_name || 'factory',
-                    item: (row.item_name || 'Unknown').trim(),
-                    qty: inQty,
-                    price,
-                    total: inQty * price
-                });
-            }
-
-            if (outQty > 0) {
-                db.out.push({
-                    id: row.id,
-                    date,
-                    cust: row.customer_name || 'General Sale',
-                    item: (row.item_name || 'Unknown').trim(),
-                    qty: outQty,
-                    price,
-                    total: outQty * price
-                });
+    // Confirmation dialog
+    confirm: (message, title = 'Confirm Action') => {
+        return new Promise((resolve) => {
+            const dialog = document.getElementById('confirm-dialog');
+            if (!dialog) {
+                const newDialog = document.createElement('div');
+                newDialog.id = 'confirm-dialog';
+                newDialog.className = 'modal';
+                newDialog.innerHTML = `
+                    <div class="modal-content">
+                        <h3 id="confirmTitle">${title}</h3>
+                        <p id="confirmMessage">${message}</p>
+                        <div class="modal-actions">
+                            <button id="confirmCancel" class="btn-secondary">Cancel</button>
+                            <button id="confirmOk" class="btn-danger">Confirm</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(newDialog);
+                
+                const okBtn = document.getElementById('confirmOk');
+                const cancelBtn = document.getElementById('confirmCancel');
+                
+                const cleanup = () => {
+                    newDialog.style.display = 'none';
+                    okBtn.removeEventListener('click', handleOk);
+                    cancelBtn.removeEventListener('click', handleCancel);
+                };
+                
+                const handleOk = () => {
+                    cleanup();
+                    resolve(true);
+                };
+                
+                const handleCancel = () => {
+                    cleanup();
+                    resolve(false);
+                };
+                
+                okBtn.addEventListener('click', handleOk);
+                cancelBtn.addEventListener('click', handleCancel);
+                newDialog.style.display = 'flex';
+            } else {
+                document.getElementById('confirmTitle').textContent = title;
+                document.getElementById('confirmMessage').textContent = message;
+                dialog.style.display = 'flex';
+                
+                const okBtn = document.getElementById('confirmOk');
+                const cancelBtn = document.getElementById('confirmCancel');
+                
+                const cleanup = () => {
+                    dialog.style.display = 'none';
+                    okBtn.removeEventListener('click', handleOk);
+                    cancelBtn.removeEventListener('click', handleCancel);
+                };
+                
+                const handleOk = () => {
+                    cleanup();
+                    resolve(true);
+                };
+                
+                const handleCancel = () => {
+                    cleanup();
+                    resolve(false);
+                };
+                
+                okBtn.addEventListener('click', handleOk);
+                cancelBtn.addEventListener('click', handleCancel);
             }
         });
+    },
 
-        console.log("✅ IN Records :", db.in.length);
-        console.log("✅ OUT Records:", db.out.length);
-        console.log("🟢 Last IN :", db.in.at(-1));
-        console.log("🔴 Last OUT:", db.out.at(-1));
+    // Logging
+    log: (message, data = null) => {
+        const timestamp = new Date().toISOString();
+        console.log(`[${timestamp}] ${message}`, data || '');
+        
+        // Also save to audit log
+        const auditLog = JSON.parse(localStorage.getItem('audit_log') || '[]');
+        auditLog.push({
+            timestamp,
+            message,
+            user: AppState.currentUser?.name || 'system',
+            data: data ? JSON.stringify(data) : null
+        });
+        if (auditLog.length > 1000) auditLog.shift();
+        localStorage.setItem('audit_log', JSON.stringify(auditLog));
+    },
 
-        saveLocalData();
-        renderAll();
-        updateDashboardStats();
-
-    } catch (err) {
-        console.error("❌ Fetch error:", err);
+    // Error handling
+    handleError: (error, context = '') => {
+        console.error(`[ERROR] ${context}:`, error);
+        Utils.toast(`Error: ${error.message || 'Unknown error'}`, 'error');
+        Utils.log(`ERROR - ${context}: ${error.message}`, error);
     }
-}
-async function fetchCloudRentData() {
-    try {
-        if (!_supabase || !isSupabaseConnected) return;
-        const { data, error } = await _supabase.from('KRT_RENT').select('*').order('id', { ascending: true });
-        if (error || !data) return;
-        dbRent = data.map(row => ({ id: row.id, name: row.name, shop: row.shop, date: row.date, month: row.month, debit: Number(
-                row.debit || 0), credit: Number(row.credit || 0), method: row.method || 'Cash' }));
-        saveLocalData();
-        renderRentTable();
-    } catch (err) { console.error('❌ Rent fetch error:', err); }
-}
+};
 
-// ==========================================
-// SYNC CLOUD
-// ==========================================
-async function syncAllCloudData() {
-    if (isLoading) return;
-    isLoading = true;
-    const btn = document.querySelector('.sync-btn');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '⏳ Syncing...';
-    }
-    try {
-        if (!navigator.onLine) { showNotification('⚠️ No internet!', 'warning'); return; }
-        if (!_supabase || !isSupabaseConnected) { showNotification('⚠️ Database not available', 'warning'); return; }
-        showNotification('☁️ Syncing...', 'info');
-        await fetchCloudData();
-        await fetchCloudRentData();
-        await processPendingSync();
-        showNotification('✅ Sync complete!', 'success');
-    } catch (err) { console.error('❌ Sync error:', err);
-        showNotification('❌ Sync failed!', 'error'); } finally {
-        isLoading = false;
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-sync"></i> Sync';
-        }
-    }
-}
+// ======================================================================
+// SECTION 4: SUPABASE DATABASE MODULE
+// ======================================================================
 
-// ==========================================
-// PENDING SYNC
-// ==========================================
-async function processPendingSync() {
-    if (!_supabase || !isSupabaseConnected || !navigator.onLine || pendingSync.length === 0) return;
-    const failed = [];
-    for (const op of pendingSync) {
+const Database = {
+    // Initialize Supabase client
+    init: () => {
         try {
-            if (op.type === 'insert') {
-                const { error } = await _supabase.from(op.table).insert(op.data);
-                if (error) failed.push(op);
-            } else if (op.type === 'delete') {
-                const { error } = await _supabase.from(op.table).delete().eq('id', op.id);
-                if (error) failed.push(op);
-            } else if (op.type === 'update') {
-                const { error } = await _supabase.from(op.table).update(op.data).eq('id', op.id);
-                if (error) failed.push(op);
+            if (typeof supabase === 'undefined') {
+                throw new Error('Supabase library not loaded');
             }
-        } catch (err) { failed.push(op); }
-    }
-    pendingSync = failed;
-    localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
-}
-
-function addPendingSync(op) {
-    pendingSync.push(op);
-    localStorage.setItem('krt_pending_sync', JSON.stringify(pendingSync));
-    if (navigator.onLine && isSupabaseConnected) setTimeout(processPendingSync, 2000);
-}
-
-// ==========================================
-// STOCK IN
-// ==========================================
-async function addIn() {
-    try {
-        const date = document.getElementById('in-date').value;
-        const vendor = document.getElementById('in-vendor').value || 'factory';
-        const item = document.getElementById('in-item').value.trim();
-        const barcode = document.getElementById('in-barcode').value || '';
-        const qty = Number(document.getElementById('in-qty').value);
-        const price = Number(document.getElementById('in-price').value) || 0;
-        if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
-        if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
-        if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
-        if (price <= 0 || isNaN(price)) { showNotification('⚠️ Enter valid price!', 'warning'); return; }
-        const entryData = { date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
-        if (_supabase && isSupabaseConnected && navigator.onLine) {
-            try {
-                const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
-                if (!error && data && data.length > 0) {
-                    db.in.push({ id: data[0].id, date, vendor, item, barcode, qty, price, total: qty * price });
-                    saveAndRefresh();
-                    clearInForm();
-                    showNotification('✅ Stock IN saved to cloud!', 'success');
-                    await fetchCloudData();
-                    return;
-                }
-            } catch (err) { console.error('❌ Cloud error:', err); }
+            window.supabaseClient = supabase.createClient(
+                CONFIG.SUPABASE_URL,
+                CONFIG.SUPABASE_KEY
+            );
+            Utils.log('Supabase initialized successfully');
+            return true;
+        } catch (error) {
+            Utils.handleError(error, 'Database.init');
+            return false;
         }
-        const tempId = 'local_' + Date.now();
-        db.in.push({ id: tempId, date, vendor, item, barcode, qty, price, total: qty * price });
-        saveAndRefresh();
-        addPendingSync({ type: 'insert', table: 'krt', data: entryData });
-        clearInForm();
-        showNotification('✅ Stock IN saved locally!', 'warning');
-    } catch (err) { console.error('❌ addIn error:', err);
-        showNotification('❌ Error: ' + err.message, 'error'); }
-}
+    },
 
-function clearInForm() {
-    ['in-date', 'in-vendor', 'in-item', 'in-barcode', 'in-qty', 'in-price'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-    });
-}
-
-// ==========================================
-// STOCK OUT
-// ==========================================
-async function addOut() {
-    try {
-        const date = document.getElementById('out-date').value;
-        const cust = document.getElementById('out-customer').value.trim() || 'General Sale';
-        const item = document.getElementById('out-item').value.trim();
-        const barcode = document.getElementById('out-barcode').value || '';
-        const qty = Number(document.getElementById('out-qty').value);
-        const price = Number(document.getElementById('out-price').value) || 0;
-        if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
-        if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
-        if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
-        if (price <= 0 || isNaN(price)) { showNotification('⚠️ Enter valid price!', 'warning'); return; }
-        const totalIn = db.in.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
-        const totalOut = db.out.filter(x => x.item === item).reduce((s, x) => s + x.qty, 0);
-        if (qty > totalIn - totalOut) { showNotification(`⚠️ Only ${totalIn - totalOut} available!`, 'warning'); return; }
-        const entryData = { date: date, item_name: item, stock_in: 0, stock_out: qty, price, customer_name: cust };
-        if (_supabase && isSupabaseConnected && navigator.onLine) {
-            try {
-                const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
-                if (!error && data && data.length > 0) {
-                    db.out.push({ id: data[0].id, date, cust, item, barcode, qty, price, total: qty * price });
-                    saveAndRefresh();
-                    clearOutForm();
-                    showNotification('✅ Stock OUT saved to cloud!', 'success');
-                    await fetchCloudData();
-                    return;
-                }
-            } catch (err) { console.error('❌ Cloud error:', err); }
-        }
-        const tempId = 'local_' + Date.now();
-        db.out.push({ id: tempId, date, cust, item, barcode, qty, price, total: qty * price });
-        saveAndRefresh();
-        addPendingSync({ type: 'insert', table: 'krt', data: entryData });
-        clearOutForm();
-        showNotification('✅ Stock OUT saved locally!', 'warning');
-    } catch (err) { console.error('❌ addOut error:', err);
-        showNotification('❌ Error: ' + err.message, 'error'); }
-}
-
-function clearOutForm() {
-    ['out-date', 'out-customer', 'out-item', 'out-barcode', 'out-qty', 'out-price'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-    });
-    const status = document.getElementById('stock-status');
-    if (status) status.innerHTML = '';
-}
-
-// ==========================================
-// DELETE ENTRY - FIXED with ID
-// ==========================================
-async function deleteEntry(type, id) {
-    if (!confirm('⚠️ Delete this record?')) return;
-    const index = db[type].findIndex(x => x.id === id);
-    if (index === -1) { showNotification('⚠️ Record not found!', 'error'); return; }
-    const record = db[type][index];
-    if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
-        try { await _supabase.from('KRT').delete().eq('id', record.id); } catch (err) { addPendingSync({ type: 'delete',
-                table: 'krt', id: record.id }); }
-    }
-    db[type].splice(index, 1);
-    saveAndRefresh();
-    showNotification('✅ Record deleted!', 'success');
-}
-
-// ==========================================
-// EDIT ENTRY - FIXED with ID
-// ==========================================
-async function editEntry(type, id) {
-    const index = db[type].findIndex(x => x.id === id);
-    if (index === -1) { showNotification('⚠️ Record not found!', 'error'); return; }
-    const record = db[type][index];
-    const newQty = prompt('New Quantity:', record.qty);
-    if (newQty === null) return;
-    const newPrice = prompt('New Price:', record.price);
-    if (newPrice === null) return;
-    const qtyNum = Number(newQty);
-    const priceNum = Number(newPrice) || 0;
-    if (isNaN(qtyNum) || qtyNum < 0) { showNotification('⚠️ Invalid qty!', 'warning'); return; }
-    if (priceNum < 0) { showNotification('⚠️ Invalid price!', 'warning'); return; }
-    if (record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator.onLine) {
+    // Test connection
+    testConnection: async () => {
         try {
-            await _supabase.from('KRT').update({ stock_in: type === 'in' ? qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0,
-                price: priceNum }).eq('id', record.id);
-        } catch (err) { addPendingSync({ type: 'update', table: 'krt', id: record.id, data: { stock_in: type === 'in' ?
-                    qtyNum : 0, stock_out: type === 'out' ? qtyNum : 0, price: priceNum } }); }
+            const { data, error } = await supabaseClient
+                .from(CONFIG.TABLE_NAME)
+                .select('id')
+                .limit(1);
+            
+            if (error) throw error;
+            Utils.log('Database connection successful');
+            return true;
+        } catch (error) {
+            Utils.handleError(error, 'Database.testConnection');
+            return false;
+        }
+    },
+
+    // Get all records
+    getAllRecords: async () => {
+        try {
+            const { data, error } = await supabaseClient
+                .from(CONFIG.TABLE_NAME)
+                .select('*')
+                .order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            Utils.handleError(error, 'Database.getAllRecords');
+            return [];
+        }
+    },
+
+    // Insert record
+    insertRecord: async (record) => {
+        try {
+            const { data, error } = await supabaseClient
+                .from(CONFIG.TABLE_NAME)
+                .insert([record])
+                .select();
+            
+            if (error) throw error;
+            Utils.log('Record inserted successfully', data);
+            return data[0];
+        } catch (error) {
+            Utils.handleError(error, 'Database.insertRecord');
+            return null;
+        }
+    },
+
+    // Update record
+    updateRecord: async (id, updates) => {
+        try {
+            const { data, error } = await supabaseClient
+                .from(CONFIG.TABLE_NAME)
+                .update(updates)
+                .eq('id', id)
+                .select();
+            
+            if (error) throw error;
+            Utils.log('Record updated successfully', data);
+            return data[0];
+        } catch (error) {
+            Utils.handleError(error, 'Database.updateRecord');
+            return null;
+        }
+    },
+
+    // Delete record
+    deleteRecord: async (id) => {
+        try {
+            const { error } = await supabaseClient
+                .from(CONFIG.TABLE_NAME)
+                .delete()
+                .eq('id', id);
+            
+            if (error) throw error;
+            Utils.log('Record deleted successfully', id);
+            return true;
+        } catch (error) {
+            Utils.handleError(error, 'Database.deleteRecord');
+            return false;
+        }
+    },
+
+    // Query records with filters
+    queryRecords: async (filters) => {
+        try {
+            let query = supabaseClient.from(CONFIG.TABLE_NAME).select('*');
+            
+            Object.keys(filters).forEach(key => {
+                query = query.eq(key, filters[key]);
+            });
+            
+            const { data, error } = await query.order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            Utils.handleError(error, 'Database.queryRecords');
+            return [];
+        }
+    },
+
+    // Get records by date range
+    getRecordsByDateRange: async (fromDate, toDate) => {
+        try {
+            const { data, error } = await supabaseClient
+                .from(CONFIG.TABLE_NAME)
+                .select('*')
+                .gte('date', fromDate)
+                .lte('date', toDate)
+                .order('date', { ascending: true });
+            
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            Utils.handleError(error, 'Database.getRecordsByDateRange');
+            return [];
+        }
     }
-    db[type][index].qty = qtyNum;
-    db[type][index].price = priceNum;
-    db[type][index].total = qtyNum * priceNum;
-    saveAndRefresh();
-    showNotification('✅ Updated!', 'success');
-}
+};
 
-// ==========================================
-// RENDER ALL - FIXED with ID
-// ==========================================
-function renderAll() {
-    try {
-        const today = new Date().toISOString().split('T')[0];
-        const inBody = document.getElementById('today-list-in');
-        if (inBody) {
-            let html = '',
-                c = 1;
-            db.in.forEach((x) => {
-                if (x.date === today) {
-                    html += `<tr><td>${c++}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.vendor)}</td><td>${x.qty}</td><td>${x.price || 0}</td><td>${(x.qty * (x.price || 0)).toLocaleString()}</td>
-                        <td><button class="btn-action btn-edit" onclick="editEntry('in','${x.id}')">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('in','${x.id}')">🗑️</button></td></tr>`;
+// ======================================================================
+// SECTION 5: CACHE MODULE
+// ======================================================================
+
+const Cache = {
+    get: (key) => {
+        try {
+            const item = localStorage.getItem(`cache_${key}`);
+            if (!item) return null;
+            
+            const data = JSON.parse(item);
+            const now = Date.now();
+            
+            if (now - data.timestamp > CONFIG.CACHE_TTL) {
+                localStorage.removeItem(`cache_${key}`);
+                return null;
+            }
+            
+            return data.value;
+        } catch (error) {
+            return null;
+        }
+    },
+
+    set: (key, value) => {
+        try {
+            const data = {
+                value,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(`cache_${key}`, JSON.stringify(data));
+        } catch (error) {
+            Utils.handleError(error, 'Cache.set');
+        }
+    },
+
+    clear: (key) => {
+        if (key) {
+            localStorage.removeItem(`cache_${key}`);
+        } else {
+            // Clear all cache
+            Object.keys(localStorage)
+                .filter(k => k.startsWith('cache_'))
+                .forEach(k => localStorage.removeItem(k));
+        }
+    },
+
+    getAll: () => {
+        const result = {};
+        Object.keys(localStorage)
+            .filter(k => k.startsWith('cache_'))
+            .forEach(k => {
+                try {
+                    const data = JSON.parse(localStorage.getItem(k));
+                    result[k.replace('cache_', '')] = data.value;
+                } catch (e) {
+                    // Skip invalid cache
                 }
             });
-            inBody.innerHTML = html || `<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">📭 No entries today</td></tr>`;
-        }
-        const outBody = document.getElementById('today-list-out');
-        if (outBody) {
-            let html = '',
-                c = 1;
-            db.out.forEach((x) => {
-                if (x.date === today) {
-                    html += `<tr><td>${c++}</td><td>${x.date}</td><td>${escapeHtml(x.cust)}</td><td>${escapeHtml(x.item)}</td><td>${x.barcode || 'N/A'}</td><td>${x.qty}</td><td>${x.price || 0}</td><td>${(x.qty * (x.price || 0)).toLocaleString()}</td>
-                        <td><button class="btn-action btn-edit" onclick="editEntry('out','${x.id}')">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('out','${x.id}')">🗑️</button></td></tr>`;
-                }
-            });
-            outBody.innerHTML = html || `<tr><td colspan="9" style="text-align:center;padding:20px;color:#888;">📭 No sales today</td></tr>`;
-        }
-        const balBody = document.getElementById('table-balance-body');
-        if (balBody) {
-            const items = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
-            balBody.innerHTML = items.map(name => {
-                if (!name) return '';
-                const tin = db.in.filter(x => x.item === name).reduce((s, x) => s + x.qty, 0);
-                const tout = db.out.filter(x => x.item === name).reduce((s, x) => s + x.qty, 0);
-                const totalInValue = db.in.filter(x => x.item === name).reduce((s, x) => s + (x.qty * x.price), 0);
-                const totalOutValue = db.out.filter(x => x.item === name).reduce((s, x) => s + (x.qty * x.price), 0);
-                const profit = totalOutValue - totalInValue;
-                const bal = tin - tout;
-                const inItem = db.in.find(x => x.item === name);
-                return `<tr><td>${inItem ? escapeHtml(inItem.barcode) : 'N/A'}</td><td style="font-weight:600;">${escapeHtml(name)}</td>
-                    <td style="color:#2980b9;">${tin}</td><td style="color:#e67e22;">${tout}</td>
-                    <td style="font-weight:bold;color:${bal < 5 ? '#e74c3c' : '#27ae60'};">${bal}</td>
-                    <td style="color:${profit >= 0 ? '#27ae60' : '#e74c3c'};font-weight:bold;">PKR ${profit.toLocaleString()}</td></tr>`;
-            }).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">📭 No items</td></tr>`;
-        }
-        updateItemLists();
-        updateDashboardStats();
-    } catch (err) { console.error('❌ renderAll error:', err); }
-}
+        return result;
+    }
+};
 
-// ==========================================
-// DASHBOARD
-// ==========================================
-function updateDashboardStats() {
-    try {
-        const totalIn = db.in.reduce((s, x) => s + x.qty, 0);
-        const totalOut = db.out.reduce((s, x) => s + x.qty, 0);
-        const totalInValue = db.in.reduce((s, x) => s + (x.qty * x.price), 0);
-        const totalOutValue = db.out.reduce((s, x) => s + (x.qty * x.price), 0);
-        const totalProfit = totalOutValue - totalInValue;
-        const uniqueItems = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
-        const el1 = document.getElementById('dash-total-in');
-        if (el1) el1.textContent = totalIn;
-        const el2 = document.getElementById('dash-total-out');
-        if (el2) el2.textContent = totalOut;
-        const el3 = document.getElementById('dash-unique-items');
-        if (el3) el3.textContent = uniqueItems.length;
-        const el4 = document.getElementById('dash-revenue');
-        if (el4) el4.textContent = 'PKR ' + totalOutValue.toLocaleString();
-        const el5 = document.getElementById('dash-profit');
-        if (el5) { el5.textContent = 'PKR ' + totalProfit.toLocaleString();
-            el5.style.color = totalProfit >= 0 ? '#27ae60' : '#e74c3c'; }
-        const act = document.getElementById('recent-activity');
-        if (act) {
-            const all = [...db.in.map(x => ({ ...x,
-                type: 'IN' })), ...db.out.map(x => ({ ...x,
-                type: 'OUT' }))];
-            all.sort((a, b) => new Date(b.date) - new Date(a.date));
-            const recent = all.slice(0, 10);
-            act.innerHTML = recent.length ? recent.map(x => `
-                <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;">
-                    <span><span style="font-weight:600;">${escapeHtml(x.item)}</span> <span style="color:${x.type === 'IN' ? '#27ae60' : '#e74c3c'};font-weight:bold;">${x.type === 'IN' ? '📥 +' : '📤 -'}${x.qty}</span></span>
-                    <span style="color:#7f8c8d;font-size:12px;">${x.date}</span>
-                </div>
-            `).join('') : `<p style="color:#7f8c8d;text-align:center;padding:20px;">No activity yet</p>`;
-        }
-    } catch (err) { console.error('❌ Dashboard error:', err); }
-}
+// ======================================================================
+// SECTION 6: SYNC SERVICE
+// ======================================================================
 
-function escapeHtml(text) { if (!text) return '';
-    const d = document.createElement('div');
-    d.textContent = text;
-    return d.innerHTML; }
+const SyncService = {
+    isSyncing: false,
+    queue: [],
+    
+    // Add to sync queue
+    addToQueue: (operation, data) => {
+        const syncItem = {
+            id: Utils.generateId(),
+            operation,
+            data,
+            timestamp: Date.now(),
+            retries: 0
+        };
+        
+        this.queue.push(syncItem);
+        localStorage.setItem('sync_queue', JSON.stringify(this.queue));
+        this.processQueue();
+    },
 
-function updateItemLists() {
-    const list = document.getElementById('items-list');
-    if (!list) return;
-    const items = [...new Set([...db.in.map(x => x.item), ...db.out.map(x => x.item)])];
-    list.innerHTML = items.map(name => `<option value="${escapeHtml(name)}">`).join('');
-}
-
-function updateCustomerDropdown() {
-    const list = document.getElementById('customer-list');
-    if (!list) return;
-    list.innerHTML = Object.keys(db.ledgers).map(name => `<option value="${escapeHtml(name)}">`).join('');
-}
-
-// ==========================================
-// LIVE STOCK CHECK
-// ==========================================
-function showLiveStock(itemName) {
-    try {
-        const status = document.getElementById('stock-status');
-        if (!status) return;
-        if (!itemName || !itemName.trim()) {
-            status.innerHTML = '';
+    // Process sync queue
+    processQueue: async () => {
+        if (this.isSyncing || this.queue.length === 0) return;
+        if (!navigator.onLine) {
+            Utils.toast('Offline - Sync will resume when online', 'warning');
             return;
         }
-        const totalIn = db.in.filter(x => x.item === itemName).reduce((s, x) => s + x.qty, 0);
-        const totalOut = db.out.filter(x => x.item === itemName).reduce((s, x) => s + x.qty, 0);
-        const balance = totalIn - totalOut;
-        if (balance > 0) {
-            status.style.color = '#27ae60';
-            status.innerHTML = `✅ Available: <strong>${balance}</strong>`;
-        } else if (balance <= 0 && totalIn > 0) {
-            status.style.color = '#e74c3c';
-            status.innerHTML = `⚠️ Out of Stock! (Balance: ${balance})`;
-        } else {
-            status.style.color = '#7f8c8d';
-            status.innerHTML = 'ℹ️ No record found.';
+
+        this.isSyncing = true;
+        document.getElementById('syncIcon').className = 'fas fa-sync fa-spin';
+        document.getElementById('syncStatus').textContent = 'Syncing...';
+
+        try {
+            for (let i = 0; i < this.queue.length; i++) {
+                const item = this.queue[i];
+                let success = false;
+
+                try {
+                    switch (item.operation) {
+                        case 'insert':
+                            const result = await Database.insertRecord(item.data);
+                            if (result) success = true;
+                            break;
+                        case 'update':
+                            success = await Database.updateRecord(item.data.id, item.data.updates);
+                            break;
+                        case 'delete':
+                            success = await Database.deleteRecord(item.data.id);
+                            break;
+                        default:
+                            Utils.log('Unknown sync operation', item.operation);
+                    }
+                } catch (error) {
+                    Utils.handleError(error, 'SyncService.processQueue');
+                    item.retries++;
+                    if (item.retries < CONFIG.MAX_RETRIES) {
+                        // Keep in queue for retry
+                        continue;
+                    } else {
+                        // Remove after max retries
+                        Utils.log('Sync item failed after max retries', item);
+                    }
+                }
+
+                if (success) {
+                    this.queue.splice(i, 1);
+                    i--;
+                }
+            }
+
+            localStorage.setItem('sync_queue', JSON.stringify(this.queue));
+            AppState.lastSync = new Date();
+            Utils.toast('Sync completed successfully', 'success');
+            updateSyncStatus('Synced');
+
+        } catch (error) {
+            Utils.handleError(error, 'SyncService.processQueue');
+            updateSyncStatus('Sync Failed');
+        } finally {
+            this.isSyncing = false;
+            document.getElementById('syncIcon').className = 'fas fa-cloud';
         }
-    } catch (err) { console.error('❌ showLiveStock error:', err); }
+    },
+
+    // Force sync
+    forceSync: async () => {
+        await this.processQueue();
+        await refreshAllData();
+    }
+};
+
+// ======================================================================
+// SECTION 7: AUTHENTICATION MODULE
+// ======================================================================
+
+const Auth = {
+    // Login function
+    login: (username, password) => {
+        try {
+            // Get users from localStorage
+            let users = JSON.parse(localStorage.getItem('erp_users') || '[]');
+            
+            // Default admin if no users
+            if (users.length === 0) {
+                users = [{
+                    id: 'admin',
+                    name: 'Administrator',
+                    password: '123',
+                    permissions: ['all'],
+                    created_at: new Date().toISOString()
+                }];
+                localStorage.setItem('erp_users', JSON.stringify(users));
+            }
+
+            const user = users.find(u => u.id === username && u.password === password);
+            
+            if (!user) {
+                Utils.toast('Invalid username or password', 'error');
+                return false;
+            }
+
+            AppState.currentUser = user;
+            AppState.permissions = user.permissions;
+            localStorage.setItem('current_user', JSON.stringify(user));
+            
+            Utils.log('User logged in', user);
+            Utils.toast(`Welcome ${user.name}!`, 'success');
+            
+            return true;
+        } catch (error) {
+            Utils.handleError(error, 'Auth.login');
+            return false;
+        }
+    },
+
+    // Logout function
+    logout: () => {
+        AppState.currentUser = null;
+        localStorage.removeItem('current_user');
+        Utils.log('User logged out');
+        Utils.toast('Logged out successfully');
+        
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('main-content').style.display = 'none';
+        document.getElementById('sidebar').style.display = 'none';
+        document.getElementById('toggle-btn')?.remove();
+    },
+
+    // Check if user is logged in
+    isLoggedIn: () => {
+        if (AppState.currentUser) return true;
+        
+        const savedUser = localStorage.getItem('current_user');
+        if (savedUser) {
+            AppState.currentUser = JSON.parse(savedUser);
+            AppState.permissions = AppState.currentUser.permissions || [];
+            return true;
+        }
+        return false;
+    },
+
+    // Check permission
+    hasPermission: (page) => {
+        if (!AppState.currentUser) return false;
+        if (AppState.permissions.includes('all')) return true;
+        return AppState.permissions.includes(page);
+    },
+
+    // Create new user
+    createUser: (name, userId, password, permissions) => {
+        try {
+            let users = JSON.parse(localStorage.getItem('erp_users') || '[]');
+            
+            if (users.find(u => u.id === userId)) {
+                Utils.toast('User ID already exists', 'error');
+                return false;
+            }
+
+            const newUser = {
+                id: userId,
+                name: name,
+                password: password,
+                permissions: permissions,
+                created_at: new Date().toISOString()
+            };
+
+            users.push(newUser);
+            localStorage.setItem('erp_users', JSON.stringify(users));
+            Utils.log('User created', newUser);
+            Utils.toast(`User ${name} created successfully!`, 'success');
+            
+            renderUsers();
+            return true;
+        } catch (error) {
+            Utils.handleError(error, 'Auth.createUser');
+            return false;
+        }
+    },
+
+    // Delete user
+    deleteUser: async (userId) => {
+        if (userId === 'admin') {
+            Utils.toast('Cannot delete admin user', 'error');
+            return;
+        }
+
+        const confirmed = await Utils.confirm(`Delete user ${userId}?`, 'Delete User');
+        if (!confirmed) return;
+
+        try {
+            let users = JSON.parse(localStorage.getItem('erp_users') || '[]');
+            users = users.filter(u => u.id !== userId);
+            localStorage.setItem('erp_users', JSON.stringify(users));
+            Utils.log('User deleted', userId);
+            Utils.toast('User deleted successfully');
+            renderUsers();
+        } catch (error) {
+            Utils.handleError(error, 'Auth.deleteUser');
+        }
+    }
+};
+
+// ======================================================================
+// SECTION 8: STOCK MANAGEMENT MODULE
+// ======================================================================
+
+const Stock = {
+    // Add Stock In (Purchase)
+    addIn: async () => {
+        try {
+            const date = document.getElementById('in-date').value;
+            const vendor = document.getElementById('in-vendor').value.trim();
+            const item = document.getElementById('in-item').value.trim();
+            const barcode = document.getElementById('in-barcode').value.trim();
+            const qty = parseInt(document.getElementById('in-qty').value);
+            const price = parseFloat(document.getElementById('in-price').value);
+
+            // Validation
+            if (!date || !item || !qty || !price) {
+                Utils.toast('Please fill all required fields (Date, Item, Qty, Price)', 'error');
+                return;
+            }
+
+            if (qty <= 0 || price <= 0) {
+                Utils.toast('Quantity and price must be greater than 0', 'error');
+                return;
+            }
+
+            const total = Utils.calculateTotal(qty, price);
+            const entry = {
+                id: Utils.generateId(),
+                type: 'in',
+                date: date,
+                vendor: vendor || 'Cash Purchase',
+                item: item,
+                barcode: barcode || `KRT-${Date.now()}`,
+                qty: qty,
+                price: price,
+                total: total,
+                created_at: new Date().toISOString(),
+                synced: false
+            };
+
+            // Add to local
+            AppState.stockIn.push(entry);
+            updateStockBalance(entry);
+            
+            // Add to sync queue
+            SyncService.addToQueue('insert', {
+                ...entry,
+                table: CONFIG.TABLE_NAME
+            });
+
+            // Cache update
+            Cache.set('stockIn', AppState.stockIn);
+
+            // Update UI
+            renderTodayIn();
+            updateDashboardStats();
+            renderBalanceTable();
+            populateItemList();
+
+            // Clear form
+            document.getElementById('in-item').value = '';
+            document.getElementById('in-barcode').value = '';
+            document.getElementById('in-qty').value = '';
+            document.getElementById('in-price').value = '';
+
+            Utils.toast(`Stock IN: ${item} - ${qty} units added`, 'success');
+            Utils.log('Stock IN added', entry);
+
+        } catch (error) {
+            Utils.handleError(error, 'Stock.addIn');
+        }
+    },
+
+    // Add Stock Out (Sale)
+    addOut: async () => {
+        try {
+            const date = document.getElementById('out-date').value;
+            const customer = document.getElementById('out-customer').value.trim();
+            const item = document.getElementById('out-item').value.trim();
+            const barcode = document.getElementById('out-barcode').value.trim();
+            const qty = parseInt(document.getElementById('out-qty').value);
+            const price = parseFloat(document.getElementById('out-price').value);
+
+            // Validation
+            if (!date || !item || !qty || !price) {
+                Utils.toast('Please fill all required fields (Date, Item, Qty, Price)', 'error');
+                return;
+            }
+
+            if (qty <= 0 || price <= 0) {
+                Utils.toast('Quantity and price must be greater than 0', 'error');
+                return;
+            }
+
+            // Check available stock
+            const available = getItemBalance(item);
+            if (qty > available) {
+                Utils.toast(`Insufficient stock! Available: ${available}`, 'error');
+                return;
+            }
+
+            const total = Utils.calculateTotal(qty, price);
+            const entry = {
+                id: Utils.generateId(),
+                type: 'out',
+                date: date,
+                customer: customer || 'Walk-in Customer',
+                item: item,
+                barcode: barcode || `SALE-${Date.now()}`,
+                qty: qty,
+                price: price,
+                total: total,
+                created_at: new Date().toISOString(),
+                synced: false
+            };
+
+            // Add to local
+            AppState.stockOut.push(entry);
+            updateStockBalance(entry);
+            
+            // Add to sync queue
+            SyncService.addToQueue('insert', {
+                ...entry,
+                table: CONFIG.TABLE_NAME
+            });
+
+            // Cache update
+            Cache.set('stockOut', AppState.stockOut);
+
+            // Update UI
+            renderTodayOut();
+            updateDashboardStats();
+            renderBalanceTable();
+            populateItemList();
+
+            // Clear form
+            document.getElementById('out-customer').value = '';
+            document.getElementById('out-item').value = '';
+            document.getElementById('out-barcode').value = '';
+            document.getElementById('out-qty').value = '';
+            document.getElementById('out-price').value = '';
+            document.getElementById('stock-status').innerHTML = '';
+
+            Utils.toast(`Stock OUT: ${item} - ${qty} units sold`, 'success');
+            Utils.log('Stock OUT added', entry);
+
+        } catch (error) {
+            Utils.handleError(error, 'Stock.addOut');
+        }
+    },
+
+    // Show live stock status
+    showLiveStock: (itemName) => {
+        if (!itemName) {
+            document.getElementById('stock-status').innerHTML = '';
+            return;
+        }
+
+        const available = getItemBalance(itemName);
+        const status = document.getElementById('stock-status');
+        
+        if (available > 0) {
+            status.innerHTML = `✅ Available Stock: <strong>${available}</strong> units`;
+            status.style.color = '#27ae60';
+        } else {
+            status.innerHTML = `❌ No stock available for "${itemName}"`;
+            status.style.color = '#e74c3c';
+        }
+    },
+
+    // Delete stock entry
+    deleteStockEntry: async (id, type) => {
+        const confirmed = await Utils.confirm('Delete this entry?', 'Delete Record');
+        if (!confirmed) return;
+
+        try {
+            // Add to sync queue for deletion
+            SyncService.addToQueue('delete', { id });
+
+            if (type === 'in') {
+                AppState.stockIn = AppState.stockIn.filter(e => e.id !== id);
+                Cache.set('stockIn', AppState.stockIn);
+                renderTodayIn();
+            } else {
+                AppState.stockOut = AppState.stockOut.filter(e => e.id !== id);
+                Cache.set('stockOut', AppState.stockOut);
+                renderTodayOut();
+            }
+
+            // Recalculate balance
+            AppState.balance = {};
+            AppState.stockIn.forEach(e => updateStockBalance(e));
+            AppState.stockOut.forEach(e => updateStockBalance(e));
+            
+            renderBalanceTable();
+            updateDashboardStats();
+            Utils.toast('Entry deleted successfully');
+            Utils.log('Stock entry deleted', { id, type });
+
+        } catch (error) {
+            Utils.handleError(error, 'Stock.deleteStockEntry');
+        }
+    },
+
+    // Edit stock entry
+    editStockEntry: async (id, type) => {
+        try {
+            let entry;
+            if (type === 'in') {
+                entry = AppState.stockIn.find(e => e.id === id);
+            } else {
+                entry = AppState.stockOut.find(e => e.id === id);
+            }
+
+            if (!entry) {
+                Utils.toast('Entry not found', 'error');
+                return;
+            }
+
+            // Prompt for new values
+            const newQty = prompt(`Enter new quantity (current: ${entry.qty}):`, entry.qty);
+            if (newQty === null) return;
+            
+            const newPrice = prompt(`Enter new price (current: ${entry.price}):`, entry.price);
+            if (newPrice === null) return;
+
+            const qty = parseInt(newQty);
+            const price = parseFloat(newPrice);
+
+            if (qty <= 0 || price <= 0) {
+                Utils.toast('Quantity and price must be greater than 0', 'error');
+                return;
+            }
+
+            const updates = {
+                qty: qty,
+                price: price,
+                total: Utils.calculateTotal(qty, price)
+            };
+
+            // Update local
+            if (type === 'in') {
+                Object.assign(entry, updates);
+                Cache.set('stockIn', AppState.stockIn);
+                renderTodayIn();
+            } else {
+                Object.assign(entry, updates);
+                Cache.set('stockOut', AppState.stockOut);
+                renderTodayOut();
+            }
+
+            // Recalculate balance
+            AppState.balance = {};
+            AppState.stockIn.forEach(e => updateStockBalance(e));
+            AppState.stockOut.forEach(e => updateStockBalance(e));
+            
+            renderBalanceTable();
+            updateDashboardStats();
+            
+            // Add to sync queue
+            SyncService.addToQueue('update', {
+                id: id,
+                updates: updates
+            });
+
+            Utils.toast('Entry updated successfully');
+            Utils.log('Stock entry updated', { id, updates });
+
+        } catch (error) {
+            Utils.handleError(error, 'Stock.editStockEntry');
+        }
+    }
+};
+
+// ======================================================================
+// SECTION 9: LEDGER MODULE
+// ======================================================================
+
+const Ledger = {
+    entries: [],
+    
+    loadEntries: () => {
+        try {
+            this.entries = JSON.parse(localStorage.getItem('ledger_entries') || '[]');
+            return this.entries;
+        } catch (error) {
+            Utils.handleError(error, 'Ledger.loadEntries');
+            return [];
+        }
+    },
+
+    saveEntries: () => {
+        try {
+            localStorage.setItem('ledger_entries', JSON.stringify(this.entries));
+        } catch (error) {
+            Utils.handleError(error, 'Ledger.saveEntries');
+        }
+    },
+
+    addEntry: (entry) => {
+        try {
+            entry.id = Utils.generateId();
+            entry.created_at = new Date().toISOString();
+            this.entries.push(entry);
+            this.saveEntries();
+            Utils.log('Ledger entry added', entry);
+            return entry;
+        } catch (error) {
+            Utils.handleError(error, 'Ledger.addEntry');
+            return null;
+        }
+    },
+
+    deleteEntry: async (id) => {
+        const confirmed = await Utils.confirm('Delete this ledger entry?', 'Delete Entry');
+        if (!confirmed) return;
+
+        try {
+            this.entries = this.entries.filter(e => e.id !== id);
+            this.saveEntries();
+            Utils.toast('Ledger entry deleted');
+            Utils.log('Ledger entry deleted', id);
+            return true;
+        } catch (error) {
+            Utils.handleError(error, 'Ledger.deleteEntry');
+            return false;
+        }
+    },
+
+    getCustomerEntries: (customerName) => {
+        return this.entries.filter(e => 
+            e.customer && e.customer.toLowerCase().includes(customerName.toLowerCase())
+        );
+    },
+
+    calculateBalance: (entries) => {
+        let totalDebit = 0;
+        let totalCredit = 0;
+        
+        entries.forEach(e => {
+            totalDebit += Number(e.debit || 0);
+            totalCredit += Number(e.credit || 0);
+        });
+        
+        return {
+            totalDebit,
+            totalCredit,
+            balance: totalDebit - totalCredit
+        };
+    }
+};
+
+// ======================================================================
+// SECTION 10: RENT BOOK MODULE
+// ======================================================================
+
+const RentBook = {
+    entries: [],
+    
+    loadEntries: () => {
+        try {
+            this.entries = JSON.parse(localStorage.getItem('rent_entries') || '[]');
+            return this.entries;
+        } catch (error) {
+            Utils.handleError(error, 'RentBook.loadEntries');
+            return [];
+        }
+    },
+
+    saveEntries: () => {
+        try {
+            localStorage.setItem('rent_entries', JSON.stringify(this.entries));
+        } catch (error) {
+            Utils.handleError(error, 'RentBook.saveEntries');
+        }
+    },
+
+    addEntry: (entry) => {
+        try {
+            entry.id = Utils.generateId();
+            entry.created_at = new Date().toISOString();
+            this.entries.push(entry);
+            this.saveEntries();
+            Utils.log('Rent entry added', entry);
+            return entry;
+        } catch (error) {
+            Utils.handleError(error, 'RentBook.addEntry');
+            return null;
+        }
+    },
+
+    deleteEntry: async (id) => {
+        const confirmed = await Utils.confirm('Delete this rent entry?', 'Delete Entry');
+        if (!confirmed) return;
+
+        try {
+            this.entries = this.entries.filter(e => e.id !== id);
+            this.saveEntries();
+            Utils.toast('Rent entry deleted');
+            Utils.log('Rent entry deleted', id);
+            return true;
+        } catch (error) {
+            Utils.handleError(error, 'RentBook.deleteEntry');
+            return false;
+        }
+    },
+
+    getShopkeeperEntries: (name) => {
+        return this.entries.filter(e => 
+            e.shopkeeper && e.shopkeeper.toLowerCase().includes(name.toLowerCase())
+        );
+    },
+
+    calculateBalance: (entries) => {
+        let totalDebit = 0;
+        let totalCredit = 0;
+        
+        entries.forEach(e => {
+            totalDebit += Number(e.debit || 0);
+            totalCredit += Number(e.credit || 0);
+        });
+        
+        return {
+            totalDebit,
+            totalCredit,
+            balance: totalDebit - totalCredit
+        };
+    }
+};
+
+// ======================================================================
+// SECTION 11: REPORTING MODULE
+// ======================================================================
+
+const Reports = {
+    // Generate custom report
+    generateReport: async () => {
+        try {
+            const fromDate = document.getElementById('rep-from-date').value;
+            const toDate = document.getElementById('rep-to-date').value;
+
+            if (!fromDate || !toDate) {
+                Utils.toast('Please select date range', 'error');
+                return;
+            }
+
+            // Get records from cache or database
+            let inRecords = AppState.stockIn.filter(e => 
+                e.date >= fromDate && e.date <= toDate
+            );
+            
+            let outRecords = AppState.stockOut.filter(e => 
+                e.date >= fromDate && e.date <= toDate
+            );
+
+            // If cache is empty, try database
+            if (inRecords.length === 0 && outRecords.length === 0) {
+                const dbRecords = await Database.getRecordsByDateRange(fromDate, toDate);
+                inRecords = dbRecords.filter(r => r.type === 'in');
+                outRecords = dbRecords.filter(r => r.type === 'out');
+            }
+
+            // Render report
+            const inTable = document.getElementById('rep-in-table');
+            const outTable = document.getElementById('rep-out-table');
+            
+            inTable.innerHTML = '';
+            outTable.innerHTML = '';
+
+            let inTotal = 0;
+            let outTotal = 0;
+
+            inRecords.forEach(e => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${Utils.formatDate(e.date)}</td>
+                    <td>${e.item}</td>
+                    <td>${e.vendor || '-'}</td>
+                    <td>${e.qty}</td>
+                    <td>${Utils.formatCurrency(e.price)}</td>
+                    <td>${Utils.formatCurrency(e.total)}</td>
+                `;
+                inTable.appendChild(row);
+                inTotal += e.total;
+            });
+
+            outRecords.forEach(e => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${Utils.formatDate(e.date)}</td>
+                    <td>${e.item}</td>
+                    <td>${e.customer || '-'}</td>
+                    <td>${e.qty}</td>
+                    <td>${Utils.formatCurrency(e.price)}</td>
+                    <td>${Utils.formatCurrency(e.total)}</td>
+                `;
+                outTable.appendChild(row);
+                outTotal += e.total;
+            });
+
+            // Add totals row
+            if (inRecords.length > 0) {
+                const totalRow = document.createElement('tr');
+                totalRow.style.fontWeight = 'bold';
+                totalRow.style.background = '#27ae60';
+                totalRow.style.color = 'white';
+                totalRow.innerHTML = `
+                    <td colspan="5" style="text-align:right;">TOTAL PURCHASES:</td>
+                    <td>${Utils.formatCurrency(inTotal)}</td>
+                `;
+                inTable.appendChild(totalRow);
+            }
+
+            if (outRecords.length > 0) {
+                const totalRow = document.createElement('tr');
+                totalRow.style.fontWeight = 'bold';
+                totalRow.style.background = '#e74c3c';
+                totalRow.style.color = 'white';
+                totalRow.innerHTML = `
+                    <td colspan="5" style="text-align:right;">TOTAL SALES:</td>
+                    <td>${Utils.formatCurrency(outTotal)}</td>
+                `;
+                outTable.appendChild(totalRow);
+            }
+
+            document.getElementById('report-period').textContent = 
+                `Period: ${Utils.formatDate(fromDate)} to ${Utils.formatDate(toDate)}`;
+
+            Utils.toast('Report generated successfully');
+            Utils.log('Report generated', { fromDate, toDate, inRecords: inRecords.length, outRecords: outRecords.length });
+
+        } catch (error) {
+            Utils.handleError(error, 'Reports.generateReport');
+        }
+    },
+
+    // Export to Excel
+    exportToExcel: () => {
+        try {
+            const table = document.querySelector('#print-area table');
+            if (!table) {
+                Utils.toast('No data to export', 'error');
+                return;
+            }
+
+            let csv = '';
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(row => {
+                const cols = row.querySelectorAll('td, th');
+                const rowData = [];
+                cols.forEach(col => {
+                    rowData.push(col.textContent.trim());
+                });
+                csv += rowData.join(',') + '\n';
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `report_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            Utils.toast('Report exported to CSV');
+            Utils.log('Report exported to Excel');
+
+        } catch (error) {
+            Utils.handleError(error, 'Reports.exportToExcel');
+        }
+    }
+};
+
+// ======================================================================
+// SECTION 12: SEARCH MODULE
+// ======================================================================
+
+const Search = {
+    // Master search
+    masterSearch: () => {
+        try {
+            const fromDate = document.getElementById('master-from').value;
+            const toDate = document.getElementById('master-to').value;
+
+            if (!fromDate || !toDate) {
+                Utils.toast('Please select date range', 'error');
+                return;
+            }
+
+            // Search in local data
+            let inRecords = AppState.stockIn.filter(e => 
+                e.date >= fromDate && e.date <= toDate
+            );
+            
+            let outRecords = AppState.stockOut.filter(e => 
+                e.date >= fromDate && e.date <= toDate
+            );
+
+            // Search in database if local data is insufficient
+            if (inRecords.length === 0 && outRecords.length === 0) {
+                Utils.toast('Searching in cloud...', 'info');
+                // Trigger sync and retry
+                SyncService.forceSync();
+                setTimeout(() => {
+                    inRecords = AppState.stockIn.filter(e => 
+                        e.date >= fromDate && e.date <= toDate
+                    );
+                    outRecords = AppState.stockOut.filter(e => 
+                        e.date >= fromDate && e.date <= toDate
+                    );
+                    renderSearchResults(inRecords, outRecords);
+                }, 2000);
+            } else {
+                renderSearchResults(inRecords, outRecords);
+            }
+
+        } catch (error) {
+            Utils.handleError(error, 'Search.masterSearch');
+        }
+    },
+
+    // Global search
+    globalSearch: (query) => {
+        if (!query || query.length < 2) {
+            document.getElementById('page-dashboard')?.style.setProperty('display', '');
+            return;
+        }
+
+        try {
+            const results = [];
+            
+            // Search in stock IN
+            AppState.stockIn.forEach(e => {
+                if (e.item.toLowerCase().includes(query.toLowerCase()) ||
+                    (e.vendor && e.vendor.toLowerCase().includes(query.toLowerCase())) ||
+                    (e.barcode && e.barcode.includes(query))) {
+                    results.push({ ...e, type: 'Stock IN' });
+                }
+            });
+
+            // Search in stock OUT
+            AppState.stockOut.forEach(e => {
+                if (e.item.toLowerCase().includes(query.toLowerCase()) ||
+                    (e.customer && e.customer.toLowerCase().includes(query.toLowerCase())) ||
+                    (e.barcode && e.barcode.includes(query))) {
+                    results.push({ ...e, type: 'Stock OUT' });
+                }
+            });
+
+            // Search in ledger
+            const ledgerEntries = Ledger.loadEntries();
+            ledgerEntries.forEach(e => {
+                if (e.customer && e.customer.toLowerCase().includes(query.toLowerCase())) {
+                    results.push({ ...e, type: 'Ledger' });
+                }
+            });
+
+            // Display results
+            displaySearchResults(results);
+
+        } catch (error) {
+            Utils.handleError(error, 'Search.globalSearch');
+        }
+    }
+};
+
+// ======================================================================
+// SECTION 13: UI RENDER FUNCTIONS
+// ======================================================================
+
+// Render today's stock IN
+function renderTodayIn() {
+    const today = new Date().toISOString().split('T')[0];
+    const todayEntries = AppState.stockIn.filter(e => e.date === today);
+    const tbody = document.getElementById('today-list-in');
+    tbody.innerHTML = '';
+
+    if (todayEntries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888;">No entries today</td></tr>';
+        return;
+    }
+
+    todayEntries.forEach((e, i) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${e.item}</td>
+            <td>${e.vendor || '-'}</td>
+            <td>${e.qty}</td>
+            <td>${Utils.formatCurrency(e.price)}</td>
+            <td>${Utils.formatCurrency(e.total)}</td>
+            <td>
+                <button class="btn-action btn-edit" onclick="Stock.editStockEntry('${e.id}','in')">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn-action btn-delete" onclick="Stock.deleteStockEntry('${e.id}','in')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
 }
 
-// ==========================================
-// RENT BOOK - FIXED with Filter
-// ==========================================
+// Render today's stock OUT
+function renderTodayOut() {
+    const today = new Date().toISOString().split('T')[0];
+    const todayEntries = AppState.stockOut.filter(e => e.date === today);
+    const tbody = document.getElementById('today-list-out');
+    tbody.innerHTML = '';
+
+    if (todayEntries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#888;">No entries today</td></tr>';
+        return;
+    }
+
+    todayEntries.forEach((e, i) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${Utils.formatDate(e.date)}</td>
+            <td>${e.customer || '-'}</td>
+            <td>${e.item}</td>
+            <td>${e.barcode || '-'}</td>
+            <td>${e.qty}</td>
+            <td>${Utils.formatCurrency(e.price)}</td>
+            <td>${Utils.formatCurrency(e.total)}</td>
+            <td>
+                <button class="btn-action btn-edit" onclick="Stock.editStockEntry('${e.id}','out')">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn-action btn-delete" onclick="Stock.deleteStockEntry('${e.id}','out')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Render balance table
+function renderBalanceTable() {
+    const tbody = document.getElementById('table-balance-body');
+    tbody.innerHTML = '';
+
+    const items = Object.keys(AppState.balance);
+    
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888;">No stock available</td></tr>';
+        return;
+    }
+
+    items.forEach(item => {
+        const data = AppState.balance[item];
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${data.barcode || '-'}</td>
+            <td><strong>${item}</strong></td>
+            <td>${data.totalIn}</td>
+            <td>${data.totalOut}</td>
+            <td style="font-weight:700; color:${data.available > 0 ? '#27ae60' : '#e74c3c'}">${data.available}</td>
+            <td>${Utils.formatCurrency(data.profit || 0)}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Render ledger table
+function renderLedgerTable() {
+    const customerName = document.getElementById('ledger-cust-name').value.trim();
+    let entries = Ledger.loadEntries();
+    
+    if (customerName) {
+        entries = entries.filter(e => 
+            e.customer && e.customer.toLowerCase().includes(customerName.toLowerCase())
+        );
+    }
+
+    const tbody = document.getElementById('ledger-table-body');
+    tbody.innerHTML = '';
+
+    if (entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#888;">No entries found</td></tr>';
+        updateLedgerTotals([]);
+        return;
+    }
+
+    entries.forEach((e, i) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${Utils.formatDate(e.date)}</td>
+            <td>${e.item || '-'}</td>
+            <td>${e.qty || 0}</td>
+            <td>${Utils.formatCurrency(e.price || 0)}</td>
+            <td>${Utils.formatCurrency(e.total || 0)}</td>
+            <td>${Utils.formatCurrency(e.debit || 0)}</td>
+            <td>${Utils.formatCurrency(e.credit || 0)}</td>
+            <td>${e.method || 'Cash'}</td>
+            <td>
+                <button class="btn-action btn-delete" onclick="Ledger.deleteEntry('${e.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    updateLedgerTotals(entries);
+}
+
+// Update ledger totals
+function updateLedgerTotals(entries) {
+    let totalQty = 0;
+    let totalPrice = 0;
+    let totalValue = 0;
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    entries.forEach(e => {
+        totalQty += Number(e.qty || 0);
+        totalPrice += Number(e.price || 0);
+        totalValue += Number(e.total || 0);
+        totalDebit += Number(e.debit || 0);
+        totalCredit += Number(e.credit || 0);
+    });
+
+    document.getElementById('total-ledger-qty').textContent = totalQty;
+    document.getElementById('total-ledger-price').textContent = Utils.formatCurrency(totalPrice);
+    document.getElementById('total-ledger-value').textContent = Utils.formatCurrency(totalValue);
+    document.getElementById('total-ledger-debit').textContent = Utils.formatCurrency(totalDebit);
+    document.getElementById('total-ledger-credit').textContent = Utils.formatCurrency(totalCredit);
+    
+    const balance = totalDebit - totalCredit;
+    document.getElementById('final-ledger-balance').textContent = 
+        `Balance: ${Utils.formatCurrency(balance)} (${balance >= 0 ? 'Receivable' : 'Payable'})`;
+    document.getElementById('final-ledger-balance').style.background = balance >= 0 ? '#f1c40f' : '#e74c3c';
+    document.getElementById('final-ledger-balance').style.color = balance >= 0 ? '#1a1a2e' : 'white';
+}
+
+// Render rent book table
+function renderRentTable() {
+    const name = document.getElementById('rent-name').value.trim();
+    const shopNo = document.getElementById('rent-shop-no').value.trim();
+    let entries = RentBook.loadEntries();
+    
+    if (name) {
+        entries = entries.filter(e => 
+            e.shopkeeper && e.shopkeeper.toLowerCase().includes(name.toLowerCase())
+        );
+    }
+    if (shopNo) {
+        entries = entries.filter(e => e.shopNo === shopNo);
+    }
+
+    const tbody = document.getElementById('rent-main-rows');
+    tbody.innerHTML = '';
+
+    if (entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#888;">No rent entries found</td></tr>';
+        updateRentTotals([]);
+        return;
+    }
+
+    let runningBalance = 0;
+    entries.forEach((e, i) => {
+        runningBalance += (Number(e.debit || 0) - Number(e.credit || 0));
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${e.shopNo || '-'}</td>
+            <td>${Utils.formatDate(e.date)}</td>
+            <td>${e.month || '-'}</td>
+            <td>${Utils.formatCurrency(e.debit || 0)}</td>
+            <td>${Utils.formatCurrency(e.credit || 0)}</td>
+            <td>${e.method || 'Cash'}</td>
+            <td style="font-weight:700; color:${runningBalance >= 0 ? '#27ae60' : '#e74c3c'}">
+                ${Utils.formatCurrency(runningBalance)}
+            </td>
+            <td>
+                <button class="btn-action btn-delete" onclick="RentBook.deleteEntry('${e.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    updateRentTotals(entries);
+}
+
+// Update rent totals
+function updateRentTotals(entries) {
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    entries.forEach(e => {
+        totalDebit += Number(e.debit || 0);
+        totalCredit += Number(e.credit || 0);
+    });
+
+    document.getElementById('rent-total-debit').textContent = Utils.formatCurrency(totalDebit);
+    document.getElementById('rent-total-credit').textContent = Utils.formatCurrency(totalCredit);
+    
+    const balance = totalDebit - totalCredit;
+    document.getElementById('rent-final-balance').textContent = Utils.formatCurrency(balance);
+    document.getElementById('rent-final-balance').style.color = balance >= 0 ? '#27ae60' : '#e74c3c';
+}
+
+// Render users table
+function renderUsers() {
+    const users = JSON.parse(localStorage.getItem('erp_users') || '[]');
+    const tbody = document.getElementById('user-table-body');
+    tbody.innerHTML = '';
+
+    if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#888;">No users</td></tr>';
+        return;
+    }
+
+    users.forEach(u => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${u.id}</strong></td>
+            <td>${u.name}</td>
+            <td>${u.permissions.includes('all') ? 'All Permissions' : u.permissions.join(', ') || 'None'}</td>
+            <td>
+                ${u.id !== 'admin' ? `
+                    <button class="btn-action btn-delete" onclick="Auth.deleteUser('${u.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                ` : '<span style="color:#888;">System</span>'}
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Populate item list for autocomplete
+function populateItemList() {
+    const datalist = document.getElementById('items-list');
+    const items = Object.keys(AppState.balance);
+    
+    // Add items from all records
+    AppState.stockIn.forEach(e => items.push(e.item));
+    AppState.stockOut.forEach(e => items.push(e.item));
+    
+    const uniqueItems = [...new Set(items)];
+    datalist.innerHTML = '';
+    uniqueItems.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item;
+        datalist.appendChild(option);
+    });
+}
+
+// Update dashboard stats
+function updateDashboardStats() {
+    const totalIn = AppState.stockIn.reduce((sum, e) => sum + e.total, 0);
+    const totalOut = AppState.stockOut.reduce((sum, e) => sum + e.total, 0);
+    const uniqueItems = Object.keys(AppState.balance).length;
+    const profit = totalOut - totalIn;
+
+    document.getElementById('dash-total-in').textContent = Utils.formatCurrency(totalIn);
+    document.getElementById('dash-total-out').textContent = Utils.formatCurrency(totalOut);
+    document.getElementById('dash-unique-items').textContent = uniqueItems;
+    document.getElementById('dash-revenue').textContent = Utils.formatCurrency(totalOut);
+    document.getElementById('dash-profit').textContent = Utils.formatCurrency(profit);
+
+    // Update recent activity
+    const activityDiv = document.getElementById('recent-activity');
+    const allEntries = [...AppState.stockIn, ...AppState.stockOut]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 10);
+
+    if (allEntries.length === 0) {
+        activityDiv.innerHTML = '<p style="color:#888; text-align:center;">No recent activity</p>';
+        return;
+    }
+
+    activityDiv.innerHTML = '';
+    allEntries.forEach(e => {
+        const div = document.createElement('div');
+        div.style.cssText = `
+            display: flex; justify-content: space-between; 
+            padding: 8px 12px; border-bottom: 1px solid #eee;
+            font-size: 13px;
+        `;
+        div.innerHTML = `
+            <span>
+                <strong>${e.type === 'in' ? '📥 IN' : '📤 OUT'}</strong>
+                ${e.item} × ${e.qty}
+                ${e.type === 'in' ? `from ${e.vendor || 'vendor'}` : `to ${e.customer || 'customer'}`}
+            </span>
+            <span>${Utils.formatCurrency(e.total)}</span>
+        `;
+        activityDiv.appendChild(div);
+    });
+}
+
+// Update sync status
+function updateSyncStatus(status) {
+    document.getElementById('syncStatus').textContent = status;
+    const icon = document.getElementById('syncIcon');
+    if (status === 'Syncing...') {
+        icon.className = 'fas fa-sync fa-spin';
+    } else if (status === 'Synced') {
+        icon.className = 'fas fa-cloud';
+        icon.style.color = '#27ae60';
+    } else if (status === 'Sync Failed') {
+        icon.className = 'fas fa-exclamation-triangle';
+        icon.style.color = '#e74c3c';
+    } else {
+        icon.className = 'fas fa-cloud';
+        icon.style.color = '';
+    }
+}
+
+// Display search results
+function displaySearchResults(results) {
+    // Implementation depends on UI design
+    // For now, show in a modal or dedicated section
+    Utils.toast(`Found ${results.length} results`, 'info');
+    console.log('Search results:', results);
+}
+
+// Render search results in master search
+function renderSearchResults(inRecords, outRecords) {
+    const inTable = document.getElementById('master-in-table');
+    const outTable = document.getElementById('master-out-table');
+    
+    inTable.innerHTML = '';
+    outTable.innerHTML = '';
+
+    if (inRecords.length === 0 && outRecords.length === 0) {
+        Utils.toast('No records found in this date range', 'info');
+        inTable.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888;">No records found</td></tr>';
+        outTable.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888;">No records found</td></tr>';
+        return;
+    }
+
+    inRecords.forEach(e => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${Utils.formatDate(e.date)}</td>
+            <td>${e.item}</td>
+            <td>${e.vendor || '-'}</td>
+            <td>${e.qty}</td>
+            <td>${Utils.formatCurrency(e.price)}</td>
+            <td>${Utils.formatCurrency(e.total)}</td>
+            <td>
+                <button class="btn-action btn-edit" onclick="Stock.editStockEntry('${e.id}','in')">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn-action btn-delete" onclick="Stock.deleteStockEntry('${e.id}','in')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        inTable.appendChild(row);
+    });
+
+    outRecords.forEach(e => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${Utils.formatDate(e.date)}</td>
+            <td>${e.item}</td>
+            <td>${e.customer || '-'}</td>
+            <td>${e.qty}</td>
+            <td>${Utils.formatCurrency(e.price)}</td>
+            <td>${Utils.formatCurrency(e.total)}</td>
+            <td>
+                <button class="btn-action btn-edit" onclick="Stock.editStockEntry('${e.id}','out')">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn-action btn-delete" onclick="Stock.deleteStockEntry('${e.id}','out')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        outTable.appendChild(row);
+    });
+
+    Utils.toast(`Found ${inRecords.length} IN and ${outRecords.length} OUT records`, 'success');
+}
+
+// ======================================================================
+// SECTION 14: STOCK BALANCE HELPER FUNCTIONS
+// ======================================================================
+
+// Update stock balance for a single entry
+function updateStockBalance(entry) {
+    const item = entry.item;
+    
+    if (!AppState.balance[item]) {
+        AppState.balance[item] = {
+            item: item,
+            totalIn: 0,
+            totalOut: 0,
+            available: 0,
+            profit: 0,
+            barcode: entry.barcode || ''
+        };
+    }
+
+    if (entry.type === 'in') {
+        AppState.balance[item].totalIn += entry.qty;
+        AppState.balance[item].profit -= entry.total; // Cost
+    } else {
+        AppState.balance[item].totalOut += entry.qty;
+        AppState.balance[item].profit += entry.total; // Revenue
+    }
+
+    AppState.balance[item].available = 
+        AppState.balance[item].totalIn - AppState.balance[item].totalOut;
+}
+
+// Get balance for a specific item
+function getItemBalance(item) {
+    if (!AppState.balance[item]) return 0;
+    return AppState.balance[item].available;
+}
+
+// ======================================================================
+// SECTION 15: PAGE NAVIGATION
+// ======================================================================
+
+function switchPage(pageId, title) {
+    // Check permissions
+    const pageName = pageId.replace('page-', '');
+    if (!Auth.hasPermission(pageName) && !Auth.hasPermission('all')) {
+        Utils.toast('You don\'t have permission to access this page', 'error');
+        return;
+    }
+
+    // Hide all pages
+    document.querySelectorAll('.erp-page').forEach(p => p.style.display = 'none');
+    
+    // Show selected page
+    const page = document.getElementById(pageId);
+    if (page) page.style.display = 'block';
+    
+    // Update title
+    document.getElementById('page-title').textContent = `🐘 KRT TRADERS ERP - ${title}`;
+    
+    // Update sidebar active state
+    document.querySelectorAll('#sidebar ul li').forEach(li => li.classList.remove('active'));
+    const activeLi = Array.from(document.querySelectorAll('#sidebar ul li'))
+        .find(li => li.getAttribute('onclick')?.includes(pageId));
+    if (activeLi) activeLi.classList.add('active');
+
+    // Render page content if needed
+    switch(pageId) {
+        case 'page-balance':
+            renderBalanceTable();
+            break;
+        case 'page-customer-ledgers':
+            renderLedgerTable();
+            populateCustomerList();
+            break;
+        case 'page-rent-book':
+            renderRentTable();
+            break;
+        case 'page-settings':
+            renderUsers();
+            break;
+        case 'page-dashboard':
+            updateDashboardStats();
+            break;
+    }
+}
+
+// Populate customer list
+function populateCustomerList() {
+    const entries = Ledger.loadEntries();
+    const customers = [...new Set(entries.map(e => e.customer).filter(Boolean))];
+    const datalist = document.getElementById('customer-list');
+    datalist.innerHTML = '';
+    customers.forEach(c => {
+        const option = document.createElement('option');
+        option.value = c;
+        datalist.appendChild(option);
+    });
+}
+
+// Show ledger for selected customer
+function showLedger() {
+    renderLedgerTable();
+}
+
+// Update opening balance
+function updateOpeningBal() {
+    const openingBal = parseFloat(document.getElementById('opening-bal').value) || 0;
+    localStorage.setItem('ledger_opening_balance', openingBal);
+    Utils.toast('Opening balance updated');
+}
+
+// ======================================================================
+// SECTION 16: RENT BOOK FUNCTIONS
+// ======================================================================
+
 function addRentEntry() {
     try {
-        const name = document.getElementById('rent-name').value.trim();
-        const shop = document.getElementById('rent-shop-no').value.trim() || 'N/A';
         const date = document.getElementById('rent-date').value;
         const month = document.getElementById('rent-month').value.trim();
-        const debit = Number(document.getElementById('rent-debit').value) || 0;
-        const credit = Number(document.getElementById('rent-credit').value) || 0;
-        const method = document.getElementById('rent-method').value || 'Cash';
+        const shopkeeper = document.getElementById('rent-name').value.trim();
+        const shopNo = document.getElementById('rent-shop-no').value.trim();
+        const debit = parseFloat(document.getElementById('rent-debit').value) || 0;
+        const credit = parseFloat(document.getElementById('rent-credit').value) || 0;
+        const method = document.getElementById('rent-method').value;
 
-        if (!name) { showNotification('⚠️ Enter shopkeeper name!', 'warning'); return; }
-        if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
-        if (debit === 0 && credit === 0) { showNotification('⚠️ Enter rent or advance!', 'warning'); return; }
+        if (!date || !shopkeeper) {
+            Utils.toast('Please enter date and shopkeeper name', 'error');
+            return;
+        }
 
-        const entryData = { name, shop, date, month, debit, credit, method };
-        const tempId = 'local_' + Date.now();
-        dbRent.push({ id: tempId, ...entryData });
-        saveLocalData();
+        if (debit === 0 && credit === 0) {
+            Utils.toast('Please enter either rent amount or advance payment', 'error');
+            return;
+        }
+
+        const entry = {
+            date: date,
+            month: month || new Date(date).toLocaleString('default', { month: 'long', year: 'numeric' }),
+            shopkeeper: shopkeeper,
+            shopNo: shopNo || '-',
+            debit: debit,
+            credit: credit,
+            method: method
+        };
+
+        RentBook.addEntry(entry);
         renderRentTable();
-
-        if (_supabase && isSupabaseConnected && navigator.onLine) {
-            _supabase.from('krt_rent').insert([entryData])
-                .then(result => {
-                    if (!result.error && result.data && result.data.length > 0) {
-                        const idx = dbRent.findIndex(x => x.id === tempId);
-                        if (idx !== -1) { dbRent[idx].id = result.data[0].id;
-                            saveLocalData(); }
-                    }
-                })
-                .catch(() => addPendingSync({ type: 'insert', table: 'krt_rent', data: entryData }));
-        } else { addPendingSync({ type: 'insert', table: 'krt_rent', data: entryData }); }
-
-        document.getElementById('rent-name').value = '';
-        document.getElementById('rent-shop-no').value = '';
+        
+        // Clear fields
         document.getElementById('rent-date').value = '';
         document.getElementById('rent-month').value = '';
-        document.getElementById('rent-debit').value = '';
-        document.getElementById('rent-credit').value = '';
-        showNotification('✅ Rent entry saved!', 'success');
-    } catch (err) { console.error('❌ addRentEntry error:', err); }
-}
+        document.getElementById('rent-debit').value = '0';
+        document.getElementById('rent-credit').value = '0';
 
-function renderRentTable() {
-    try {
-        const tbody = document.getElementById('rent-main-rows');
-        if (!tbody) return;
-        
-        const filterText = document.getElementById('rent-filter')?.value?.toLowerCase() || '';
-        const filtered = filterText ? dbRent.filter(r => r.name.toLowerCase().includes(filterText)) : dbRent;
-        
-        let html = '',
-            totalDebit = 0,
-            totalCredit = 0;
+        Utils.toast('Rent entry added successfully');
 
-        // Calculate cumulative balance per shopkeeper
-        const shopkeepers = {};
-        filtered.forEach(r => {
-            if (!shopkeepers[r.name]) shopkeepers[r.name] = { debit: 0, credit: 0 };
-            shopkeepers[r.name].debit += r.debit;
-            shopkeepers[r.name].credit += r.credit;
-        });
-
-        filtered.forEach((r) => {
-            totalDebit += r.debit;
-            totalCredit += r.credit;
-            const balance = shopkeepers[r.name].debit - shopkeepers[r.name].credit;
-            html += `<tr>
-                <td>${escapeHtml(r.name)}</td>
-                <td>${escapeHtml(r.shop || 'N/A')}</td>
-                <td>${r.date}</td>
-                <td>${escapeHtml(r.month || '')}</td>
-                <td style="color:#e74c3c;">${r.debit.toLocaleString()}</td>
-                <td style="color:#27ae60;">${r.credit.toLocaleString()}</td>
-                <td>${escapeHtml(r.method)}</td>
-                <td style="font-weight:bold;color:${balance >= 0 ? '#e74c3c' : '#27ae60'};">${balance.toLocaleString()}</td>
-                <td><button class="btn-action btn-delete" onclick="deleteRentEntry('${r.id}')">🗑️</button></td>
-            </tr>`;
-        });
-
-        tbody.innerHTML = html || `<tr><td colspan="9" style="text-align:center;padding:20px;color:#888;">📭 No entries</td></tr>`;
-
-        const td = document.getElementById('rent-total-debit');
-        if (td) td.textContent = totalDebit.toLocaleString();
-        const tc = document.getElementById('rent-total-credit');
-        if (tc) tc.textContent = totalCredit.toLocaleString();
-        const bal = document.getElementById('rent-final-balance');
-        if (bal) {
-            const finalBal = totalDebit - totalCredit;
-            bal.textContent = finalBal.toLocaleString();
-            bal.style.color = finalBal >= 0 ? '#e74c3c' : '#27ae60';
-        }
-    } catch (err) { console.error('❌ renderRentTable error:', err); }
-}
-
-function deleteRentEntry(id) {
-    if (!confirm('⚠️ Delete this entry?')) return;
-    const index = dbRent.findIndex(x => x.id === id);
-    if (index === -1) return;
-    const record = dbRent[index];
-    if (record && record.id && !record.id.toString().startsWith('local_') && _supabase && isSupabaseConnected && navigator
-        .onLine) {
-        _supabase.from('krt_rent').delete().eq('id', record.id).catch(() => addPendingSync({ type: 'delete', table: 'krt_rent',
-            id: record.id }));
+    } catch (error) {
+        Utils.handleError(error, 'addRentEntry');
     }
-    dbRent.splice(index, 1);
-    saveLocalData();
-    renderRentTable();
-    showNotification('✅ Rent entry deleted!', 'success');
 }
 
-// ==========================================
-// LEDGERS
-// ==========================================
+// ======================================================================
+// SECTION 17: LEDGER FUNCTIONS
+// ======================================================================
+
 function saveLedgerEntry() {
     try {
-        const name = document.getElementById('ledger-cust-name').value.trim();
         const date = document.getElementById('led-date').value;
+        const customer = document.getElementById('ledger-cust-name').value.trim();
         const item = document.getElementById('led-item').value.trim();
-        const qty = Number(document.getElementById('led-qty').value) || 0;
-        const price = Number(document.getElementById('led-price').value) || 0;
-        const debit = Number(document.getElementById('led-debit').value) || 0;
-        const credit = Number(document.getElementById('led-credit').value) || 0;
-        const method = document.getElementById('led-method').value || 'Cash';
+        const qty = parseInt(document.getElementById('led-qty').value) || 0;
+        const price = parseFloat(document.getElementById('led-price').value) || 0;
+        const debit = parseFloat(document.getElementById('led-debit').value) || 0;
+        const credit = parseFloat(document.getElementById('led-credit').value) || 0;
+        const method = document.getElementById('led-method').value;
 
-        if (!name) { showNotification('⚠️ Enter customer name!', 'warning'); return; }
-        if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
-        if (debit === 0 && credit === 0) { showNotification('⚠️ Enter debit or credit!', 'warning'); return; }
+        if (!date || !customer) {
+            Utils.toast('Please enter date and customer name', 'error');
+            return;
+        }
 
-        if (!db.ledgers[name]) db.ledgers[name] = [];
-        if (!db.opening_balances[name]) db.opening_balances[name] = 0;
+        if (debit === 0 && credit === 0 && qty === 0) {
+            Utils.toast('Please enter quantity or amount', 'error');
+            return;
+        }
 
-        const total = qty * price;
-        db.ledgers[name].push({ date, item, qty, price, total, debit, credit, method });
-        saveLocalData();
-        showLedger();
+        const total = qty > 0 ? Utils.calculateTotal(qty, price) : 0;
 
-        document.getElementById('ledger-cust-name').value = '';
+        const entry = {
+            date: date,
+            customer: customer,
+            item: item || '-',
+            qty: qty,
+            price: price,
+            total: total,
+            debit: debit,
+            credit: credit,
+            method: method
+        };
+
+        Ledger.addEntry(entry);
+        renderLedgerTable();
+        populateCustomerList();
+
+        // Clear fields
         document.getElementById('led-date').value = '';
         document.getElementById('led-item').value = '';
-        document.getElementById('led-qty').value = '';
-        document.getElementById('led-price').value = '';
-        document.getElementById('led-debit').value = '';
-        document.getElementById('led-credit').value = '';
-        showNotification('✅ Ledger entry saved!', 'success');
-    } catch (err) { console.error('❌ saveLedgerEntry error:', err); }
-}
+        document.getElementById('led-qty').value = '0';
+        document.getElementById('led-price').value = '0';
+        document.getElementById('led-debit').value = '0';
+        document.getElementById('led-credit').value = '0';
 
-function updateOpeningBal() {
-    try {
-        const name = document.getElementById('ledger-cust-name').value.trim();
-        const val = Number(document.getElementById('opening-bal').value) || 0;
-        if (name) {
-            db.opening_balances[name] = val;
-            saveLocalData();
-            showLedger();
-        }
-    } catch (err) { console.error('❌ updateOpeningBal error:', err); }
-}
+        Utils.toast('Ledger entry saved successfully');
 
-function showLedger() {
-    try {
-        const name = document.getElementById('ledger-cust-name').value.trim();
-        const tbody = document.getElementById('ledger-table-body');
-        if (!tbody) return;
-        tbody.innerHTML = '';
-        let totalQty = 0,
-            totalPrice = 0,
-            totalValue = 0,
-            totalDebit = 0,
-            totalCredit = 0;
-
-        if (name && db.ledgers[name]) {
-            const opening = db.opening_balances[name] || 0;
-            let runningBalance = opening;
-
-            db.ledgers[name].forEach((entry, i) => {
-                totalQty += entry.qty || 0;
-                totalPrice += entry.price || 0;
-                totalValue += entry.total || 0;
-                totalDebit += entry.debit || 0;
-                totalCredit += entry.credit || 0;
-                runningBalance += (entry.debit || 0) - (entry.credit || 0);
-
-                tbody.innerHTML += `<tr>
-                    <td>${i+1}</td>
-                    <td>${entry.date}</td>
-                    <td>${escapeHtml(entry.item || '')}</td>
-                    <td>${entry.qty || 0}</td>
-                    <td>${(entry.price || 0).toLocaleString()}</td>
-                    <td>${(entry.total || 0).toLocaleString()}</td>
-                    <td style="color:#e74c3c;">${(entry.debit || 0).toLocaleString()}</td>
-                    <td style="color:#27ae60;">${(entry.credit || 0).toLocaleString()}</td>
-                    <td>${escapeHtml(entry.method || 'Cash')}</td>
-                    <td>
-                        <button class="btn-action btn-edit" onclick="editLedger('${escapeHtml(name)}',${i})">✏️</button>
-                        <button class="btn-action btn-delete" onclick="delLedger('${escapeHtml(name)}',${i})">🗑️</button>
-                    </td>
-                </tr>`;
-            });
-        }
-
-        document.getElementById('total-ledger-qty').textContent = totalQty;
-        document.getElementById('total-ledger-price').textContent = totalPrice.toLocaleString();
-        document.getElementById('total-ledger-value').textContent = totalValue.toLocaleString();
-        document.getElementById('total-ledger-debit').textContent = totalDebit.toLocaleString();
-        document.getElementById('total-ledger-credit').textContent = totalCredit.toLocaleString();
-        const finalBal = document.getElementById('final-ledger-balance');
-        if (finalBal) {
-            const opening = db.opening_balances[name] || 0;
-            const balance = opening + totalDebit - totalCredit;
-            finalBal.textContent = `Balance: ${balance.toLocaleString()}`;
-            finalBal.style.color = balance >= 0 ? '#e74c3c' : '#27ae60';
-        }
-    } catch (err) { console.error('❌ showLedger error:', err); }
-}
-
-function delLedger(custName, index) {
-    if (!confirm('⚠️ Delete this entry?')) return;
-    if (db.ledgers[custName] && db.ledgers[custName][index]) {
-        db.ledgers[custName].splice(index, 1);
-        if (db.ledgers[custName].length === 0) {
-            delete db.ledgers[custName];
-            delete db.opening_balances[custName];
-        }
-        saveLocalData();
-        showLedger();
-        showNotification('✅ Entry deleted!', 'success');
+    } catch (error) {
+        Utils.handleError(error, 'saveLedgerEntry');
     }
 }
 
-function editLedger(custName, index) {
-    const entry = db.ledgers[custName] && db.ledgers[custName][index];
-    if (!entry) { showNotification('⚠️ Entry not found!', 'error'); return; }
-    const newDebit = prompt('New Debit:', entry.debit);
-    if (newDebit === null) return;
-    const newCredit = prompt('New Credit:', entry.credit);
-    if (newCredit === null) return;
-    db.ledgers[custName][index].debit = Number(newDebit) || 0;
-    db.ledgers[custName][index].credit = Number(newCredit) || 0;
-    saveLocalData();
-    showLedger();
-    showNotification('✅ Updated!', 'success');
-}
-
-// ==========================================
-// USERS
-// ==========================================
-function loadUserTable() {
-    try {
-        const tbody = document.getElementById('user-table-body');
-        if (!tbody) return;
-        tbody.innerHTML = extraUsers.map((u, i) =>
-            `<tr><td>${escapeHtml(u.id)}</td><td>${escapeHtml(u.name)}</td><td><small>${escapeHtml(u.perms ? u.perms.join(', ') : '')}</small></td>
-            <td><button class="btn-action btn-delete" onclick="deleteExtraUser(${i})">🗑️</button></td></tr>`
-        ).join('') || `<tr><td colspan="4" style="text-align:center;padding:20px;color:#888;">No users</td></tr>`;
-    } catch (err) { console.error('❌ loadUserTable error:', err); }
-}
-
-function deleteExtraUser(index) {
-    if (!confirm('⚠️ Delete user?')) return;
-    extraUsers.splice(index, 1);
-    saveLocalData();
-    loadUserTable();
-    showNotification('✅ User deleted!', 'success');
-}
+// ======================================================================
+// SECTION 18: SETTINGS FUNCTIONS
+// ======================================================================
 
 function createNewUser() {
-    try {
-        const name = document.getElementById('new-username').value.trim();
-        const id = document.getElementById('new-userid').value.trim();
-        const pass = document.getElementById('new-password').value.trim();
-        const perms = [];
-        document.querySelectorAll('.perm:checked').forEach(cb => perms.push(cb.value));
-        if (!name) { showNotification('⚠️ Enter name!', 'warning'); return; }
-        if (!id) { showNotification('⚠️ Enter user ID!', 'warning'); return; }
-        if (!pass) { showNotification('⚠️ Enter password!', 'warning'); return; }
-        if (extraUsers.some(u => u.id === id)) { showNotification('⚠️ User ID exists!', 'warning'); return; }
-        extraUsers.push({ id, pass, name, perms });
-        saveLocalData();
-        loadUserTable();
-        document.getElementById('new-username').value = '';
-        document.getElementById('new-userid').value = '';
-        document.getElementById('new-password').value = '';
-        document.querySelectorAll('.perm:checked').forEach(cb => cb.checked = false);
-        showNotification(`✅ User "${name}" created!`, 'success');
-    } catch (err) { console.error('❌ createNewUser error:', err); }
+    const name = document.getElementById('new-username').value.trim();
+    const userId = document.getElementById('new-userid').value.trim();
+    const password = document.getElementById('new-password').value.trim();
+    
+    // Get selected permissions
+    const permissions = [];
+    document.querySelectorAll('.perm:checked').forEach(cb => {
+        permissions.push(cb.value);
+    });
+
+    if (!name || !userId || !password) {
+        Utils.toast('Please fill all user fields', 'error');
+        return;
+    }
+
+    if (password.length < 3) {
+        Utils.toast('Password must be at least 3 characters', 'error');
+        return;
+    }
+
+    Auth.createUser(name, userId, password, permissions);
+    
+    // Clear fields
+    document.getElementById('new-username').value = '';
+    document.getElementById('new-userid').value = '';
+    document.getElementById('new-password').value = '';
+    document.querySelectorAll('.perm:checked').forEach(cb => cb.checked = false);
 }
 
-// ==========================================
-// LOGIN / LOGOUT
-// ==========================================
-function login() {
-    try {
-        const u = document.getElementById('user').value.trim().toLowerCase();
-        const p = document.getElementById('pass').value.trim();
-        if (u === 'admin' && p === '123') {
-            localStorage.setItem('isLoggedIn', 'true');
-            localStorage.setItem('userRole', 'admin');
-            showSystem('admin');
-        } else if (u === 'ali' && p === '123') {
-            localStorage.setItem('isLoggedIn', 'true');
-            localStorage.setItem('userRole', 'staff');
-            showSystem('staff');
-        } else if (u === 'sattar' && p === '123') {
-            localStorage.setItem('isLoggedIn', 'true');
-            localStorage.setItem('userRole', 'manager');
-            showSystem('manager');
-        } else {
-            const found = extraUsers.find(user => user.id === u && user.pass === p);
-            if (found) {
-                localStorage.setItem('isLoggedIn', 'true');
-                localStorage.setItem('userRole', 'extra');
-                showSystem(found);
-            } else {
-                showNotification('❌ Wrong ID or Password!', 'error');
-            }
-        }
-    } catch (err) { console.error('❌ Login error:', err); }
+// ======================================================================
+// SECTION 19: SYNC & REFRESH FUNCTIONS
+// ======================================================================
+
+async function syncAllCloudData() {
+    if (!navigator.onLine) {
+        Utils.toast('You are offline. Sync will resume when online.', 'warning');
+        return;
+    }
+
+    Utils.toast('Syncing with cloud...', 'info');
+    await SyncService.forceSync();
+    await refreshAllData();
 }
 
-function showSystem(roleOrUser) {
+async function refreshAllData() {
     try {
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('sidebar').style.display = 'block';
-        document.getElementById('main-content').style.display = 'block';
-        if (typeof roleOrUser === 'object') {
-            const items = document.querySelectorAll('#sidebar ul li');
-            items.forEach(item => {
-                const onclick = item.getAttribute('onclick') || '';
-                if (onclick.includes('page-dashboard') || onclick.includes('logout')) { item.style.display = 'flex'; return; }
-                let hasPerm = false;
-                if (roleOrUser.perms) hasPerm = roleOrUser.perms.some(p => onclick.includes(p));
-                item.style.display = hasPerm ? 'flex' : 'none';
-            });
-        } else {
-            const items = document.querySelectorAll('#sidebar ul li');
-            items.forEach(item => item.style.display = 'flex');
-            if (roleOrUser === 'staff') {
-                items.forEach(item => {
-                    const t = item.innerText || '';
-                    if (!t.includes('Dashboard') && !t.includes('Report') && !t.includes('Balance') && !t.includes(
-                            'Logout')) {
-                        item.style.display = 'none';
-                    }
-                });
-            } else if (roleOrUser === 'manager') {
-                items.forEach(item => {
-                    const t = item.innerText || '';
-                    if (!t.includes('Dashboard') && !t.includes('Ledgers') && !t.includes('Rent Book') && !t
-                        .includes('Balance') && !t.includes('Logout')) {
-                        item.style.display = 'none';
-                    }
-                });
+        const records = await Database.getAllRecords();
+        
+        if (records && records.length > 0) {
+            // Separate IN and OUT
+            const inRecords = records.filter(r => r.type === 'in');
+            const outRecords = records.filter(r => r.type === 'out');
+            
+            // Update local state if cloud has newer data
+            if (inRecords.length > AppState.stockIn.length) {
+                AppState.stockIn = inRecords;
+                Cache.set('stockIn', inRecords);
             }
+            
+            if (outRecords.length > AppState.stockOut.length) {
+                AppState.stockOut = outRecords;
+                Cache.set('stockOut', outRecords);
+            }
+            
+            // Recalculate balance
+            AppState.balance = {};
+            AppState.stockIn.forEach(e => updateStockBalance(e));
+            AppState.stockOut.forEach(e => updateStockBalance(e));
         }
-        renderAll();
+
+        // Update UI
+        renderTodayIn();
+        renderTodayOut();
+        renderBalanceTable();
         updateDashboardStats();
-        loadUserTable();
-    } catch (err) { console.error('❌ showSystem error:', err); }
+        populateItemList();
+        
+        Utils.log('Data refreshed from cloud');
+        Utils.toast('Data refreshed successfully');
+
+    } catch (error) {
+        Utils.handleError(error, 'refreshAllData');
+    }
+}
+
+// ======================================================================
+// SECTION 20: LOGIN/LOGOUT FUNCTIONS
+// ======================================================================
+
+function login() {
+    const username = document.getElementById('user').value.trim();
+    const password = document.getElementById('pass').value.trim();
+
+    if (!username || !password) {
+        Utils.toast('Please enter username and password', 'error');
+        return;
+    }
+
+    if (Auth.login(username, password)) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('sidebar').style.display = 'block';
+        
+        // Show toggle button on mobile
+        if (window.innerWidth <= 768) {
+            const toggleBtn = document.createElement('button');
+            toggleBtn.id = 'toggle-btn';
+            toggleBtn.innerHTML = '<i class="fas fa-bars"></i>';
+            toggleBtn.onclick = toggleSidebar;
+            document.body.appendChild(toggleBtn);
+        }
+
+        // Load data
+        loadLocalData();
+        refreshAllData();
+        
+        // Start auto sync
+        startAutoSync();
+        
+        // Update user name
+        document.getElementById('userName').textContent = AppState.currentUser.name;
+        
+        // Show default page
+        switchPage('page-dashboard', 'DASHBOARD');
+    }
 }
 
 function logout() {
-    if (!confirm('🚪 Logout?')) return;
-    localStorage.removeItem('isLoggedIn');
-    localStorage.removeItem('userRole');
-    location.reload();
+    Auth.logout();
+    clearInterval(window.syncInterval);
 }
 
-// ==========================================
-// SIDEBAR
-// ==========================================
+// ======================================================================
+// SECTION 21: SIDEBAR TOGGLE
+// ======================================================================
+
 function toggleSidebar() {
-    const sb = document.getElementById('sidebar');
-    const mc = document.getElementById('main-content');
-    if (!sb || !mc) return;
-    if (sb.style.left === '0px') { sb.style.left = '-240px';
-        mc.style.marginLeft = '0'; } else { sb.style.left = '0px';
-        mc.style.marginLeft = '240px'; }
+    const sidebar = document.getElementById('sidebar');
+    const currentLeft = sidebar.style.left;
+    sidebar.style.left = currentLeft === '0px' ? '-240px' : '0px';
 }
 
-function switchPage(pageId, title) {
-    document.querySelectorAll('.erp-page').forEach(p => p.style.display = 'none');
-    const page = document.getElementById(pageId);
-    if (page) page.style.display = 'block';
-    const titleEl = document.getElementById('page-title');
-    if (titleEl) titleEl.textContent = `🐘 KRT TRADERS ERP - ${title}`;
-}
+// ======================================================================
+// SECTION 22: PRINT & EXPORT FUNCTIONS
+// ======================================================================
 
-// ==========================================
-// SEARCH / REPORT - FIXED with ID
-// ==========================================
-function generateMasterSearch() {
-    try {
-        const from = document.getElementById('master-from').value;
-        const to = document.getElementById('master-to').value;
-        if (!from || !to) { showNotification('⚠️ Select dates!', 'warning'); return; }
-        const fIn = db.in.filter(x => x.date >= from && x.date <= to);
-        const fOut = db.out.filter(x => x.date >= from && x.date <= to);
-        const inTable = document.getElementById('master-in-table');
-        if (inTable) {
-            inTable.innerHTML = fIn.map(x => `<tr><td>${x.date}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.vendor)}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
-                <td><button class="btn-action btn-edit" onclick="editEntry('in','${x.id}')">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('in','${x.id}')">🗑️</button></td></tr>`).join('') ||
-                `<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
-        }
-        const outTable = document.getElementById('master-out-table');
-        if (outTable) {
-            outTable.innerHTML = fOut.map(x => `<tr><td>${x.date}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.cust)}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total}</td>
-                <td><button class="btn-action btn-edit" onclick="editEntry('out','${x.id}')">✏️</button><button class="btn-action btn-delete" onclick="deleteEntry('out','${x.id}')">🗑️</button></td></tr>`).join('') ||
-                `<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
-        }
-        showNotification(`✅ Found ${fIn.length + fOut.length} records`, 'success');
-    } catch (err) { console.error('❌ generateMasterSearch error:', err); }
+function printSection() {
+    window.print();
 }
 
 function generateCustomReport() {
-    try {
-        const from = document.getElementById('rep-from-date').value;
-        const to = document.getElementById('rep-to-date').value;
-        if (!from || !to) { showNotification('⚠️ Select dates!', 'warning'); return; }
-        const fIn = db.in.filter(x => x.date >= from && x.date <= to);
-        const fOut = db.out.filter(x => x.date >= from && x.date <= to);
-        const totalInValue = fIn.reduce((s, x) => s + x.total, 0);
-        const totalOutValue = fOut.reduce((s, x) => s + x.total, 0);
-        const inTable = document.querySelector('#rep-in-table');
-        if (inTable) {
-            inTable.innerHTML = fIn.map(x => `<tr><td>${x.date}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.vendor)}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total.toLocaleString()}</td></tr>`)
-                .join('') ||
-                `<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
+    Reports.generateReport();
+}
+
+function generateMasterSearch() {
+    Search.masterSearch();
+}
+
+// ======================================================================
+// SECTION 23: AUTO SYNC
+// ======================================================================
+
+function startAutoSync() {
+    if (window.syncInterval) clearInterval(window.syncInterval);
+    
+    window.syncInterval = setInterval(() => {
+        if (navigator.onLine && !SyncService.isSyncing) {
+            SyncService.processQueue();
         }
-        const outTable = document.querySelector('#rep-out-table');
-        if (outTable) {
-            outTable.innerHTML = fOut.map(x => `<tr><td>${x.date}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(x.cust)}</td><td>${x.qty}</td><td>${x.price}</td><td>${x.total.toLocaleString()}</td></tr>`)
-                .join('') ||
-                `<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">No records</td></tr>`;
-        }
-        const existing = document.querySelector('.report-summary');
-        if (existing) existing.remove();
-        const summary = document.createElement('div');
-        summary.className = 'report-summary';
-        summary.style.cssText =
-            'display:flex;justify-content:space-around;background:#2c3e50;color:white;padding:15px;border-radius:8px;margin-top:20px;flex-wrap:wrap;';
-        summary.innerHTML = `
-            <span>📥 Total IN: PKR ${totalInValue.toLocaleString()}</span>
-            <span>📤 Total OUT: PKR ${totalOutValue.toLocaleString()}</span>
-            <span style="color:${totalOutValue - totalInValue >= 0 ? '#2ecc71' : '#e74c3c'};font-weight:bold;">
-                💰 Profit: PKR ${(totalOutValue - totalInValue).toLocaleString()}
-            </span>
-        `;
-        const printArea = document.getElementById('print-area');
-        if (printArea) printArea.appendChild(summary);
-        document.getElementById('report-period').textContent = `📅 Period: ${from} to ${to}`;
-        showNotification('✅ Report generated!', 'success');
-    } catch (err) { console.error('❌ generateCustomReport error:', err); }
+    }, CONFIG.SYNC_INTERVAL);
 }
 
-// ==========================================
-// EXPORT DATA - NEW FUNCTION
-// ==========================================
-function exportAllData() {
-    try {
-        // Export Stock IN
-        let csvIn = 'Date,Item,Vendor,Qty,Price,Total\n';
-        db.in.forEach(x => {
-            csvIn += `${x.date},${x.item},${x.vendor},${x.qty},${x.price},${x.total}\n`;
-        });
-        downloadCSV(csvIn, 'stock_in_data.csv');
+// ======================================================================
+// SECTION 24: LOAD LOCAL DATA
+// ======================================================================
 
-        // Export Stock OUT
-        let csvOut = 'Date,Item,Customer,Qty,Price,Total\n';
-        db.out.forEach(x => {
-            csvOut += `${x.date},${x.item},${x.cust},${x.qty},${x.price},${x.total}\n`;
-        });
-        downloadCSV(csvOut, 'stock_out_data.csv');
-
-        // Export Rent Book
-        let csvRent = 'Name,Shop,Date,Month,Debit,Credit,Method\n';
-        dbRent.forEach(x => {
-            csvRent += `${x.name},${x.shop},${x.date},${x.month},${x.debit},${x.credit},${x.method}\n`;
-        });
-        downloadCSV(csvRent, 'rent_book_data.csv');
-
-        showNotification('✅ All data exported!', 'success');
-    } catch (err) { console.error('❌ Export error:', err);
-        showNotification('❌ Export failed!', 'error'); }
-}
-
-function downloadCSV(csv, filename) {
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-// ==========================================
-// NOTIFICATIONS
-// ==========================================
-function showNotification(message, type = 'info') {
-    try {
-        const colors = { success: '#27ae60', error: '#e74c3c', warning: '#f39c12', info: '#3498db' };
-        const existing = document.querySelectorAll('.toast-notification');
-        existing.forEach(el => { if (el.textContent === message) el.remove(); });
-        const div = document.createElement('div');
-        div.className = `toast-notification ${type}`;
-        div.textContent = message;
-        div.style.cssText = `
-            position:fixed;bottom:20px;right:20px;padding:12px 24px;
-            background:white;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.2);
-            border-left:4px solid ${colors[type] || '#3498db'};
-            z-index:999999;font-family:'Poppins',sans-serif;
-            max-width:400px;transform:translateY(100px);opacity:0;
-            transition:all 0.4s ease;font-size:14px;
-        `;
-        document.body.appendChild(div);
-        setTimeout(() => { div.style.transform = 'translateY(0)';
-            div.style.opacity = '1'; }, 50);
-        setTimeout(() => { div.style.transform = 'translateY(100px)';
-            div.style.opacity = '0';
-            setTimeout(() => { if (div.parentNode) div.remove(); }, 400); }, 4000);
-    } catch (err) { console.error('❌ showNotification error:', err); }
-}
-
-function printSection() { window.print(); }
-
-// ==========================================
-// STARTUP
-// ==========================================
-document.addEventListener('DOMContentLoaded', function() {
-    try {
-        loadLocalData();
-        renderAll();
-        renderRentTable();
-        loadUserTable();
-        updateCustomerDropdown();
-        updateItemLists();
-        setTimeout(() => {
-            testSupabaseConnection();
-            if (navigator.onLine && isSupabaseConnected) syncAllCloudData();
-        }, 2000);
-        const loggedIn = localStorage.getItem('isLoggedIn');
-        const role = localStorage.getItem('userRole');
-        if (loggedIn === 'true') {
-            if (role === 'admin') showSystem('admin');
-            else if (role === 'staff') showSystem('staff');
-            else if (role === 'manager') showSystem('manager');
-        }
-        console.log('🚀 KRT TRADERS ERP v5.0 Loaded!');
-        console.log('📦 Developed by Bilal Suleman');
-    } catch (err) { console.error('❌ Startup error:', err);
-        showNotification('⚠️ Error loading app: ' + err.message, 'error'); }
-});
-
-// ==========================================
-// KEYBOARD SHORTCUTS
-// ==========================================
-document.addEventListener('keydown', function(e) {
-    if (e.ctrlKey && e.key === 's') { e.preventDefault();
-        syncAllCloudData(); }
-    if (e.key === 'Escape') { const sb = document.getElementById('sidebar'); if (sb && sb.style.left === '0px') toggleSidebar(); }
-    if (e.key === 'Enter') { const pass = document.getElementById('pass'); if (pass && document.activeElement === pass)
-            login(); }
-});
-
-// ==========================================
-// CLOCK
-// ==========================================
-function updateClock() {
-    const el = document.getElementById('live-clock');
-    if (el) {
-        const now = new Date();
-        el.textContent = now.toLocaleString('en-PK', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
-            hour: '2-digit', minute: '2-digit' });
+function loadLocalData() {
+    // Load from cache
+    const cachedIn = Cache.get('stockIn');
+    const cachedOut = Cache.get('stockOut');
+    
+    if (cachedIn) {
+        AppState.stockIn = cachedIn;
+        cachedIn.forEach(e => updateStockBalance(e));
     }
-}
-setInterval(updateClock, 10000);
-updateClock();
+    
+    if (cachedOut) {
+        AppState.stockOut = cachedOut;
+        cachedOut.forEach(e => updateStockBalance(e));
+    }
 
-// ==========================================
-// WELCOME
-// ==========================================
-(function() {
-    const overlay = document.getElementById('welcome-overlay');
+    // Load ledger entries
+    Ledger.loadEntries();
+    
+    // Load rent entries
+    RentBook.loadEntries();
+
+    // Load sync queue
+    const queue = localStorage.getItem('sync_queue');
+    if (queue) {
+        try {
+            SyncService.queue = JSON.parse(queue);
+        } catch (e) {
+            SyncService.queue = [];
+        }
+    }
+
+    // Update UI
+    renderTodayIn();
+    renderTodayOut();
+    renderBalanceTable();
+    updateDashboardStats();
+    populateItemList();
+    populateCustomerList();
+    renderLedgerTable();
+    renderRentTable();
+    
+    Utils.log('Local data loaded');
+}
+
+// ======================================================================
+// SECTION 25: KEYBOARD SHORTCUTS
+// ======================================================================
+
+document.addEventListener('keydown', (e) => {
+    // Ctrl+K for global search
+    if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
+        document.getElementById('globalSearch')?.focus();
+    }
+    
+    // Escape to close dialogs
+    if (e.key === 'Escape') {
+        const dialog = document.getElementById('confirm-dialog');
+        if (dialog && dialog.style.display === 'flex') {
+            document.getElementById('confirmCancel')?.click();
+        }
+    }
+
+    // F1 for help
+    if (e.key === 'F1') {
+        e.preventDefault();
+        Utils.toast('KRT ERP v5.0 - Press Ctrl+K for search', 'info');
+    }
+
+    // Ctrl+S to save (when in forms)
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        const activePage = document.querySelector('.erp-page[style*="display: block"]');
+        if (activePage) {
+            const saveBtn = activePage.querySelector('.btn-primary, .btn-danger, .btn-info');
+            if (saveBtn) saveBtn.click();
+        }
+    }
+});
+
+// ======================================================================
+// SECTION 26: NETWORK STATUS HANDLING
+// ======================================================================
+
+window.addEventListener('online', () => {
+    AppState.isOnline = true;
+    Utils.toast('Back online! Syncing data...', 'success');
+    SyncService.processQueue();
+    refreshAllData();
+});
+
+window.addEventListener('offline', () => {
+    AppState.isOnline = false;
+    Utils.toast('You are offline. Changes will sync when online.', 'warning');
+});
+
+// ======================================================================
+// SECTION 27: WELCOME & LOADING ANIMATION
+// ======================================================================
+
+let loadingProgress = 0;
+function startLoadingAnimation() {
     const bar = document.getElementById('loading-bar');
-    if (bar) {
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += Math.random() * 3 + 0.5;
-            if (progress >= 100) { progress = 100;
-                clearInterval(interval);
-                setTimeout(() => { overlay.style.display = 'none';
-                    document.getElementById('login-screen').style.display = 'flex'; }, 500); }
-            bar.style.width = progress + '%';
-        }, 70);
-    } else {
-        setTimeout(() => { overlay.style.display = 'none';
-            document.getElementById('login-screen').style.display = 'flex'; }, 1000);
-    }
-})();
+    const text = document.getElementById('welcome-text');
+    
+    const messages = [
+        '🐘 KRT TRADERS ERP',
+        '📦 Loading Stock Data...',
+        '🔄 Syncing with Cloud...',
+        '🔐 Securing System...',
+        '✨ Ready!'
+    ];
+    
+    const interval = setInterval(() => {
+        loadingProgress += Math.random() * 15 + 5;
+        if (loadingProgress > 100) loadingProgress = 100;
+        
+        bar.style.width = loadingProgress + '%';
+        
+        const index = Math.min(Math.floor(loadingProgress / 25), messages.length - 1);
+        text.textContent = messages[index];
+        
+        if (loadingProgress >= 100) {
+            clearInterval(interval);
+            setTimeout(() => {
+                document.getElementById('welcome-overlay').style.display = 'none';
+                document.getElementById('login-screen').style.display = 'flex';
+                startClock();
+            }, 300);
+        }
+    }, 200);
+}
 
-console.log('🐘 KRT TRADERS ERP v5.0 - Ready!');
+// ======================================================================
+// SECTION 28: LIVE CLOCK
+// ======================================================================
+
+function startClock() {
+    const clock = document.getElementById('live-clock');
+    if (!clock) return;
+    
+    setInterval(() => {
+        const now = new Date();
+        clock.textContent = now.toLocaleString('en-PK', {
+            weekday: 'short',
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+    }, 1000);
+}
+
+// ======================================================================
+// SECTION 29: DARK MODE TOGGLE
+// ======================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    if (darkModeToggle) {
+        darkModeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            const icon = darkModeToggle.querySelector('i');
+            if (document.body.classList.contains('dark-mode')) {
+                icon.className = 'fas fa-sun';
+                localStorage.setItem('dark_mode', 'enabled');
+            } else {
+                icon.className = 'fas fa-moon';
+                localStorage.setItem('dark_mode', 'disabled');
+            }
+        });
+
+        // Load dark mode preference
+        if (localStorage.getItem('dark_mode') === 'enabled') {
+            document.body.classList.add('dark-mode');
+            darkModeToggle.querySelector('i').className = 'fas fa-sun';
+        }
+    }
+});
+
+// ======================================================================
+// SECTION 30: GLOBAL SEARCH
+// ======================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('globalSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', Utils.debounce((e) => {
+            const query = e.target.value.trim();
+            if (query.length >= 2) {
+                Search.globalSearch(query);
+            }
+        }, 300));
+    }
+});
+
+// ======================================================================
+// SECTION 31: ADD IN/OUT FUNCTIONS (Global)
+// ======================================================================
+
+function addIn() {
+    Stock.addIn();
+}
+
+function addOut() {
+    Stock.addOut();
+}
+
+function showLiveStock(itemName) {
+    Stock.showLiveStock(itemName);
+}
+
+// ======================================================================
+// SECTION 32: INITIALIZATION
+// ======================================================================
+
+// Initialize Supabase
+Database.init();
+
+// Start loading animation
+startLoadingAnimation();
+
+// Check for saved login
+if (Auth.isLoggedIn()) {
+    setTimeout(() => {
+        document.getElementById('welcome-overlay').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('sidebar').style.display = 'block';
+        
+        loadLocalData();
+        refreshAllData();
+        startAutoSync();
+        startClock();
+        
+        document.getElementById('userName').textContent = AppState.currentUser.name;
+        switchPage('page-dashboard', 'DASHBOARD');
+    }, 1000);
+}
+
+// Handle resize for sidebar toggle
+window.addEventListener('resize', () => {
+    const toggleBtn = document.getElementById('toggle-btn');
+    if (window.innerWidth > 768 && toggleBtn) {
+        toggleBtn.remove();
+        document.getElementById('sidebar').style.left = '0px';
+    } else if (window.innerWidth <= 768 && !toggleBtn && document.getElementById('sidebar').style.display !== 'none') {
+        const newToggle = document.createElement('button');
+        newToggle.id = 'toggle-btn';
+        newToggle.innerHTML = '<i class="fas fa-bars"></i>';
+        newToggle.onclick = toggleSidebar;
+        document.body.appendChild(newToggle);
+        document.getElementById('sidebar').style.left = '-240px';
+    }
+});
+
+// Console welcome message
+console.log(`
+%c🐘 KRT TRADERS ERP v5.0
+%cEnterprise Resource Planning System
+%cDeveloped by Bilal Suleman
+%c© 2026 KRT Traders - All Rights Reserved
+`, 'font-size: 24px; font-weight: bold; color: #f1c40f;',
+'font-size: 14px; color: #3498db;',
+'font-size: 12px; color: #2ecc71;',
+'font-size: 10px; color: #888;');
+
+// ======================================================================
+// END OF SCRIPT
+// ======================================================================
