@@ -98,8 +98,9 @@ async function fetchCloudData() {
             const inQty = Number(row.stock_in || 0);
             const outQty = Number(row.stock_out || 0);
             const price = Number(row.price || 0);
-            const date = (row.Date || row.date || '').split('T')[0] || new Date().toISOString().split('T')[0];
-            if (inQty > 0) {
+            const todayStr = new Date().toISOString().split('T')[0];
+const inDateEl = document.getElementById('in-date');
+if (inDateEl && !inDateEl.value) inDateEl.value = todayStr;            if (inQty > 0) {
                 db.in.push({ id: row.id, date, vendor: row.vendor_name || 'factory', item: row.item_name || 'Unknown', qty: inQty,
                     price, total: inQty * price });
             }
