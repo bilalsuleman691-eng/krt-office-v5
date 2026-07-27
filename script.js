@@ -333,7 +333,10 @@ async function editEntry(type, id) {
 // ==========================================
 function renderAll() {
     try {
-        const today = new Date().toISOString().split('T')[0];
+        // Local Date nikalne ka sahi tareeqa jo Pakistan timezone ( ya local system timezone) ko match kare
+const now = new Date();
+const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        
         const inBody = document.getElementById('today-list-in');
         if (inBody) {
             let html = '',
