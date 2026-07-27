@@ -80,10 +80,9 @@ function saveLocalData() {
 
 function saveAndRefresh() {
     saveLocalData();
-    renderAll();
-    updateDashboardStats();
+    if (typeof renderAll === 'function') renderAll();
+    if (typeof updateDashboardStats === 'function') updateDashboardStats();
 }
-
 // ==========================================
 // FETCH CLOUD DATA
 // ==========================================
