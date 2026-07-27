@@ -86,7 +86,7 @@ function saveAndRefresh() {
 
 // ==========================================
 // FETCH CLOUD DATA
-// ==========================================async function fetchCloudData() {
+async function fetchCloudData() {
     try {
         if (!_supabase || !isSupabaseConnected) return;
 
