@@ -220,52 +220,70 @@ function addPendingSync(op) {
     if (navigator.onLine && isSupabaseConnected) setTimeout(processPendingSync, 2000);
 }
 
-// ==========================================
-// STOCK IN
-// ==========================================
 async function addIn() {
     try {
-        const date = document.getElementById('in-date').value;
-        const vendor = document.getElementById('in-vendor').value || 'factory';
-        const item = document.getElementById('in-item').value.trim();
-        const barcode = document.getElementById('in-barcode').value || '';
-        const qty = Number(document.getElementById('in-qty').value);
-        const price = Number(document.getElementById('in-price').value) || 0;
-        if (!date) { showNotification('⚠️ Select date!', 'warning'); return; }
-        if (!item) { showNotification('⚠️ Enter item!', 'warning'); return; }
-        if (qty <= 0 || isNaN(qty)) { showNotification('⚠️ Valid qty!', 'warning'); return; }
-        if (price <= 0 || isNaN(price)) { showNotification('⚠️ Enter valid price!', 'warning'); return; }
-        const entryData = { date: date, item_name: item, stock_in: qty, stock_out: 0, price, vendor_name: vendor };
-        if (_supabase && isSupabaseConnected && navigator.onLine) {
-            try {
-                const { data, error } = await _supabase.from('KRT').insert([entryData]).select();
-                if (!error && data && data.length > 0) {
-                    db.in.push({ id: data[0].id, date, vendor, item, barcode, qty, price, total: qty * price });
-                    saveAndRefresh();
-                    clearInForm();
-                    showNotification('✅ Stock IN saved to cloud!', 'success');
-                    await fetchCloudData();
-                    return;
-                }
-            } catch (err) { console.error('❌ Cloud error:', err); }
+        const date = document.getElementById('inDate').value || new Date().toISOString().split('T')[0];
+        const vendor_name = document.getElementById('inVendor').value.trim();
+        const item_name = document.getElementById('inItem').value.trim();
+        const barcode = document.getElementById('inBarcode').value.trim();
+        const stock_in = Number(document.getElementById('inQty').value);
+        const price = Number(document.getElementById('inPrice').value);
+
+        if (!item_name || !stock_in || !price) {
+            alert('Please fill all required fields!');
+            return;
         }
-        const tempId = 'local_' + Date.now();
-        db.in.push({ id: tempId, date, vendor, item, barcode, qty, price, total: qty * price });
-        saveAndRefresh();
-        addPendingSync({ type: 'insert', table: 'krt', data: entryData });
-        clearInForm();
-        showNotification('✅ Stock IN saved locally!', 'warning');
-    } catch (err) { console.error('❌ addIn error:', err);
-        showNotification('❌ Error: ' + err.message, 'error'); }
-}
 
-function clearInForm() {
-    ['in-date', 'in-vendor', 'in-item', 'in-barcode', 'in-qty', 'in-price'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-    });
-}
+        const payload = {
+            date: date,
+            vendor_name: vendor_name || 'factory',
+            item_name: item_name,
+            barcode: barcode,
+            stock_in: stock_in,
+            stock_out: 0,
+            price: price
+        };
 
+        if (_supabase && isSupabaseConnected) {
+            const { error } = await _supabase.from('KRT').insert([payload]);
+            if (error) {
+                console.error('Supabase Insert Error:', error);
+                alert('Cloud Save Error: ' + error.message);
+                return;
+            }
+        }
+
+        // Local array mein push karein taake foran screen par aye
+        db.in.push({
+            id: Date.now(),
+            date: date,
+            vendor: payload.vendor_name,
+            item: item_name,
+            barcode: barcode,
+            qty: stock_in,
+            price: price,
+            total: stock_in * price
+        });
+
+        saveLocalData();
+        renderAll();
+        updateDashboardStats();
+        
+        // Input fields clear kar dein
+        document.getElementById('inItem').value = '';
+        document.getElementById('inQty').value = '';
+        document.getElementById('inPrice').value = '';
+        document.getElementById('inBarcode').value = '';
+
+        showToast('Stock IN saved to cloud!');
+        
+        // Background sync taake table fresh data utha le
+        setTimeout(fetchCloudData, 500);
+
+    } catch (err) {
+        console.error('Add In Error:', err);
+    }
+}
 // ==========================================
 // STOCK OUT
 // ==========================================
