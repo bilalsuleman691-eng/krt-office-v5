@@ -90,10 +90,11 @@ async function fetchCloudData() {
     try {
         if (!_supabase || !isSupabaseConnected) return;
 
-        const { data, error } = await _supabase
-            .from('KRT')
-            .select('*')
-            .order('id', { ascending: true });
+       const { data, error } = await _supabase
+    .from('KRT')
+    .select('*')
+    .order('id', { ascending: true })
+    .range(0, 5000);
 
         if (error) {
             console.error("❌ Supabase Error:", error);
