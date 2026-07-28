@@ -89,35 +89,100 @@ function saveAndRefresh() {
 // ==========================================
 async function fetchCloudData() {
     try {
-        if (!_supabase || !isSupabaseConnected) return;
-        const { data, error } = await _supabase
-    .from('KRT')
-    .select('*')
-    .order('id', { ascending: true })
-    .range(0, 10000);
-        if (error || !data) return;
+        if (!_supabase || !isSupabaseConnected) {
+            console.log('⚠️ Supabase not connected');
+            return;
+        }
+
+        showNotification('📥 Loading data from cloud...', 'info');
+        
+        let allData = [];
+        let page = 0;
+        const pageSize = 1000;  // Supabase max limit
+        let hasMore = true;
+
+        // Har page mein 1000 records fetch karein
+        while (hasMore) {
+            const from = page * pageSize;
+            const to = (page + 1) * pageSize - 1;
+            
+            console.log(`📥 Fetching page ${page + 1} (${from} to ${to})`);
+            
+            const { data, error } = await _supabase
+                .from('KRT')
+                .select('*')
+                .order('id', { ascending: true })
+                .range(from, to);
+
+            if (error) {
+                console.error('❌ Supabase error:', error);
+                hasMore = false;
+                break;
+            }
+
+            if (!data || data.length === 0) {
+                hasMore = false;
+                break;
+            }
+
+            allData = [...allData, ...data];
+            console.log(`✅ Fetched ${data.length} records (Total: ${allData.length})`);
+            
+            // Agar data ki quantity pageSize se kam hai, toh last page hai
+            if (data.length < pageSize) {
+                hasMore = false;
+            }
+            page++;
+        }
+
+        console.log(`📊 Total records fetched: ${allData.length}`);
+        showNotification(`✅ ${allData.length} records loaded!`, 'success');
+        
+        // Clear existing data
         db.in = [];
         db.out = [];
-        data.forEach(row => {
+        
+        // Process all fetched data
+        allData.forEach(row => {
             const inQty = Number(row.stock_in || 0);
             const outQty = Number(row.stock_out || 0);
             const price = Number(row.price || 0);
             const date = (row.Date || row.date || '').split('T')[0] || new Date().toISOString().split('T')[0];
+            
             if (inQty > 0) {
-                db.in.push({ id: row.id, date, vendor: row.vendor_name || 'factory', item: row.item_name || 'Unknown', qty: inQty,
-                    price, total: inQty * price });
+                db.in.push({ 
+                    id: row.id, 
+                    date, 
+                    vendor: row.vendor_name || 'factory', 
+                    item: row.item_name || 'Unknown', 
+                    qty: inQty,
+                    price, 
+                    total: inQty * price 
+                });
             }
+            
             if (outQty > 0) {
-                db.out.push({ id: row.id, date, cust: row.customer_name || 'General Sale', item: row.item_name || 'Unknown',
-                    qty: outQty, price, total: outQty * price });
+                db.out.push({ 
+                    id: row.id, 
+                    date, 
+                    cust: row.customer_name || 'General Sale', 
+                    item: row.item_name || 'Unknown',
+                    qty: outQty, 
+                    price, 
+                    total: outQty * price 
+                });
             }
         });
+
         saveLocalData();
         renderAll();
         updateDashboardStats();
-    } catch (err) { console.error('❌ Fetch error:', err); }
+        
+    } catch (err) { 
+        console.error('❌ Fetch error:', err);
+        showNotification('❌ Error loading data: ' + err.message, 'error');
+    }
 }
-
 async function fetchCloudRentData() {
     try {
         if (!_supabase || !isSupabaseConnected) return;
