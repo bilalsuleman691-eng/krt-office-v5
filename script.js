@@ -668,11 +668,60 @@ function saveLedgerEntry() {
         if (!db.ledgers[name]) db.ledgers[name] = [];
         if (!db.opening_balances[name]) db.opening_balances[name] = 0;
 
-        const total = qty * price;
-        db.ledgers[name].push({ date, item, qty, price, total, debit, credit, method });
-        saveLocalData();
-        showLedger();
+        const entryData = {
+    customer_name: name,
+    date: date,
+    item: item,
+    qty: qty,
+    price: price,
+    total: total,
+    debit: debit,
+    credit: credit,
+    method: method
+};
 
+if (_supabase && isSupabaseConnected && navigator.onLine) {
+
+    const { data, error } = await _supabase
+        .from('krt_ledger')
+        .insert([entryData])
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Ledger Supabase Error:', error);
+        showNotification('❌ Ledger cloud save failed!', 'error');
+        return;
+    }
+
+    db.ledgers[name].push({
+        id: data.id,
+        date,
+        item,
+        qty,
+        price,
+        total,
+        debit,
+        credit,
+        method
+    });
+
+} else {
+
+    db.ledgers[name].push({
+        id: 'local_' + Date.now(),
+        date,
+        item,
+        qty,
+        price,
+        total,
+        debit,
+        credit,
+        method
+    });
+}
+
+saveLocalData();
         document.getElementById('ledger-cust-name').value = '';
         document.getElementById('led-date').value = '';
         document.getElementById('led-item').value = '';
